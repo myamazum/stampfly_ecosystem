@@ -36,6 +36,7 @@ static const char* NVS_KEY_LOGLEVEL = "loglevel";
 static const char* NVS_KEY_TRIM_ROLL = "trim_roll";
 static const char* NVS_KEY_TRIM_PITCH = "trim_pitch";
 static const char* NVS_KEY_TRIM_YAW = "trim_yaw";
+static const char* NVS_KEY_COMM_MODE = "comm_mode";
 // Note: NVS_KEY_TELEMETRY_RATE removed - telemetry is now fixed at 400Hz
 
 // =============================================================================
@@ -154,6 +155,47 @@ static esp_err_t saveLogLevelToNVS(esp_log_level_t level)
     return ret;
 }
 
+// Helper: Load comm mode from NVS
+// 通信モードをNVSから読み込み
+static uint8_t loadCommModeFromNVS()
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE_CLI, NVS_READONLY, &handle);
+    if (ret != ESP_OK) {
+        return 0;  // Default: ESP-NOW
+    }
+
+    uint8_t mode = 0;
+    ret = nvs_get_u8(handle, NVS_KEY_COMM_MODE, &mode);
+    nvs_close(handle);
+
+    if (ret != ESP_OK) {
+        return 0;  // Default: ESP-NOW
+    }
+
+    return mode;
+}
+
+// Helper: Save comm mode to NVS
+// 通信モードをNVSに保存
+static esp_err_t saveCommModeToNVS(uint8_t mode)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE_CLI, NVS_READWRITE, &handle);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to open NVS for comm_mode: %d", ret);
+        return ret;
+    }
+
+    ret = nvs_set_u8(handle, NVS_KEY_COMM_MODE, mode);
+    if (ret == ESP_OK) {
+        ret = nvs_commit(handle);
+    }
+
+    nvs_close(handle);
+    return ret;
+}
+
 // External reference to magnetometer calibrator (defined in main.cpp)
 extern stampfly::MagCalibrator* g_mag_calibrator;
 
@@ -189,6 +231,11 @@ extern RateController* g_rate_controller_ptr;
 
 // UDP Server
 #include "udp_server.hpp"
+
+// Shared control handler (defined in main.cpp)
+// 共有制御ハンドラ（main.cppで定義）
+extern void handleControlInput(uint16_t throttle, uint16_t roll, uint16_t pitch,
+                               uint16_t yaw, uint8_t flags);
 
 namespace stampfly {
 
@@ -1765,6 +1812,11 @@ static void cmd_comm(int argc, char** argv, void* context)
             udp_server.stop();
             cli->print("UDP server stopped\r\n");
         }
+
+        // Save to NVS
+        // NVSに保存
+        saveCommModeToNVS(0);  // 0 = ESP-NOW
+        cli->print("Mode saved to NVS\r\n");
     } else if (strcmp(cmd, "udp") == 0) {
         // Start UDP server if not running
         // UDPサーバーが動作していなければ開始
@@ -1785,10 +1837,28 @@ static void cmd_comm(int argc, char** argv, void* context)
             cli->print("UDP server started on port %d\r\n", 8888);
         }
 
+        // Always set callback (even if server was already running)
+        // 常にコールバックを設定（サーバーが既に動作中でも）
+        udp_server.setControlCallback([](const udp::ControlPacket& pkt, const SockAddrIn*) {
+            // Update Control Arbiter for statistics
+            // 統計用にControl Arbiterを更新
+            auto& arb = ControlArbiter::getInstance();
+            arb.updateFromUDP(pkt.throttle, pkt.roll, pkt.pitch, pkt.yaw, pkt.flags);
+
+            // Call shared control handler (updates state, handles arm/disarm)
+            // 共有制御ハンドラを呼び出し（状態更新、arm/disarm処理）
+            handleControlInput(pkt.throttle, pkt.roll, pkt.pitch, pkt.yaw, pkt.flags);
+        });
+
         arbiter.setCommMode(CommMode::UDP);
         cli->print("Communication mode set to UDP\r\n");
         cli->print("WiFi AP SSID: StampFly\r\n");
         cli->print("Vehicle IP: 192.168.4.1\r\n");
+
+        // Save to NVS
+        // NVSに保存
+        saveCommModeToNVS(1);  // 1 = UDP
+        cli->print("Mode saved to NVS\r\n");
     } else if (strcmp(cmd, "status") == 0) {
         // Re-call with argc=1 to show status
         cmd_comm(1, argv, context);

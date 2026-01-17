@@ -36,6 +36,12 @@
 #include "cli.hpp"
 #include "logger.hpp"
 #include "telemetry.hpp"
+#include "control_arbiter.hpp"
+#include "udp_server.hpp"
+
+// NVS
+#include "nvs_flash.h"
+#include "nvs.h"
 
 // State
 #include "stampfly_state.hpp"
@@ -562,6 +568,49 @@ esp_err_t communication()
         g_comm_ptr = &g_comm;
 
         ESP_LOGI(TAG, "ControllerComm initialized");
+    }
+
+    // Restore comm mode from NVS
+    // NVSから通信モードを復元
+    {
+        nvs_handle_t handle;
+        esp_err_t ret = nvs_open("stampfly_cli", NVS_READONLY, &handle);
+        if (ret == ESP_OK) {
+            uint8_t saved_mode = 0;
+            ret = nvs_get_u8(handle, "comm_mode", &saved_mode);
+            nvs_close(handle);
+
+            if (ret == ESP_OK && saved_mode == 1) {
+                // UDP mode was saved - restore it
+                // UDPモードが保存されていた - 復元する
+                ESP_LOGI(TAG, "Restoring UDP mode from NVS");
+
+                auto& arbiter = stampfly::ControlArbiter::getInstance();
+                auto& udp_server = stampfly::UDPServer::getInstance();
+
+                // Initialize and start UDP server
+                ret = udp_server.init();
+                if (ret == ESP_OK) {
+                    ret = udp_server.start();
+                    if (ret == ESP_OK) {
+                        // Set callback for control packets
+                        // 制御パケット用コールバックを設定
+                        udp_server.setControlCallback([](const stampfly::udp::ControlPacket& pkt, const SockAddrIn*) {
+                            auto& arb = stampfly::ControlArbiter::getInstance();
+                            arb.updateFromUDP(pkt.throttle, pkt.roll, pkt.pitch, pkt.yaw, pkt.flags);
+                            handleControlInput(pkt.throttle, pkt.roll, pkt.pitch, pkt.yaw, pkt.flags);
+                        });
+
+                        arbiter.setCommMode(stampfly::CommMode::UDP);
+                        ESP_LOGI(TAG, "UDP mode restored - server started on port 8888");
+                    } else {
+                        ESP_LOGW(TAG, "Failed to start UDP server: %s", esp_err_to_name(ret));
+                    }
+                } else {
+                    ESP_LOGW(TAG, "Failed to init UDP server: %s", esp_err_to_name(ret));
+                }
+            }
+        }
     }
 
     return ESP_OK;

@@ -38,7 +38,19 @@ esp_err_t UDPClient::init(const Config& config) {
 
     // Initialize TCP/IP stack
     // TCP/IPスタックを初期化
-    ESP_ERROR_CHECK(esp_netif_init());
+    esp_err_t ret = esp_netif_init();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "Failed to init netif: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Create default event loop (if not already created)
+    // デフォルトイベントループを作成（未作成の場合）
+    ret = esp_event_loop_create_default();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "Failed to create event loop: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     // Create default WiFi STA
     // デフォルトWiFi STAを作成
@@ -47,29 +59,45 @@ esp_err_t UDPClient::init(const Config& config) {
     // Initialize WiFi with default config
     // デフォルト設定でWiFiを初期化
     wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
+    ret = esp_wifi_init(&wifi_init_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init WiFi: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     // Register event handlers
     // イベントハンドラを登録
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(
+    ret = esp_event_handler_instance_register(
         WIFI_EVENT,
         ESP_EVENT_ANY_ID,
         &wifiEventHandler,
         this,
         &wifi_event_handler_
-    ));
+    );
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register WiFi event handler: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(
+    ret = esp_event_handler_instance_register(
         IP_EVENT,
         IP_EVENT_STA_GOT_IP,
         &wifiEventHandler,
         this,
         &ip_event_handler_
-    ));
+    );
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register IP event handler: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     // Set WiFi mode to STA
     // WiFiモードをSTAに設定
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ret = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set WiFi mode: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     initialized_ = true;
     ESP_LOGI(TAG, "Initialized");
@@ -90,7 +118,11 @@ esp_err_t UDPClient::start() {
 
     // Start WiFi
     // WiFiを開始
-    ESP_ERROR_CHECK(esp_wifi_start());
+    esp_err_t ret = esp_wifi_start();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     running_ = true;
     ESP_LOGI(TAG, "Started");

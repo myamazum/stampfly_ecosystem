@@ -44,6 +44,7 @@
 
 // Communication
 #include "controller_comm.hpp"
+#include "control_arbiter.hpp"
 
 // CLI
 #include "cli.hpp"
@@ -290,27 +291,33 @@ void onButtonEvent(stampfly::Button::Event event)
 // Control Packet Handler
 // =============================================================================
 
-void onControlPacket(const stampfly::ControlPacket& packet)
+// Shared arm flag state for edge detection (used by both ESP-NOW and UDP)
+// エッジ検出用の共有ARMフラグ状態（ESP-NOWとUDP両方で使用）
+static bool s_prev_arm_flag = false;
+
+/**
+ * @brief Shared control input handler for ESP-NOW and UDP
+ *        ESP-NOWとUDP共通の制御入力ハンドラ
+ *
+ * This function is called from both ESP-NOW and UDP callbacks
+ * to handle control input and arm/disarm logic.
+ */
+void handleControlInput(uint16_t throttle, uint16_t roll, uint16_t pitch,
+                        uint16_t yaw, uint8_t flags)
 {
     auto& state = stampfly::StampFlyState::getInstance();
 
-    // Update control inputs (raw ADC values)
-    state.updateControlInput(
-        packet.throttle,
-        packet.roll,
-        packet.pitch,
-        packet.yaw
-    );
+    // Update control inputs (raw ADC values, 0-4095 range, center 2048)
+    state.updateControlInput(throttle, roll, pitch, yaw);
 
     // Update control flags
-    state.updateControlFlags(packet.flags);
+    state.updateControlFlags(flags);
 
     // Handle arm/disarm toggle from controller (rising edge detection)
-    static bool prev_arm_flag = false;
-    bool arm_flag = (packet.flags & stampfly::CTRL_FLAG_ARM) != 0;
+    bool arm_flag = (flags & stampfly::CTRL_FLAG_ARM) != 0;
 
     // Detect rising edge (button press)
-    if (arm_flag && !prev_arm_flag) {
+    if (arm_flag && !s_prev_arm_flag) {
         stampfly::FlightState flight_state = state.getFlightState();
         if (flight_state == stampfly::FlightState::IDLE ||
             flight_state == stampfly::FlightState::ERROR) {
@@ -336,7 +343,20 @@ void onControlPacket(const stampfly::ControlPacket& packet)
             }
         }
     }
-    prev_arm_flag = arm_flag;
+    s_prev_arm_flag = arm_flag;
+}
+
+void onControlPacket(const stampfly::ControlPacket& packet)
+{
+    // Only process ESP-NOW packets if in ESP-NOW mode
+    // ESP-NOWモードの場合のみESP-NOWパケットを処理
+    auto& arbiter = stampfly::ControlArbiter::getInstance();
+    if (arbiter.getCommMode() != stampfly::CommMode::ESPNOW) {
+        return;  // Ignore ESP-NOW packets in UDP mode
+    }
+
+    handleControlInput(packet.throttle, packet.roll, packet.pitch,
+                       packet.yaw, packet.flags);
 }
 
 

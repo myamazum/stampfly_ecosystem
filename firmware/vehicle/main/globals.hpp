@@ -215,6 +215,24 @@ extern stampfly::Buzzer* g_buzzer_ptr;
 extern sf::SensorFusion* g_fusion_ptr;
 
 // =============================================================================
+// Shared Control Handler (used by both ESP-NOW and UDP callbacks)
+// 共有制御ハンドラ（ESP-NOWとUDPコールバック両方で使用）
+// =============================================================================
+
+/**
+ * @brief Handle control input from any source (ESP-NOW, UDP)
+ *        任意のソース（ESP-NOW、UDP）からの制御入力を処理
+ *
+ * @param throttle Raw throttle value [0-4095]
+ * @param roll Raw roll value [0-4095], center=2048
+ * @param pitch Raw pitch value [0-4095], center=2048
+ * @param yaw Raw yaw value [0-4095], center=2048
+ * @param flags Control flags (ARM, FLIP, MODE, ALT_MODE)
+ */
+void handleControlInput(uint16_t throttle, uint16_t roll, uint16_t pitch,
+                        uint16_t yaw, uint8_t flags);
+
+// =============================================================================
 // Debug Checkpoints (C linkage for external access)
 // =============================================================================
 
