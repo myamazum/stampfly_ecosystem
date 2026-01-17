@@ -209,17 +209,52 @@ AtomS3 をUSBで接続し、以下を実行:
 sf flash controller
 ```
 
-## 5. ペアリング
+## 5. 通信モードの選択
 
-初回使用時、またはペアリング情報をリセットしたい場合に実行します。
+StampFlyは2つの通信モードをサポートしています。
 
-### 手順
+| モード | 特徴 | 用途 |
+|-------|------|------|
+| ESP-NOW | 低遅延、TDMA同期、最大10台同時 | 複数機編隊飛行、レース |
+| UDP | シンプル、WiFi AP経由、単機運用 | 開発・デバッグ、単機飛行 |
 
+### ESP-NOWモード（デフォルト）
+
+複数機の編隊飛行やTDMA同期が必要な場合に使用。
+
+**ペアリング手順:**
 1. **コントローラ**: M5ボタン（画面下）を押しながら電源を入れる
 2. LCD に "Pairing mode..." と表示され、ビープ音が鳴り始める
 3. **StampFly**: ボタンを長押し（約2秒）してペアリングモードに入る
 4. 両方からビープ音が鳴ればペアリング完了
 5. ペアリング情報は自動保存され、次回以降は自動接続
+
+### UDPモード（推奨：単機運用時）
+
+単機での飛行や開発・デバッグ時に使用。設定が簡単です。
+
+**設定手順:**
+
+1. **Vehicle側（CLI）:**
+   ```
+   comm udp
+   ```
+   この設定はNVSに保存され、次回起動時も維持されます。
+
+2. **Controller側:**
+   - 画面を押してメニューを開く
+   - 「UDP Mode」を選択
+   - コントローラが再起動し、VehicleのWiFi APに接続
+
+**通信の仕組み:**
+```
+┌────────────┐      WiFi AP      ┌────────────┐
+│ Controller │ ←───────────────→ │  Vehicle   │
+│   (STA)    │   192.168.4.1     │   (AP)     │
+└────────────┘                   └────────────┘
+```
+
+**注意:** UDPモードではペアリングは不要です。VehicleのWiFi APに自動接続します。
 
 ## 6. 飛行前の確認
 
@@ -516,12 +551,43 @@ sf build controller
 sf flash controller
 ```
 
-## 5. Pairing
+## 5. Communication Mode Selection
 
+StampFly supports two communication modes.
+
+| Mode | Features | Use Case |
+|------|----------|----------|
+| ESP-NOW | Low latency, TDMA sync, up to 10 devices | Multi-vehicle, racing |
+| UDP | Simple, via WiFi AP, single-vehicle | Development, solo flight |
+
+### ESP-NOW Mode (Default)
+
+For multi-vehicle formation or TDMA synchronization.
+
+**Pairing:**
 1. **Controller**: Hold M5 button while powering on
 2. LCD shows "Pairing mode..."
 3. **StampFly**: Long-press button (~2 sec) to enter pairing mode
 4. Both beep when pairing completes
+
+### UDP Mode (Recommended for single-vehicle)
+
+For solo flights or development/debugging. Simple setup.
+
+**Setup:**
+
+1. **Vehicle (CLI):**
+   ```
+   comm udp
+   ```
+   This setting is saved to NVS and persists after restart.
+
+2. **Controller:**
+   - Press screen to open menu
+   - Select "UDP Mode"
+   - Controller restarts and connects to Vehicle's WiFi AP
+
+**Note:** UDP mode does not require pairing. Auto-connects to Vehicle's WiFi AP.
 
 ## 6. Pre-Flight Checks
 

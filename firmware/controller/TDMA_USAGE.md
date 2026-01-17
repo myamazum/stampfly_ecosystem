@@ -1,10 +1,25 @@
 # TDMA（時分割多元接続方式）使用ガイド
 
-## 概要
+> **Note:** [English version follows after the Japanese section.](#english) / 日本語の後に英語版があります。
+
+## 1. 概要
+
+このドキュメントは、**ESP-NOW通信モード**における複数コントローラの同時運用について説明します。
+
+> **⚠️ 重要:** TDMAはESP-NOWモード専用の機能です。UDPモードでは使用しません。
+>
+> | 通信モード | 複数機対応 | 同期方式 |
+> |-----------|-----------|----------|
+> | ESP-NOW | 最大10台 | TDMA（時分割多元接続） |
+> | UDP | **単機のみ** | 同期不要 |
+>
+> 単機運用の場合はUDPモードの方がシンプルです。複数機の編隊飛行にはESP-NOW + TDMAが必要です。
+
+### このドキュメントについて
 
 このプログラムは、複数のStampFlyが同一チャンネルで干渉なく通信し操縦できるよう、TDMA（Time Division Multiple Access）方式を実装しています。
 
-## TDMA方式の仕組み
+## 2. TDMA方式の仕組み
 
 ### タイミング構造
 
@@ -66,9 +81,9 @@
 
 ---
 
-## 設定方法
+## 3. 設定方法
 
-### 1. デバイスIDの設定
+### デバイスIDの設定
 
 コントローラのデバイスIDを設定します。**親機は必ず1台のみ、ID=0に設定してください。**
 
@@ -103,7 +118,7 @@
 #define TDMA_DEVICE_ID 2
 ```
 
-### 2. WiFiチャンネルの設定
+### WiFiチャンネルの設定
 
 すべてのデバイスで**同一チャンネル**を使用する必要があります。
 
@@ -127,7 +142,7 @@
 #define CHANNEL 6
 ```
 
-### 3. TDMA詳細パラメータ（通常は変更不要）
+### TDMA詳細パラメータ（通常は変更不要）
 
 [src/main.cpp:57-60](src/main.cpp#L57-L60)
 
@@ -140,7 +155,7 @@
 
 **通常はこれらの値を変更する必要はありません。**
 
-### 4. PLL同期パラメータ（上級者向け）
+### PLL同期パラメータ（上級者向け）
 
 [src/main.cpp:121-122](src/main.cpp#L121-L122)
 
@@ -153,16 +168,16 @@ static const float PLL_KI = 0.01;    // 積分ゲイン
 
 ---
 
-## ビルドと書き込み手順
+## 4. ビルドと書き込み手順
 
-### 1. 設定確認
+### 設定確認
 
 各コントローラのプログラムで以下を確認：
 
 - ✅ デバイスIDが重複していないか（親機は1台のみID=0）
 - ✅ すべてのデバイスで同じチャンネルを使用しているか
 
-### 2. ビルド
+### ビルド
 
 PlatformIOでビルドします：
 
@@ -170,13 +185,13 @@ PlatformIOでビルドします：
 pio run
 ```
 
-### 3. 書き込み
+### 書き込み
 
 ```bash
 pio run --target upload
 ```
 
-### 4. 動作確認
+### 動作確認
 
 シリアルモニタで起動メッセージを確認：
 
@@ -200,7 +215,7 @@ TDMA Slave initialized (ID=1)
 
 ---
 
-## 使用例：3台のコントローラを使用する場合
+## 5. 使用例：3台のコントローラを使用する場合
 
 ### コントローラ1（親機）の設定
 
@@ -241,9 +256,9 @@ TDMA Slave initialized (ID=1)
 
 ---
 
-## トラブルシューティング
+## 6. トラブルシューティング
 
-### Q1: 子機が同期しない
+### 子機が同期しない
 
 **確認事項:**
 - 親機（ID=0）が正常に起動しているか（起動メッセージを確認）
@@ -257,7 +272,7 @@ TDMA Slave initialized (ID=1)
 
 **注意:** TDMA同期はコントローラ間のビーコン同期であり、ドローンとのペアリングとは無関係です。
 
-### Q2: 複数の親機を使いたい
+### 複数の親機を使いたい
 
 **仕様制限:**
 現在の実装では、**1つのネットワークに親機は1台のみ**です。複数の親機を使用する場合は、異なるチャンネルを使用してネットワークを分離してください。
@@ -266,11 +281,11 @@ TDMA Slave initialized (ID=1)
 - ネットワーク1: チャンネル6、親機（ID=0）+ 子機（ID=1,2）
 - ネットワーク2: チャンネル11、親機（ID=0）+ 子機（ID=1,2）
 
-### Q3: デバイスIDを動的に変更したい
+### デバイスIDを動的に変更したい
 
 現在のバージョンでは、デバイスIDはコンパイル時の定数です。将来のバージョンで、実行時設定やSPIFFS保存機能を追加予定です。
 
-### Q4: 10台以上のコントローラを使いたい
+### 10台以上のコントローラを使いたい
 
 現在のフレーム時間（20ms）とスロット時間（2ms）で最大10台まで対応しています。
 さらに多くのコントローラを使用する場合は、スロット数を増やす必要があります：
@@ -282,7 +297,7 @@ TDMA Slave initialized (ID=1)
 
 ただし、フレーム時間が長くなると制御の遅延が増加します（現在は50Hz制御周期）。
 
-### Q5: タイムアウトエラーが発生する
+### タイムアウトエラーが発生する
 
 TDMA送信タスクはセマフォで待機しており、タイムアウトは発生しません（portMAX_DELAYで無限待機）。
 ただし、ビーコンロストの場合は50ms（5フレーム）でタイムアウト警告が表示されます。
@@ -294,7 +309,7 @@ static const uint32_t BEACON_TIMEOUT_US = 50000;    // 50ms = 5 frames
 
 ---
 
-## 動作確認とデバッグ
+## 7. 動作確認とデバッグ
 
 ### デバッグモードの有効化
 
@@ -329,7 +344,7 @@ USBSerial.printf("PLL error: %d us, integral: %d\n", pll_error_us, pll_integral)
 
 ---
 
-## パケットフォーマット
+## 8. パケットフォーマット
 
 ### ビーコンパケット（親機のみ送信）
 
@@ -368,7 +383,7 @@ USBSerial.printf("PLL error: %d us, integral: %d\n", pll_error_us, pll_integral)
 
 ---
 
-## 性能仕様
+## 9. 性能仕様
 
 | 項目 | 値 |
 |-----|-----|
@@ -381,7 +396,7 @@ USBSerial.printf("PLL error: %d us, integral: %d\n", pll_error_us, pll_integral)
 
 ---
 
-## 将来の拡張予定
+## 10. 将来の拡張予定
 
 - [ ] デバイスIDの実行時設定（SPIFFS保存）
 - [ ] チャンネルの実行時設定
@@ -392,7 +407,7 @@ USBSerial.printf("PLL error: %d us, integral: %d\n", pll_error_us, pll_integral)
 
 ---
 
-## 参考情報
+## 11. 参考情報
 
 ### 関連ファイル
 
@@ -428,3 +443,144 @@ Kouhei Ito - kouhei.ito@itolab-ktc.com
 
 - 2025-11-26: 5台以上対応（フレーム20ms、スロット2ms）、専用タスク分離、ビープ音識別機能追加
 - 2025-11-07: TDMA初版実装
+
+---
+
+<a id="english"></a>
+
+# TDMA (Time Division Multiple Access) Usage Guide
+
+## 1. Overview
+
+This document describes multi-controller simultaneous operation in **ESP-NOW communication mode**.
+
+> **⚠️ Important:** TDMA is an ESP-NOW mode exclusive feature. It is not used in UDP mode.
+>
+> | Communication Mode | Multi-Vehicle Support | Synchronization |
+> |-------------------|----------------------|-----------------|
+> | ESP-NOW | Up to 10 units | TDMA (Time Division Multiple Access) |
+> | UDP | **Single unit only** | Not required |
+>
+> For single-unit operation, UDP mode is simpler. Multi-vehicle formation flight requires ESP-NOW + TDMA.
+
+### About This Document
+
+This program implements TDMA (Time Division Multiple Access) to enable multiple StampFly drones to communicate and be controlled on the same channel without interference.
+
+## 2. How TDMA Works
+
+### Timing Structure
+
+```
+Frame (20ms)
+├─ Beacon (master only, 500μs before frame start)
+├─ Slot 0 (2ms) Master control data transmission
+├─ Slot 1 (2ms) Slave ID=1 control data transmission
+├─ Slot 2 (2ms) Slave ID=2 control data transmission
+├─ ...
+└─ Slot 9 (2ms) Slave ID=9 control data transmission
+```
+
+### Operating Principle
+
+1. **Master (ID=0)**: Autonomously transmits beacon at 20ms intervals, sends control data in slot 0
+2. **Slaves (ID=1-9)**: Receive master's beacon for synchronization, transmit in assigned slots
+3. **Dedicated Task**: TDMA transmission is handled by a dedicated task (tdma_send_task) for precise timing control
+
+## 3. Configuration
+
+### Device ID Configuration
+
+Set the controller's device ID. **The master must be exactly one unit, set to ID=0.**
+
+| Device ID | Role | Slot | Notes |
+|-----------|------|------|-------|
+| 0 | Master | Slot 0 | **Exactly one** |
+| 1 | Slave 1 | Slot 1 | |
+| 2 | Slave 2 | Slot 2 | |
+| ... | ... | ... | |
+| 9 | Slave 9 | Slot 9 | |
+
+### WiFi Channel Configuration
+
+All devices **must use the same channel**.
+
+- **Range**: 1-14 (1-13 recommended in Japan)
+- **Note**: **Master and slaves must use the same value**
+
+## 4. Build and Flash
+
+### Build
+
+Build with PlatformIO:
+
+```bash
+pio run
+```
+
+### Flash
+
+```bash
+pio run --target upload
+```
+
+### Verify Operation
+
+Check startup messages via serial monitor:
+
+```bash
+pio device monitor
+```
+
+#### Master Startup Message Example
+
+```
+ESP-NOW Version 123
+TDMA Master started (ID=0)
+```
+
+#### Slave Startup Message Example
+
+```
+ESP-NOW Version 123
+TDMA Slave initialized (ID=1)
+```
+
+## 5. Troubleshooting
+
+### Slave Not Synchronizing
+
+**Check:**
+- Is the master (ID=0) starting normally?
+- Is the channel (CHANNEL) the same on master and slaves?
+- Is "WAIT" or "LOST!" displayed on the slave's screen?
+
+**Solutions:**
+1. Restart all controllers (start master first)
+2. Check beacon reception logs via serial monitor
+3. Listen for 4000Hz beep sound indicating beacon loss
+
+**Note:** TDMA synchronization is beacon synchronization between controllers, independent of drone pairing.
+
+### Using Multiple Masters
+
+**Limitation:**
+Current implementation supports **only one master per network**. To use multiple masters, use different channels to separate networks.
+
+## 6. Performance Specifications
+
+| Item | Value |
+|------|-------|
+| Frame Period | 20ms (50Hz) |
+| Slot Width | 2ms |
+| Max Simultaneous Connections | 10 units |
+| Beacon Timing Precision | ±few μs (esp_timer) |
+| Sync Precision | ±tens of μs (steady state) |
+| Transmission Delay | Max 20ms (wait until own slot) |
+
+## 7. References
+
+### Technical Documentation
+
+- ESP-NOW: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
+- ESP32 Timer: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/esp_timer.html

@@ -11,7 +11,19 @@ StampFlyエコシステムは以下の通信プロトコルを使用：
 | プロトコル | 用途 | 方向 | レート |
 |-----------|------|------|--------|
 | ESP-NOW + TDMA | 制御・基本テレメトリ | Controller ↔ Vehicle | 50Hz |
+| UDP over WiFi | 制御・基本テレメトリ（代替） | Controller ↔ Vehicle | 50Hz |
 | WebSocket | 拡張テレメトリ（ESKF+センサ） | Vehicle → GCS | 400Hz |
+
+### 通信モード
+
+Vehicle と Controller は2つの通信モードをサポート：
+
+| モード | 特徴 | 用途 |
+|-------|------|------|
+| ESP-NOW | 低遅延、TDMA同期、最大10台同時接続 | 複数機編隊飛行、レース |
+| UDP | WiFi AP経由、シンプル、単機運用 | 開発・デバッグ、単機飛行 |
+
+通信モードは CLI の `comm` コマンドで切り替え可能（NVSに保存）。
 
 ## 2. ディレクトリ構成
 
@@ -156,7 +168,7 @@ protocol/
 - 実効サンプルレート: 400 Hz (4 samples × 100 fps)
 - 帯域幅: 552 × 100 × 8 = 442 kbps
 
-## 4. TDMAフレーム構造
+## 4. TDMAフレーム構造（ESP-NOWモード）
 
 ```
 |<------------------- 20ms Frame ------------------->|
@@ -169,9 +181,88 @@ protocol/
 - **スロット幅**: 2ms
 - **ビーコン**: フレーム開始500μs前に送信
 
-## 5. チェックサム
+## 5. UDP通信プロトコル
 
-### Sum (ControlPacket, TelemetryPacket)
+ESP-NOWの代替として、WiFi AP経由のUDP通信をサポート。
+VehicleがAP（192.168.4.1）、ControllerがSTAとして接続。
+
+### ネットワーク構成
+
+```
+┌────────────┐      WiFi AP      ┌────────────┐
+│ Controller │ ←───────────────→ │  Vehicle   │
+│   (STA)    │   192.168.4.x     │   (AP)     │
+└────────────┘                   └────────────┘
+      ↓ UDP                           ↑ UDP
+   Port 8888 ────── Control ──────────┘
+      ↑                               ↓
+   Port 8889 ────── Telemetry ────────┘
+```
+
+### ポート構成
+
+| ポート | 方向 | 用途 |
+|-------|------|------|
+| 8888 | Controller → Vehicle | 制御パケット |
+| 8889 | Vehicle → Controller | テレメトリパケット |
+
+### UDP ControlPacket (16 bytes)
+
+| Offset | Size | Field | Description |
+|--------|------|-------|-------------|
+| 0 | 1 | header | パケットヘッダ (0xAA) |
+| 1 | 1 | packet_type | パケットタイプ (0x01) |
+| 2 | 1 | sequence | シーケンス番号 |
+| 3 | 1 | device_id | 送信元デバイスID |
+| 4 | 2 | throttle | スロットル [0-4095] |
+| 6 | 2 | roll | ロール [0-4095], 2048=中央 |
+| 8 | 2 | pitch | ピッチ [0-4095], 2048=中央 |
+| 10 | 2 | yaw | ヨー [0-4095], 2048=中央 |
+| 12 | 1 | flags | 制御フラグ |
+| 13 | 1 | reserved | 予約 |
+| 14 | 2 | checksum | CRC16-CCITT |
+
+### UDP TelemetryPacket (20 bytes)
+
+| Offset | Size | Field | Unit | Description |
+|--------|------|-------|------|-------------|
+| 0 | 1 | header | - | パケットヘッダ (0xAA) |
+| 1 | 1 | packet_type | - | パケットタイプ (0x02) |
+| 2 | 1 | sequence | - | シーケンス番号 |
+| 3 | 1 | flight_state | - | 飛行状態 |
+| 4 | 2 | battery_mv | mV | バッテリー電圧 |
+| 6 | 2 | roll_deg10 | 0.1° | ロール角 |
+| 8 | 2 | pitch_deg10 | 0.1° | ピッチ角 |
+| 10 | 2 | yaw_deg10 | 0.1° | ヨー角 |
+| 12 | 2 | altitude_cm | cm | 高度 |
+| 14 | 2 | velocity_z_cms | cm/s | 垂直速度 |
+| 16 | 1 | rssi | - | 受信信号強度 |
+| 17 | 1 | flags | - | ステータスフラグ |
+| 18 | 2 | checksum | - | CRC16-CCITT |
+
+### 通信モード切り替え
+
+**Vehicle側（CLI）:**
+```
+comm udp      # UDPモードに切り替え
+comm espnow   # ESP-NOWモードに切り替え
+comm          # 現在の状態表示
+```
+
+**Controller側（メニュー）:**
+- メニューから「UDP Mode」を選択
+- WiFi APをスキャンして「StampFly_*」に接続
+
+### タイムアウト
+
+| パラメータ | 値 | 説明 |
+|-----------|-----|------|
+| CONTROL_TIMEOUT | 500ms | 制御パケット途絶検出 |
+| CLIENT_TIMEOUT | 5000ms | クライアント切断検出 |
+
+## 6. チェックサム
+
+### Sum (ESP-NOW ControlPacket, TelemetryPacket)
 ```c
 uint8_t sum = 0;
 for (size_t i = 0; i < packet_size - 1; i++) {
@@ -187,15 +278,32 @@ for (size_t i = 0; i < checksum_offset; i++) {
 }
 ```
 
-## 6. タイムアウト
+### CRC16-CCITT (UDP Packets)
+```c
+uint16_t crc = 0xFFFF;
+for (size_t i = 0; i < len; i++) {
+    crc ^= (uint16_t)data[i] << 8;
+    for (int j = 0; j < 8; j++) {
+        if (crc & 0x8000)
+            crc = (crc << 1) ^ 0x1021;
+        else
+            crc <<= 1;
+    }
+}
+return crc;
+```
+
+## 7. タイムアウト
 
 | パラメータ | 値 | 説明 |
 |-----------|-----|------|
-| BEACON_LOSS | 50ms | ビーコンロス検出 |
+| BEACON_LOSS | 50ms | ビーコンロス検出（ESP-NOW） |
 | COMM_TIMEOUT | 500ms | 通信途絶検出 |
 | DRONE_RETRY | 5000ms | 再接続間隔 |
+| UDP_CONTROL_TIMEOUT | 500ms | UDP制御パケット途絶検出 |
+| UDP_CLIENT_TIMEOUT | 5000ms | UDPクライアント切断検出 |
 
-## 7. ペアリング
+## 8. ペアリング（ESP-NOWモード）
 
 1. コントローラがペアリングモードに入る（ボタン押下）
 2. コントローラがブロードキャストでペアリング要求を送信
@@ -208,16 +316,21 @@ for (size_t i = 0; i < checksum_offset; i++) {
 - Byte 1-6: ドローンMACアドレス
 - Byte 7-10: シグネチャ (0xAA 0x55 0x16 0x88)
 
-## 8. 実装ファイル
+## 9. 実装ファイル
 
 ### Vehicle
 - `firmware/vehicle/components/sf_svc_comm/` - ESP-NOW通信
+- `firmware/vehicle/components/sf_svc_udp/` - UDPサーバー
 - `firmware/vehicle/components/sf_svc_telemetry/` - WebSocketテレメトリ
 
 ### Controller
 - `firmware/controller/components/espnow_tdma/` - TDMA実装
+- `firmware/controller/components/sf_udp_client/` - UDPクライアント
 
-## 9. 設計原則
+### Common
+- `firmware/common/protocol/` - 共通プロトコル定義（udp_protocol.hpp）
+
+## 10. 設計原則
 
 エコシステム内の全ての通信実装はこの仕様から派生する。
 
@@ -241,7 +354,19 @@ StampFly ecosystem uses the following protocols:
 | Protocol | Purpose | Direction | Rate |
 |----------|---------|-----------|------|
 | ESP-NOW + TDMA | Control & basic telemetry | Controller ↔ Vehicle | 50Hz |
+| UDP over WiFi | Control & basic telemetry (alternative) | Controller ↔ Vehicle | 50Hz |
 | WebSocket | Extended telemetry (ESKF+sensors) | Vehicle → GCS | 400Hz |
+
+### Communication Modes
+
+Vehicle and Controller support two communication modes:
+
+| Mode | Features | Use Case |
+|------|----------|----------|
+| ESP-NOW | Low latency, TDMA sync, up to 10 simultaneous controllers | Multi-vehicle formation, racing |
+| UDP | Simple, via Vehicle's WiFi AP, single-vehicle operation | Development/debugging, solo flight |
+
+Mode switching is done via CLI `comm` command (saved to NVS).
 
 See `spec/*.yaml` for detailed machine-readable specifications.
 
