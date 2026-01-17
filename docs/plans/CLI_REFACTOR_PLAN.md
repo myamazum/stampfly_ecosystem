@@ -619,7 +619,101 @@ void client_task(void* arg) {
 | 出力リダイレクト時の競合 | Thread-Local Storage 使用 |
 | 移行中の機能退行 | Phase毎に動作確認、旧実装は最後まで残す |
 
-## 10. 代替案
+## 10. 飛行制御への影響分析
+
+### 結論
+
+**CLI処理は飛行制御に影響しない。** 現在のタスク設計（コア分離 + 優先度分離）により安全性が確保されている。
+
+### タスク優先度とコア配置
+
+```
+Core 1 (飛行制御専用)              Core 0 (その他)
+───────────────────────            ───────────────────────
+IMU Task      : 24 (最高)          Mag Task      : 18
+Control Task  : 23                 Baro Task     : 16
+OptFlow Task  : 20                 Comm Task     : 15
+                                   ToF Task      : 14
+                                   Telemetry Task: 13
+                                   Power Task    : 12
+                                   Button Task   : 10
+                                   LED Task      : 8
+                                   CLI Task      : 5 (最低)
+                                   WiFi CLI      : 5 (予定)
+```
+
+### 安全性の根拠
+
+#### 1. 物理的コア分離
+- **飛行制御（IMU/Control/OptFlow）は Core 1 で動作**
+- **CLI/WiFi CLI は Core 0 で動作**
+- ESP32-S3 のデュアルコアにより物理的に独立
+- Core 0 での処理がどれだけ重くても Core 1 には影響しない
+
+#### 2. 優先度による保護
+- CLI Task は優先度 5（システム内最低）
+- Control Task は優先度 23（CLI の 4.6 倍）
+- FreeRTOS のプリエンプティブスケジューリングにより、高優先度タスクは即座に実行される
+
+#### 3. 処理フロー図
+
+```
+                    ┌─────────────────────────────────────┐
+                    │           ESP32-S3                  │
+                    ├──────────────────┬──────────────────┤
+                    │      Core 1      │      Core 0      │
+                    │   (Flight Ctrl)  │   (Auxiliary)    │
+                    ├──────────────────┼──────────────────┤
+                    │                  │                  │
+                    │  IMU Task (24)   │  CLI Task (5)    │
+                    │      ↓           │      ↓           │
+                    │  400Hz 確実実行  │  低優先度で実行   │
+                    │      ↓           │      ↓           │
+                    │  Control Task    │  linenoise       │
+                    │  (23)            │  ブロッキングI/O  │
+                    │      ↓           │      ↓           │
+                    │  Motor Output    │  コマンド実行    │
+                    │                  │                  │
+                    │  ← 相互に独立 →  │                  │
+                    └──────────────────┴──────────────────┘
+```
+
+### linenoise 追加時の懸念と評価
+
+| 懸念事項 | リスク評価 | 理由 |
+|----------|-----------|------|
+| ブロッキング I/O | **低** | CLI Task のみ影響、Core 1 は無関係 |
+| malloc 使用 | **低** | ESP-IDF の heap_caps は高速、履歴サイズ制限で対応 |
+| 文字列処理 | **低** | Core 0、最低優先度で実行 |
+| 共有リソース競合 | **中** | NVS/センサ状態アクセス時にミューテックス使用（既存設計） |
+
+### 追加の安全策（オプション）
+
+飛行中の CLI 応答を制限することで、さらに安全性を高めることが可能：
+
+```cpp
+void CLITask(void* arg) {
+    while (true) {
+        auto& state = StampFlyState::getInstance();
+
+        if (state.getFlightState() == FlightState::FLYING) {
+            // 飛行中は入力処理を間引く（10Hz）
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else {
+            // 地上では通常処理
+            processInput();
+        }
+    }
+}
+```
+
+### 実装後の確認事項
+
+1. **制御ループジッタ測定**: 飛行中に CLI 操作を行い、制御周期の乱れがないか確認
+2. **CPU 使用率モニタリング**: `vTaskGetRunTimeStats()` で各タスクの CPU 時間を確認
+3. **実飛行テスト**: CLI 操作しながらのホバリング安定性確認
+
+## 11. 代替案
 
 ### 案A: linenoise を WiFi にも使用（難易度高）
 
