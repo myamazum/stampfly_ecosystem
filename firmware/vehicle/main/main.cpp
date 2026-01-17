@@ -567,6 +567,12 @@ extern "C" void app_main(void)
     init::telemetry();
     updateLedDuringInit();
 
+    // Initialize WiFi CLI (Telnet server)
+    // WiFi CLI初期化（Telnetサーバー）
+    ESP_LOGI(TAG, "Initializing WiFi CLI...");
+    init::wifi_cli();
+    updateLedDuringInit();
+
     // Start all tasks
     ESP_LOGI(TAG, "Starting tasks...");
     startTasks();

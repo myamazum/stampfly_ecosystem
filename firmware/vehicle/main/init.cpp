@@ -38,6 +38,7 @@
 #include "telemetry.hpp"
 #include "control_arbiter.hpp"
 #include "udp_server.hpp"
+#include "wifi_cli.hpp"
 
 // NVS
 #include "nvs_flash.h"
@@ -672,6 +673,38 @@ esp_err_t telemetry()
     }
 
     ESP_LOGI(TAG, "Telemetry initialized - Connect to WiFi 'StampFly', open http://192.168.4.1");
+    return ESP_OK;
+}
+
+esp_err_t wifi_cli()
+{
+    ESP_LOGI(TAG, "Initializing WiFi CLI...");
+
+    auto& wifi_cli = stampfly::WiFiCLI::getInstance();
+    stampfly::WiFiCLI::Config cfg;
+    cfg.port = 23;  // Telnet standard port
+    cfg.max_clients = 2;
+    cfg.idle_timeout_ms = 300000;  // 5 minutes
+
+    esp_err_t ret = wifi_cli.init(cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "WiFi CLI init failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Set CLI instance for command forwarding
+    // コマンド転送用にCLIインスタンスを設定
+    wifi_cli.setCLI(&g_cli);
+
+    // Start the server
+    // サーバーを開始
+    ret = wifi_cli.start();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "WiFi CLI start failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "WiFi CLI initialized - telnet 192.168.4.1");
     return ESP_OK;
 }
 

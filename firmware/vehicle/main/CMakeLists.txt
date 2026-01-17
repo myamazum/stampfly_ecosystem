@@ -37,5 +37,6 @@ idf_component_register(
         sf_svc_comm
         sf_svc_cli
         sf_svc_telemetry
+        sf_svc_wifi_cli
         sf_svc_led
 )

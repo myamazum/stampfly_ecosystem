@@ -55,6 +55,12 @@ esp_err_t logger();
 esp_err_t telemetry();
 
 /**
+ * @brief WiFi CLIの初期化
+ * Telnet-like CLI over WiFi (port 23)
+ */
+esp_err_t wifi_cli();
+
+/**
  * @brief I2Cバスハンドルを取得
  */
 i2c_master_bus_handle_t getI2CBus();
