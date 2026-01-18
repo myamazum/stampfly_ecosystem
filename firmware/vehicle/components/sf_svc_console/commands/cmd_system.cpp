@@ -128,11 +128,55 @@ static int cmd_version(int argc, char** argv)
 }
 
 // =============================================================================
+// help command (custom implementation for WiFi CLI compatibility)
+// =============================================================================
+
+static int cmd_help(int argc, char** argv)
+{
+    auto& console = Console::getInstance();
+
+    console.print("\r\nAvailable commands:\r\n");
+    console.print("  status    - Show system status\r\n");
+    console.print("  version   - Show version info\r\n");
+    console.print("  reboot    - Reboot the system\r\n");
+    console.print("  sensor    - Show sensor data [imu|mag|baro|tof|flow|power|all]\r\n");
+    console.print("  loglevel  - Set ESP_LOG level [none|error|warn|info|debug|verbose]\r\n");
+    console.print("  binlog    - Binary log [on|off|freq]\r\n");
+    console.print("  motor     - Motor control [test|spin|stop]\r\n");
+    console.print("  trim      - Trim adjust [roll|pitch|yaw <val>|save|reset]\r\n");
+    console.print("  gain      - Rate control gains [axis param value]\r\n");
+    console.print("  comm      - Comm mode [espnow|udp|status]\r\n");
+    console.print("  pair      - Pairing control [start|stop|channel]\r\n");
+    console.print("  unpair    - Clear pairing\r\n");
+    console.print("  calib     - Sensor calibration [gyro|accel|status]\r\n");
+    console.print("  magcal    - Magnetometer calibration [start|stop|status|clear]\r\n");
+    console.print("  led       - LED [brightness <0-255>]\r\n");
+    console.print("  sound     - Sound [on|off]\r\n");
+    console.print("  pos       - Position [reset|status]\r\n");
+    console.print("  debug     - Debug mode [on|off]\r\n");
+    console.print("  ctrl      - Show controller input [watch [sec]]\r\n");
+    console.print("  attitude  - Show attitude\r\n");
+    console.print("\r\n");
+
+    return 0;
+}
+
+// =============================================================================
 // Command Registration
 // =============================================================================
 
 void register_system_commands()
 {
+    // help (custom implementation)
+    const esp_console_cmd_t help_cmd = {
+        .command = "help",
+        .help = "Show available commands",
+        .hint = NULL,
+        .func = &cmd_help,
+        .argtable = NULL,
+    };
+    esp_console_cmd_register(&help_cmd);
+
     // status
     const esp_console_cmd_t status_cmd = {
         .command = "status",

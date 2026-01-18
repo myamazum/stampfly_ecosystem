@@ -62,9 +62,10 @@ void Console::registerAllCommands()
 
     ESP_LOGI(TAG, "Registering all commands");
 
-    // Register built-in help command
-    // 組み込みhelpコマンドを登録
-    esp_console_register_help_command();
+    // Note: Custom help command is registered in register_system_commands()
+    // カスタムhelpコマンドは register_system_commands() で登録される
+    // (Uses Console::print() for WiFi CLI compatibility)
+    // (WiFi CLI互換のため Console::print() を使用)
 
     // Register command groups
     // コマンドグループを登録
