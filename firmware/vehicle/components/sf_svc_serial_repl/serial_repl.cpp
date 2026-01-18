@@ -4,6 +4,9 @@
  *
  * USB Serial を使用した REPL の実装
  * linenoise による履歴・補完・行編集機能を提供
+ *
+ * Note: VFS configuration for stdin/stdout is handled by ESP-IDF based on
+ * sdkconfig (CONFIG_ESP_CONSOLE_USB_CDC or CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
  */
 
 #include "serial_repl.hpp"
@@ -44,10 +47,13 @@ esp_err_t SerialREPL::init()
 
     ESP_LOGI(TAG, "Initializing SerialREPL with linenoise");
 
+    // =========================================================================
     // Configure linenoise
-    // linenoiseの設定
-    // Note: VFS/stdio routing is handled by ESP-IDF console subsystem
+    // linenoise の設定
+    //
+    // Note: VFS (stdin/stdout routing) is already configured by ESP-IDF
     // based on sdkconfig (CONFIG_ESP_CONSOLE_USB_CDC)
+    // =========================================================================
     linenoiseSetMultiLine(1);  // Enable multiline mode / マルチライン有効化
     linenoiseHistorySetMaxLen(history_max_len_);
 
