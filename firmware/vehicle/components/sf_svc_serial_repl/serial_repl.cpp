@@ -1,12 +1,9 @@
 /**
  * @file serial_repl.cpp
- * @brief Serial REPL implementation with linenoise
+ * @brief Serial REPL implementation using ESP-IDF Console REPL
  *
- * USB Serial を使用した REPL の実装
- * linenoise による履歴・補完・行編集機能を提供
- *
- * Note: VFS configuration for stdin/stdout is handled by ESP-IDF based on
- * sdkconfig (CONFIG_ESP_CONSOLE_USB_CDC or CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
+ * ESP-IDF の esp_console REPL API を使用した Serial REPL の実装
+ * USB CDC 経由で linenoise による履歴・補完・行編集機能を提供
  */
 
 #include "serial_repl.hpp"
@@ -16,7 +13,7 @@
 #include <cstring>
 
 #include "esp_log.h"
-#include "linenoise/linenoise.h"
+#include "esp_console.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -45,31 +42,30 @@ esp_err_t SerialREPL::init()
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Initializing SerialREPL with linenoise");
+    ESP_LOGI(TAG, "Initializing SerialREPL with esp_console REPL");
 
     // =========================================================================
-    // Configure linenoise
-    // linenoise の設定
-    //
-    // Note: VFS (stdin/stdout routing) is already configured by ESP-IDF
-    // based on sdkconfig (CONFIG_ESP_CONSOLE_USB_CDC)
+    // Configure esp_console REPL for USB CDC
+    // USB CDC 用に esp_console REPL を設定
     // =========================================================================
-    linenoiseSetMultiLine(1);  // Enable multiline mode / マルチライン有効化
-    linenoiseHistorySetMaxLen(history_max_len_);
+    esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
+    repl_config.prompt = "stampfly>";
+    repl_config.max_cmdline_length = 256;
+    repl_config.history_save_path = NULL;  // Don't save history to file
+    repl_config.task_stack_size = 4096;
+    repl_config.task_priority = 5;
 
-    // Set completion callback for tab completion
-    // Tab補完用コールバックを設定
-    linenoiseSetCompletionCallback(
-        reinterpret_cast<linenoiseCompletionCallback*>(completionCallback));
+    // USB CDC device configuration
+    // USB CDC デバイス設定
+    esp_console_dev_usb_cdc_config_t cdc_config = ESP_CONSOLE_DEV_CDC_CONFIG_DEFAULT();
 
-    // Set hints callback (optional)
-    // ヒントコールバックを設定（オプション）
-    linenoiseSetHintsCallback(
-        reinterpret_cast<linenoiseHintsCallback*>(hintsCallback));
-
-    // Disable buffering for stdin
-    // stdinのバッファリングを無効化
-    setvbuf(stdin, NULL, _IONBF, 0);
+    // Initialize the REPL
+    // REPL を初期化
+    esp_err_t ret = esp_console_new_repl_usb_cdc(&cdc_config, &repl_config, &repl_);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create USB CDC REPL: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     initialized_ = true;
     ESP_LOGI(TAG, "SerialREPL initialized successfully");
@@ -77,74 +73,54 @@ esp_err_t SerialREPL::init()
 }
 
 // =============================================================================
-// Main REPL Loop
+// Start REPL
+// =============================================================================
+
+esp_err_t SerialREPL::start()
+{
+    if (!initialized_) {
+        ESP_LOGE(TAG, "SerialREPL not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (running_) {
+        ESP_LOGW(TAG, "SerialREPL already running");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Starting SerialREPL");
+
+    // Start the REPL task
+    // REPL タスクを開始
+    esp_err_t ret = esp_console_start_repl(repl_);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start REPL: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    running_ = true;
+    ESP_LOGI(TAG, "SerialREPL started");
+    return ESP_OK;
+}
+
+// =============================================================================
+// Run (blocking - for compatibility, but not used with esp_console REPL)
 // =============================================================================
 
 void SerialREPL::run()
 {
-    if (!initialized_) {
-        ESP_LOGE(TAG, "SerialREPL not initialized");
-        return;
-    }
+    // With esp_console REPL, the REPL runs in its own task
+    // esp_console REPL では、REPL は独自のタスクで実行される
+    // This function is kept for API compatibility but should not be called
+    // この関数は API 互換性のために残すが、呼び出すべきではない
 
-    auto& console = Console::getInstance();
+    ESP_LOGW(TAG, "SerialREPL::run() called but esp_console REPL manages its own task");
+    ESP_LOGW(TAG, "Use SerialREPL::start() instead");
 
-    // Set output to stdout for Serial REPL
-    // Serial REPL用にstdout出力を設定
-    console.setOutput([](const char* str, void*) {
-        printf("%s", str);
-        fflush(stdout);
-    }, nullptr);
-
-    // Welcome message
-    // ウェルカムメッセージ
-    printf("\r\n");
-    printf("=== StampFly CLI ===\r\n");
-    printf("Type 'help' for available commands.\r\n");
-    printf("\r\n");
-
+    // Block forever to prevent the calling task from exiting
+    // 呼び出し元タスクが終了しないように永久にブロック
     while (true) {
-        // linenoise handles:
-        // - History (up/down arrows)
-        // - Line editing (left/right arrows, backspace, delete)
-        // - Tab completion
-        // - Ctrl+C (returns nullptr)
-        // - Ctrl+D (returns nullptr at empty line)
-        //
-        // linenoiseが処理する機能:
-        // - 履歴（上下矢印）
-        // - 行編集（左右矢印、バックスペース、削除）
-        // - Tab補完
-        // - Ctrl+C（nullptrを返す）
-        // - Ctrl+D（空行でnullptrを返す）
-        char* line = linenoise("stampfly> ");
-
-        if (line == nullptr) {
-            // EOF, Ctrl+C, or error - small delay and continue
-            // EOF、Ctrl+C、またはエラー - 少し待って継続
-            vTaskDelay(pdMS_TO_TICKS(100));
-            continue;
-        }
-
-        // Skip empty lines
-        // 空行はスキップ
-        if (strlen(line) == 0) {
-            linenoiseFree(line);
-            continue;
-        }
-
-        // Add to history
-        // 履歴に追加
-        linenoiseHistoryAdd(line);
-
-        // Execute command
-        // コマンドを実行
-        int ret = console.run(line);
-        if (ret != 0) {
-            printf("Error: command returned %d\r\n", ret);
-        }
-
-        linenoiseFree(line);
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }
 
@@ -155,117 +131,8 @@ void SerialREPL::run()
 void SerialREPL::setHistoryMaxLen(int len)
 {
     history_max_len_ = len;
-    if (initialized_) {
-        linenoiseHistorySetMaxLen(len);
-    }
-}
-
-// =============================================================================
-// Completion Callback
-// =============================================================================
-
-void SerialREPL::completionCallback(const char* buf, void* lc)
-{
-    if (buf == nullptr || lc == nullptr) {
-        return;
-    }
-
-    linenoiseCompletions* completions = static_cast<linenoiseCompletions*>(lc);
-    size_t buf_len = strlen(buf);
-
-    // Get registered commands from esp_console
-    // esp_consoleから登録済みコマンドを取得
-
-    // List of known commands for completion
-    // 補完用の既知コマンドリスト
-    static const char* commands[] = {
-        "help",
-        "status",
-        "reboot",
-        "version",
-        "sensor",
-        "loglevel",
-        "binlog",
-        "motor",
-        "trim",
-        "gain",
-        "comm",
-        "pair",
-        "unpair",
-        "calib",
-        "magcal",
-        "led",
-        "sound",
-        "pos",
-        "debug",
-        "ctrl",
-        "attitude",
-        nullptr
-    };
-
-    for (int i = 0; commands[i] != nullptr; i++) {
-        // Check if command starts with the current input
-        // コマンドが現在の入力で始まるかチェック
-        if (strncmp(buf, commands[i], buf_len) == 0) {
-            linenoiseAddCompletion(completions, commands[i]);
-        }
-    }
-}
-
-// =============================================================================
-// Hints Callback
-// =============================================================================
-
-char* SerialREPL::hintsCallback(const char* buf, int* color, int* bold)
-{
-    if (buf == nullptr) {
-        return nullptr;
-    }
-
-    // Provide hints for common commands
-    // よく使うコマンドのヒントを提供
-    if (strcmp(buf, "motor") == 0) {
-        *color = 35;  // Magenta
-        *bold = 0;
-        return const_cast<char*>(" <motor_num> <duty>");
-    }
-    if (strcmp(buf, "gain") == 0) {
-        *color = 35;
-        *bold = 0;
-        return const_cast<char*>(" [pitch|roll|yaw] [p|i|d] <value>");
-    }
-    if (strcmp(buf, "trim") == 0) {
-        *color = 35;
-        *bold = 0;
-        return const_cast<char*>(" <roll> <pitch>");
-    }
-    if (strcmp(buf, "led") == 0) {
-        *color = 35;
-        *bold = 0;
-        return const_cast<char*>(" <r> <g> <b>");
-    }
-    if (strcmp(buf, "loglevel") == 0) {
-        *color = 35;
-        *bold = 0;
-        return const_cast<char*>(" [none|error|warn|info|debug|verbose]");
-    }
-    if (strcmp(buf, "binlog") == 0) {
-        *color = 35;
-        *bold = 0;
-        return const_cast<char*>(" [start|stop|status]");
-    }
-    if (strcmp(buf, "calib") == 0) {
-        *color = 35;
-        *bold = 0;
-        return const_cast<char*>(" [gyro|acc] - Calibrate sensors");
-    }
-    if (strcmp(buf, "magcal") == 0) {
-        *color = 35;
-        *bold = 0;
-        return const_cast<char*>(" [start|stop|status] - Magnetometer calibration");
-    }
-
-    return nullptr;
+    // Note: With esp_console REPL, history is managed internally
+    // esp_console REPL では履歴は内部で管理される
 }
 
 }  // namespace stampfly

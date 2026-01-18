@@ -1,13 +1,13 @@
 /**
  * @file serial_repl.hpp
- * @brief Serial REPL with linenoise integration
+ * @brief Serial REPL using ESP-IDF Console REPL API
  *
- * Provides command-line interface over USB Serial with:
+ * Provides command-line interface over USB CDC with:
  * - Command history (up/down arrows)
  * - Tab completion for registered commands
  * - Line editing (cursor movement, backspace, delete)
  *
- * シリアルREPL（linenoise統合）
+ * シリアルREPL（ESP-IDF Console REPL API 使用）
  * - コマンド履歴（上下矢印）
  * - Tab補完
  * - 行編集（カーソル移動、バックスペース、削除）
@@ -16,13 +16,14 @@
 #pragma once
 
 #include "esp_err.h"
+#include "esp_console.h"
 
 namespace stampfly {
 
 /**
- * @brief Serial REPL class with linenoise integration
+ * @brief Serial REPL class using ESP-IDF Console REPL API
  *
- * Singleton class that manages USB Serial REPL with linenoise
+ * Singleton class that manages USB CDC REPL with linenoise
  * for advanced line editing capabilities.
  */
 class SerialREPL {
@@ -36,26 +37,39 @@ public:
     /**
      * @brief Initialize Serial REPL
      *
-     * Sets up USB Serial JTAG driver and VFS integration.
-     * Configures linenoise with history and completion callbacks.
+     * Creates USB CDC REPL with esp_console API.
+     * Configures linenoise with history and completion.
      *
-     * USB Serial JTAGドライバとVFS統合を設定。
-     * linenoiseの履歴と補完コールバックを設定。
+     * esp_console API を使用して USB CDC REPL を作成。
+     * linenoise の履歴と補完を設定。
      *
      * @return ESP_OK on success
      */
     esp_err_t init();
 
     /**
-     * @brief Run the REPL loop (blocking)
+     * @brief Start the REPL (non-blocking)
      *
-     * Main REPL loop using linenoise for input.
-     * This function blocks indefinitely, processing commands.
-     * Should be called from a dedicated FreeRTOS task.
+     * Starts the REPL task managed by esp_console.
+     * Returns immediately after starting the task.
      *
-     * linenoiseを使用したメインREPLループ。
-     * この関数は無限にブロックし、コマンドを処理する。
-     * 専用のFreeRTOSタスクから呼び出すこと。
+     * esp_console が管理する REPL タスクを開始。
+     * タスク開始後すぐに戻る。
+     *
+     * @return ESP_OK on success
+     */
+    esp_err_t start();
+
+    /**
+     * @brief Run the REPL loop (blocking, for compatibility)
+     *
+     * With esp_console REPL, the task is managed internally.
+     * This function blocks forever for API compatibility.
+     * Prefer using start() instead.
+     *
+     * esp_console REPL ではタスクは内部管理される。
+     * API 互換性のためにこの関数は永久にブロックする。
+     * 代わりに start() を使用することを推奨。
      */
     void run();
 
@@ -64,6 +78,12 @@ public:
      * @return true if initialized
      */
     bool isInitialized() const { return initialized_; }
+
+    /**
+     * @brief Check if REPL is running
+     * @return true if running
+     */
+    bool isRunning() const { return running_; }
 
     /**
      * @brief Set history maximum length
@@ -81,23 +101,9 @@ private:
     SerialREPL& operator=(const SerialREPL&) = delete;
 
     bool initialized_ = false;
+    bool running_ = false;
     int history_max_len_ = 20;
-
-    /**
-     * @brief Tab completion callback for linenoise
-     * @param buf Current input buffer
-     * @param lc Completions structure
-     */
-    static void completionCallback(const char* buf, void* lc);
-
-    /**
-     * @brief Hints callback for linenoise
-     * @param buf Current input buffer
-     * @param color Output: hint color
-     * @param bold Output: whether hint is bold
-     * @return Hint string or nullptr
-     */
-    static char* hintsCallback(const char* buf, int* color, int* bold);
+    esp_console_repl_t* repl_ = nullptr;
 };
 
 }  // namespace stampfly
