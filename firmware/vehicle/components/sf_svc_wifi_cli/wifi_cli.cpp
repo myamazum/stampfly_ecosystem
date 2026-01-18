@@ -10,6 +10,7 @@
 
 #include "wifi_cli.hpp"
 #include "console.hpp"
+#include "socket_line_editor.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -299,114 +300,6 @@ void WiFiCLI::clientTask(void* arg)
 }
 
 // =============================================================================
-// Client Handler
-// =============================================================================
-
-void WiFiCLI::handleClient(ClientContext* ctx)
-{
-    ESP_LOGI(TAG, "Handling client on fd %d", ctx->client_fd);
-
-    // Send welcome message
-    // ウェルカムメッセージを送信
-    sendWelcome(ctx->client_fd);
-    sendPrompt(ctx->client_fd);
-
-    // Set socket timeout for recv
-    // recvのソケットタイムアウトを設定
-    struct timeval tv;
-    tv.tv_sec = 1;
-    tv.tv_usec = 0;
-    setsockopt(ctx->client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
-    while (ctx->active && running_) {
-        // Check idle timeout
-        // アイドルタイムアウトをチェック
-        uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
-        if (now - ctx->last_activity_ms > config_.idle_timeout_ms) {
-            ESP_LOGI(TAG, "Client idle timeout");
-            const char* msg = "\r\nIdle timeout, disconnecting.\r\n";
-            send(ctx->client_fd, msg, strlen(msg), 0);
-            break;
-        }
-
-        // Receive data
-        // データを受信
-        char buf[64];
-        int len = recv(ctx->client_fd, buf, sizeof(buf) - 1, 0);
-
-        if (len < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // Timeout, continue
-                continue;
-            }
-            ESP_LOGE(TAG, "Recv error: errno %d", errno);
-            break;
-        }
-
-        if (len == 0) {
-            // Connection closed
-            // 接続が閉じられた
-            ESP_LOGI(TAG, "Client disconnected");
-            break;
-        }
-
-        ctx->last_activity_ms = now;
-
-        // Process received data
-        // 受信データを処理
-        for (int i = 0; i < len; i++) {
-            char c = buf[i];
-
-            // Handle special characters
-            // 特殊文字を処理
-            if (c == '\r' || c == '\n') {
-                if (ctx->rx_pos > 0) {
-                    ctx->rx_buffer[ctx->rx_pos] = '\0';
-                    processLine(ctx, ctx->rx_buffer);
-                    ctx->rx_pos = 0;
-                    sendPrompt(ctx->client_fd);
-                }
-            } else if (c == 0x7F || c == '\b') {
-                // Backspace
-                if (ctx->rx_pos > 0) {
-                    ctx->rx_pos--;
-                    // Echo backspace
-                    const char* bs = "\b \b";
-                    send(ctx->client_fd, bs, 3, 0);
-                }
-            } else if (c == 0x03) {
-                // Ctrl+C - cancel current line
-                // Ctrl+C - 現在の行をキャンセル
-                ctx->rx_pos = 0;
-                const char* msg = "^C\r\n";
-                send(ctx->client_fd, msg, strlen(msg), 0);
-                sendPrompt(ctx->client_fd);
-            } else if (c == 0x04) {
-                // Ctrl+D - disconnect
-                // Ctrl+D - 切断
-                ESP_LOGI(TAG, "Client sent Ctrl+D");
-                const char* msg = "\r\nGoodbye.\r\n";
-                send(ctx->client_fd, msg, strlen(msg), 0);
-                ctx->active = false;
-                break;
-            } else if (c >= 0x20 && c < 0x7F) {
-                // Printable character
-                // 印字可能文字
-                if (ctx->rx_pos < sizeof(ctx->rx_buffer) - 1) {
-                    ctx->rx_buffer[ctx->rx_pos++] = c;
-                    // Echo character
-                    send(ctx->client_fd, &c, 1, 0);
-                }
-            }
-            // Ignore other control characters
-            // 他の制御文字は無視
-        }
-    }
-
-    ESP_LOGI(TAG, "Client handler ended for fd %d", ctx->client_fd);
-}
-
-// =============================================================================
 // Output Callback for Console
 // =============================================================================
 
@@ -423,54 +316,142 @@ static void wifiOutputCallback(const char* str, void* ctx)
 }
 
 // =============================================================================
-// Command Processing
+// Completion Callback for WiFi CLI
 // =============================================================================
 
-void WiFiCLI::processLine(ClientContext* ctx, const char* line)
+// Tab completion callback for WiFi clients
+// WiFiクライアント用のTab補完コールバック
+static void wifiCompletionCallback(const char* buf, SocketCompletions* lc)
 {
-    ESP_LOGD(TAG, "Processing: %s", line);
-
-    // Skip empty lines
-    // 空行をスキップ
-    if (line[0] == '\0') {
+    if (buf == nullptr || lc == nullptr) {
         return;
     }
 
-    // Handle built-in exit commands
-    // 組み込みexitコマンドを処理
-    if (strcmp(line, "exit") == 0 || strcmp(line, "quit") == 0) {
-        const char* msg = "\r\nGoodbye.\r\n";
-        send(ctx->client_fd, msg, strlen(msg), 0);
-        ctx->active = false;
-        return;
+    size_t buf_len = strlen(buf);
+
+    // List of known commands for completion
+    // 補完用の既知コマンドリスト
+    static const char* commands[] = {
+        "help",
+        "status",
+        "reboot",
+        "version",
+        "sensor",
+        "loglevel",
+        "binlog",
+        "motor",
+        "trim",
+        "gain",
+        "comm",
+        "pair",
+        "unpair",
+        "calib",
+        "magcal",
+        "led",
+        "sound",
+        "pos",
+        "debug",
+        "ctrl",
+        "attitude",
+        "exit",
+        "quit",
+        nullptr
+    };
+
+    for (int i = 0; commands[i] != nullptr; i++) {
+        if (strncmp(buf, commands[i], buf_len) == 0) {
+            lc->add(commands[i]);
+        }
     }
+}
 
-    // Send newline before command output
-    // コマンド出力前に改行を送信
-    send(ctx->client_fd, "\r\n", 2, 0);
+// =============================================================================
+// Client Handler
+// =============================================================================
 
-    // Execute command via Console (esp_console based)
-    // Console経由でコマンドを実行（esp_consoleベース）
+void WiFiCLI::handleClient(ClientContext* ctx)
+{
+    ESP_LOGI(TAG, "Handling client on fd %d", ctx->client_fd);
+
+    // Send welcome message
+    // ウェルカムメッセージを送信
+    sendWelcome(ctx->client_fd);
+
+    // Create line editor for this client
+    // このクライアント用の行エディタを作成
+    SocketLineEditor editor(ctx->client_fd);
+    editor.setHistoryMaxLen(10);
+    editor.setCompletionCallback(wifiCompletionCallback);
+
+    // Get console reference
+    // コンソール参照を取得
     auto& console = Console::getInstance();
 
-    if (!console.isInitialized()) {
-        const char* msg = "Console not available\r\n";
-        send(ctx->client_fd, msg, strlen(msg), 0);
-        return;
+    while (ctx->active && running_) {
+        // Get line using SocketLineEditor (handles history, editing, completion)
+        // SocketLineEditorを使って行を取得（履歴、編集、補完を処理）
+        char* line = editor.getLine("stampfly> ");
+
+        if (line == nullptr) {
+            // Error or disconnect
+            // エラーまたは切断
+            ESP_LOGI(TAG, "Client disconnected or error");
+            break;
+        }
+
+        // Update activity timestamp
+        // アクティビティタイムスタンプを更新
+        ctx->last_activity_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+
+        // Skip empty lines
+        // 空行をスキップ
+        if (line[0] == '\0') {
+            editor.freeLine(line);
+            continue;
+        }
+
+        // Add to history
+        // 履歴に追加
+        editor.addHistory(line);
+
+        // Handle built-in exit commands
+        // 組み込みexitコマンドを処理
+        if (strcmp(line, "exit") == 0 || strcmp(line, "quit") == 0) {
+            const char* msg = "Goodbye.\r\n";
+            send(ctx->client_fd, msg, strlen(msg), 0);
+            editor.freeLine(line);
+            break;
+        }
+
+        // Execute command via Console
+        // Console経由でコマンドを実行
+        if (!console.isInitialized()) {
+            const char* msg = "Console not available\r\n";
+            send(ctx->client_fd, msg, strlen(msg), 0);
+        } else {
+            // Set output redirection to this client's socket
+            // このクライアントのソケットに出力をリダイレクト
+            int client_fd = ctx->client_fd;
+            console.setOutput(wifiOutputCallback, &client_fd);
+
+            // Execute the command
+            // コマンドを実行
+            int ret = console.run(line);
+            if (ret != 0) {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "Error: %d\r\n", ret);
+                send(ctx->client_fd, buf, strlen(buf), 0);
+            }
+
+            // Clear output redirection
+            // 出力リダイレクトをクリア
+            console.clearOutput();
+        }
+
+        editor.freeLine(line);
     }
 
-    // Set output redirection to this client's socket
-    // このクライアントのソケットに出力をリダイレクト
-    int client_fd = ctx->client_fd;
-    console.setOutput(wifiOutputCallback, &client_fd);
-
-    // Execute the command
-    // コマンドを実行
-    console.run(line);
-
-    // Clear output redirection
-    // 出力リダイレクトをクリア
-    console.clearOutput();
+    ESP_LOGI(TAG, "Client handler ended for fd %d", ctx->client_fd);
 }
 
 // =============================================================================
@@ -482,12 +463,6 @@ void WiFiCLI::sendToClient(int fd, const char* data, size_t len)
     if (fd >= 0 && data != nullptr && len > 0) {
         send(fd, data, len, 0);
     }
-}
-
-void WiFiCLI::sendPrompt(int fd)
-{
-    const char* prompt = "stampfly> ";
-    send(fd, prompt, strlen(prompt), 0);
 }
 
 void WiFiCLI::sendWelcome(int fd)

@@ -144,17 +144,9 @@ private:
     // クライアント接続を処理
     void handleClient(ClientContext* ctx);
 
-    // Process a line of input
-    // 入力行を処理
-    void processLine(ClientContext* ctx, const char* line);
-
     // Send data to a client
     // クライアントにデータを送信
     void sendToClient(int fd, const char* data, size_t len);
-
-    // Send prompt to client
-    // クライアントにプロンプトを送信
-    void sendPrompt(int fd);
 
     // Send welcome message
     // ウェルカムメッセージを送信
