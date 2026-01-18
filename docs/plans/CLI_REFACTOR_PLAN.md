@@ -20,7 +20,7 @@ Serial CLI と WiFi CLI を統合し、以下を実現する：
 | Phase 1: esp_console 統合 | ✅ 完了 |
 | Phase 2: linenoise 統合 | ✅ 完了 |
 | Phase 3: WiFi CLI 統合 | ✅ 完了 |
-| Phase 4: 旧CLI削除 | ⏳ 未着手 |
+| Phase 4: 旧CLI削除 | ✅ 完了 |
 
 ### 現状の問題
 
@@ -760,7 +760,7 @@ Integrate Serial CLI and WiFi CLI with:
 | Phase 1: esp_console integration | ✅ Done |
 | Phase 2: linenoise integration | ✅ Done |
 | Phase 3: WiFi CLI integration | ✅ Done |
-| Phase 4: Remove old CLI | ⏳ Not started |
+| Phase 4: Remove old CLI | ✅ Done |
 
 ## 2. Target Architecture
 
