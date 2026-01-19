@@ -36,7 +36,7 @@ idf_component_register(
         sf_svc_state
         sf_svc_comm
         sf_svc_console
-        sf_svc_serial_repl
+        sf_svc_serial_cli
         sf_svc_telemetry
         sf_svc_wifi_cli
         sf_svc_led

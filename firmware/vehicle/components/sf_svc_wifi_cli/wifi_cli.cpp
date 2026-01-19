@@ -10,7 +10,7 @@
 
 #include "wifi_cli.hpp"
 #include "console.hpp"
-#include "socket_line_editor.hpp"
+#include "line_editor.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -316,12 +316,52 @@ static void wifiOutputCallback(const char* str, void* ctx)
 }
 
 // =============================================================================
+// Socket I/O Callbacks for LineEditor
+// =============================================================================
+
+/**
+ * @brief Read a byte from socket
+ * @param ctx Socket file descriptor (passed as void*)
+ * @return Byte read, or -1 on error
+ *
+ * ソケットから1バイト読み取る
+ */
+static int socket_read_byte(void* ctx)
+{
+    int fd = *static_cast<int*>(ctx);
+    char c;
+    int ret = recv(fd, &c, 1, 0);
+    if (ret <= 0) {
+        return -1;  // Error or disconnect
+    }
+    return static_cast<unsigned char>(c);
+}
+
+/**
+ * @brief Write data to socket
+ * @param ctx Socket file descriptor (passed as void*)
+ * @param data Data to write
+ * @param len Length of data
+ * @return Number of bytes written
+ *
+ * ソケットにデータを書き込む
+ */
+static int socket_write_data(void* ctx, const void* data, size_t len)
+{
+    int fd = *static_cast<int*>(ctx);
+    if (data == nullptr || len == 0 || fd < 0) {
+        return 0;
+    }
+    return send(fd, data, len, 0);
+}
+
+// =============================================================================
 // Completion Callback for WiFi CLI
 // =============================================================================
 
 // Tab completion callback for WiFi clients
 // WiFiクライアント用のTab補完コールバック
-static void wifiCompletionCallback(const char* buf, SocketCompletions* lc)
+static void wifiCompletionCallback(const char* buf, LineCompletions* lc)
 {
     if (buf == nullptr || lc == nullptr) {
         return;
@@ -377,10 +417,21 @@ void WiFiCLI::handleClient(ClientContext* ctx)
     // ウェルカムメッセージを送信
     sendWelcome(ctx->client_fd);
 
-    // Create line editor for this client
-    // このクライアント用の行エディタを作成
-    SocketLineEditor editor(ctx->client_fd);
-    editor.setHistoryMaxLen(10);
+    // Create line editor for this client with socket I/O callbacks
+    // このクライアント用の行エディタをソケットI/Oコールバックで作成
+    int client_fd = ctx->client_fd;
+    LineEditorIO io = {
+        .read_byte = socket_read_byte,
+        .write_data = socket_write_data,
+        .ctx = &client_fd,
+    };
+
+    LineEditorConfig config = {
+        .enable_telnet_negotiation = true,
+        .history_max_len = 10,
+    };
+
+    LineEditor editor(io, config);
     editor.setCompletionCallback(wifiCompletionCallback);
 
     // Get console reference
@@ -388,8 +439,8 @@ void WiFiCLI::handleClient(ClientContext* ctx)
     auto& console = Console::getInstance();
 
     while (ctx->active && running_) {
-        // Get line using SocketLineEditor (handles history, editing, completion)
-        // SocketLineEditorを使って行を取得（履歴、編集、補完を処理）
+        // Get line using LineEditor (handles history, editing, completion)
+        // LineEditorを使って行を取得（履歴、編集、補完を処理）
         char* line = editor.getLine("stampfly> ");
 
         if (line == nullptr) {

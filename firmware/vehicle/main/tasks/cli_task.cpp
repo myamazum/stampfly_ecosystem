@@ -1,8 +1,8 @@
 /**
  * @file cli_task.cpp
- * @brief CLI Task - Serial REPL using ESP-IDF Console REPL API
+ * @brief CLI Task - Serial CLI using custom LineEditor
  *
- * CLIタスク - ESP-IDF Console REPL API を使用した Serial REPL
+ * CLIタスク - 独自 LineEditor を使用した Serial CLI
  *
  * Features:
  * - Command history (up/down arrows)
@@ -13,7 +13,7 @@
  */
 
 #include "tasks_common.hpp"
-#include "serial_repl.hpp"
+#include "serial_cli.hpp"
 #include "console.hpp"
 
 static const char* TAG = "CLITask";
@@ -25,15 +25,15 @@ void CLITask(void* pvParameters)
 {
     ESP_LOGI(TAG, "CLITask started");
 
-    // Get SerialREPL instance
-    // SerialREPLインスタンスを取得
-    auto& repl = stampfly::SerialREPL::getInstance();
+    // Get SerialCLI instance
+    // SerialCLI インスタンスを取得
+    auto& cli = stampfly::SerialCLI::getInstance();
 
-    // Initialize SerialREPL (creates USB CDC REPL, calls esp_console_init internally)
-    // SerialREPLを初期化（USB CDC REPL を作成、内部で esp_console_init を呼ぶ）
-    esp_err_t ret = repl.init();
+    // Initialize SerialCLI (initializes esp_console for command registration)
+    // SerialCLI を初期化（コマンド登録用に esp_console を初期化）
+    esp_err_t ret = cli.init();
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize SerialREPL: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to initialize SerialCLI: %s", esp_err_to_name(ret));
         // Fall back to simple loop if initialization fails
         // 初期化に失敗した場合はシンプルなループにフォールバック
         while (true) {
@@ -46,23 +46,13 @@ void CLITask(void* pvParameters)
     auto& console = stampfly::Console::getInstance();
     console.registerAllCommands();
 
-    // Start the REPL (non-blocking, starts internal task)
-    // REPLを開始（非ブロッキング、内部タスクを開始）
-    ret = repl.start();
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start SerialREPL: %s", esp_err_to_name(ret));
-        while (true) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-    }
+    // Run the CLI loop (blocking)
+    // CLI ループを実行（ブロッキング）
+    ESP_LOGI(TAG, "Starting SerialCLI");
+    cli.run();
 
-    // The REPL runs in its own task managed by esp_console
-    // REPL は esp_console が管理する独自のタスクで実行される
-    // This task can now be deleted or used for other purposes
-    // このタスクは削除するか、他の目的に使用できる
-    ESP_LOGI(TAG, "SerialREPL started, CLITask exiting");
-
-    // Delete this task since REPL has its own task
-    // REPL は独自のタスクを持つため、このタスクを削除
+    // Should not reach here unless CLI is stopped
+    // CLI が停止されない限りここには到達しない
+    ESP_LOGI(TAG, "CLITask ending");
     vTaskDelete(NULL);
 }
