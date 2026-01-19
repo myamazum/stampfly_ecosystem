@@ -24,6 +24,7 @@ namespace stampfly {
 // NVS keys
 static constexpr const char* NVS_NAMESPACE = "stampfly";
 static constexpr const char* NVS_KEY_PAIRING = "ctrl_mac";
+static constexpr const char* NVS_KEY_CHANNEL = "wifi_ch";
 
 // Global instance pointer for callback access
 static ControllerComm* s_instance = nullptr;
@@ -228,7 +229,7 @@ esp_err_t ControllerComm::sendTelemetry(const TelemetryPacket& packet)
     return ret;
 }
 
-esp_err_t ControllerComm::setChannel(int channel)
+esp_err_t ControllerComm::setChannel(int channel, bool save_to_nvs)
 {
     if (channel < 1 || channel > 13) {
         ESP_LOGE(TAG, "Invalid channel %d (must be 1-13)", channel);
@@ -254,7 +255,59 @@ esp_err_t ControllerComm::setChannel(int channel)
         }
     }
 
+    // Save to NVS if requested
+    if (save_to_nvs) {
+        ret = saveChannelToNVS();
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to save channel to NVS");
+        }
+    }
+
     return ESP_OK;
+}
+
+esp_err_t ControllerComm::saveChannelToNVS()
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = nvs_set_u8(handle, NVS_KEY_CHANNEL, static_cast<uint8_t>(config_.wifi_channel));
+    if (ret == ESP_OK) {
+        ret = nvs_commit(handle);
+    }
+
+    nvs_close(handle);
+
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Channel %d saved to NVS", config_.wifi_channel);
+    }
+
+    return ret;
+}
+
+// static
+int ControllerComm::loadChannelFromNVS()
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle);
+    if (ret != ESP_OK) {
+        return -1;  // NVS not initialized or namespace not found
+    }
+
+    uint8_t channel = 0;
+    ret = nvs_get_u8(handle, NVS_KEY_CHANNEL, &channel);
+    nvs_close(handle);
+
+    if (ret == ESP_OK && channel >= 1 && channel <= 13) {
+        ESP_LOGI(TAG, "Loaded channel %d from NVS", channel);
+        return static_cast<int>(channel);
+    }
+
+    return -1;  // Key not found or invalid value
 }
 
 void ControllerComm::enterPairingMode()

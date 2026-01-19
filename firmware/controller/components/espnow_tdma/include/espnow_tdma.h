@@ -15,18 +15,27 @@
 extern "C" {
 #endif
 
-// WiFiチャンネル設定
-#define ESPNOW_CHANNEL 1
+// WiFiチャンネル設定（デフォルト値）
+#define ESPNOW_CHANNEL_DEFAULT 1
+#define ESPNOW_CHANNEL_MIN 1
+#define ESPNOW_CHANNEL_MAX 13
 
-// TDMA設定
-#define TDMA_DEVICE_ID 0         // デバイスID: 0=マスター, 1-9=スレーブ
-#define TDMA_FRAME_US 20000      // 1フレーム = 20ms
+// TDMA設定（デフォルト値）
+#define TDMA_DEVICE_ID_DEFAULT 0  // デバイスID: 0=マスター, 1-9=スレーブ
+#define TDMA_DEVICE_ID_MIN 0
+#define TDMA_DEVICE_ID_MAX 9
+#define TDMA_FRAME_US 20000       // 1フレーム = 20ms
 #define TDMA_SLOT_US 2000        // 1スロット = 2ms
 #define TDMA_NUM_SLOTS 10        // スロット数
 #define TDMA_BEACON_ADVANCE_US 500  // ビーコン先行時間
 
 // 制御パケットサイズ
 #define CONTROL_PACKET_SIZE 14
+
+// ランタイム設定値（NVSから読み込み可能）
+// Runtime configuration (can be loaded from NVS)
+extern uint8_t g_espnow_channel;
+extern uint8_t g_tdma_device_id;
 
 // ドローンMACアドレス (ペアリングで更新される)
 extern uint8_t Drone_mac[6];
@@ -45,6 +54,30 @@ extern volatile uint32_t actual_send_freq_hz;
 
 // ドローン接続状態
 extern volatile bool drone_available;
+
+/**
+ * @brief チャンネル設定（espnow_init前に呼び出し）
+ * @param channel WiFiチャンネル (1-13)
+ */
+void espnow_set_channel(uint8_t channel);
+
+/**
+ * @brief チャンネル取得
+ * @return 現在のチャンネル
+ */
+uint8_t espnow_get_channel(void);
+
+/**
+ * @brief デバイスID設定（tdma_init前に呼び出し）
+ * @param device_id デバイスID (0-9)
+ */
+void tdma_set_device_id(uint8_t device_id);
+
+/**
+ * @brief デバイスID取得
+ * @return 現在のデバイスID
+ */
+uint8_t tdma_get_device_id(void);
 
 /**
  * @brief ESP-NOW + WiFi初期化

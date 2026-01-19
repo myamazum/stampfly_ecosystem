@@ -546,8 +546,17 @@ esp_err_t communication()
     // ESP-NOW Controller Communication
     {
         stampfly::ControllerComm::Config cfg;
-        cfg.wifi_channel = comm::WIFI_CHANNEL;
         cfg.timeout_ms = comm::TIMEOUT_MS;
+
+        // Load WiFi channel from NVS, use default if not found
+        int saved_channel = stampfly::ControllerComm::loadChannelFromNVS();
+        if (saved_channel >= 1 && saved_channel <= 13) {
+            cfg.wifi_channel = saved_channel;
+            ESP_LOGI(TAG, "Loaded WiFi channel %d from NVS", saved_channel);
+        } else {
+            cfg.wifi_channel = comm::WIFI_CHANNEL;
+            ESP_LOGI(TAG, "Using default WiFi channel %d", cfg.wifi_channel);
+        }
 
         esp_err_t ret = g_comm.init(cfg);
         if (ret != ESP_OK) {

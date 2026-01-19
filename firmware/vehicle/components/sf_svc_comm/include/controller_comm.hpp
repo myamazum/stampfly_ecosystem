@@ -140,15 +140,28 @@ public:
     /**
      * @brief Set WiFi channel
      * @param channel WiFi channel (1-13)
+     * @param save_to_nvs Save to NVS (default: false)
      * @return ESP_OK on success
      */
-    esp_err_t setChannel(int channel);
+    esp_err_t setChannel(int channel, bool save_to_nvs = false);
 
     /**
      * @brief Get current WiFi channel
      * @return Current channel
      */
     int getChannel() const { return config_.wifi_channel; }
+
+    /**
+     * @brief Save current channel to NVS
+     * @return ESP_OK on success
+     */
+    esp_err_t saveChannelToNVS();
+
+    /**
+     * @brief Load channel from NVS
+     * @return Channel number (1-13) or -1 if not found
+     */
+    static int loadChannelFromNVS();
 
     /**
      * @brief Save pairing information to NVS

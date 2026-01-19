@@ -228,9 +228,10 @@ static int cmd_pair(int argc, char** argv)
             console.print("Invalid channel. Use 1-13.\r\n");
             return 1;
         }
-        esp_err_t ret = g_comm_ptr->setChannel(channel);
+        // Set channel and save to NVS
+        esp_err_t ret = g_comm_ptr->setChannel(channel, true);
         if (ret == ESP_OK) {
-            console.print("WiFi channel set to %d\r\n", channel);
+            console.print("WiFi channel set to %d (saved to NVS)\r\n", channel);
         } else {
             console.print("Failed to set channel: %s\r\n", esp_err_to_name(ret));
             return 1;

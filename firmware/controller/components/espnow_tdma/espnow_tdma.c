@@ -24,6 +24,11 @@ static const char* TAG = "ESPNOW";
 static const char* TAG_TDMA = "TDMA";
 static const char* TAG_BEACON = "BEACON";
 
+// ランタイム設定値（デフォルト値で初期化）
+// Runtime configuration (initialized with defaults)
+uint8_t g_espnow_channel = ESPNOW_CHANNEL_DEFAULT;
+uint8_t g_tdma_device_id = TDMA_DEVICE_ID_DEFAULT;
+
 // ピア情報
 static esp_now_peer_info_t drone_peer;
 static esp_now_peer_info_t beacon_peer;
@@ -140,7 +145,7 @@ static void on_data_recv(const esp_now_recv_info_t *recv_info, const uint8_t *da
     } else {
         // ビーコンパケット (2バイト: BE AC)
         if (data_len == 2 && data[0] == 0xBE && data[1] == 0xAC) {
-            if (TDMA_DEVICE_ID != 0) {
+            if (g_tdma_device_id != 0) {
                 // スレーブ: ビーコン受信時刻をフレーム開始時刻として使用
                 int64_t current_time = esp_timer_get_time();
                 frame_start_time_us = current_time;
@@ -225,7 +230,7 @@ static void tdma_send_task(void* parameter)
 
             // スロット開始時刻を計算
             int64_t slot_0_start_us = frame_start_time_us + TDMA_BEACON_ADVANCE_US;
-            int64_t slot_start_us = slot_0_start_us + (TDMA_DEVICE_ID * TDMA_SLOT_US);
+            int64_t slot_start_us = slot_0_start_us + (g_tdma_device_id * TDMA_SLOT_US);
             int64_t current_us = esp_timer_get_time();
 
             // スロット開始までウェイト
@@ -270,7 +275,7 @@ static void IRAM_ATTR tdma_timer_callback(void* arg)
     frame_start_time_us = esp_timer_get_time();
 
     // マスター: ビーコン送信タスクに通知
-    if (TDMA_DEVICE_ID == 0 && beacon_task_handle != NULL) {
+    if (g_tdma_device_id == 0 && beacon_task_handle != NULL) {
         vTaskNotifyGiveFromISR(beacon_task_handle, &xHigherPriorityTaskWoken);
     }
 
@@ -316,7 +321,7 @@ esp_err_t espnow_init(void)
     ret = esp_wifi_set_ps(WIFI_PS_NONE);  // 省電力OFF
     if (ret != ESP_OK) return ret;
 
-    ret = esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
+    ret = esp_wifi_set_channel(g_espnow_channel, WIFI_SECOND_CHAN_NONE);
     if (ret != ESP_OK) return ret;
 
     // ESP-NOW初期化
@@ -330,7 +335,7 @@ esp_err_t espnow_init(void)
     esp_now_register_send_cb(on_data_sent);
     esp_now_register_recv_cb(on_data_recv);
 
-    ESP_LOGI(TAG, "ESP-NOW初期化完了 (CH=%d)", ESPNOW_CHANNEL);
+    ESP_LOGI(TAG, "ESP-NOW初期化完了 (CH=%d)", g_espnow_channel);
     return ESP_OK;
 }
 
@@ -338,7 +343,7 @@ esp_err_t beacon_peer_init(void)
 {
     memset(&beacon_peer, 0, sizeof(beacon_peer));
     memcpy(beacon_peer.peer_addr, Beacon_mac, 6);
-    beacon_peer.channel = ESPNOW_CHANNEL;
+    beacon_peer.channel = g_espnow_channel;
     beacon_peer.encrypt = false;
     beacon_peer.ifidx = WIFI_IF_STA;
 
@@ -359,7 +364,7 @@ esp_err_t drone_peer_init(void)
 {
     memset(&drone_peer, 0, sizeof(drone_peer));
     memcpy(drone_peer.peer_addr, Drone_mac, 6);
-    drone_peer.channel = ESPNOW_CHANNEL;
+    drone_peer.channel = g_espnow_channel;
     drone_peer.encrypt = false;
     drone_peer.ifidx = WIFI_IF_STA;
 
@@ -406,7 +411,7 @@ esp_err_t tdma_init(void)
     }
 
     // マスター: ビーコンタスク作成
-    if (TDMA_DEVICE_ID == 0) {
+    if (g_tdma_device_id == 0) {
         BaseType_t ret = xTaskCreatePinnedToCore(
             beacon_task,
             "BeaconTask",
@@ -455,7 +460,7 @@ esp_err_t tdma_init(void)
 
     frame_start_time_us = esp_timer_get_time();
 
-    ESP_LOGI(TAG_TDMA, "TDMA初期化完了 (ID=%d)", TDMA_DEVICE_ID);
+    ESP_LOGI(TAG_TDMA, "TDMA初期化完了 (ID=%d)", g_tdma_device_id);
     return ESP_OK;
 }
 
@@ -467,10 +472,10 @@ esp_err_t tdma_start(void)
         return err;
     }
 
-    if (TDMA_DEVICE_ID == 0) {
+    if (g_tdma_device_id == 0) {
         ESP_LOGI(TAG_TDMA, "TDMAマスター開始 (period=%d us)", TDMA_FRAME_US);
     } else {
-        ESP_LOGI(TAG_TDMA, "TDMAスレーブ開始 (ID=%d, period=%d us)", TDMA_DEVICE_ID, TDMA_FRAME_US);
+        ESP_LOGI(TAG_TDMA, "TDMAスレーブ開始 (ID=%d, period=%d us)", g_tdma_device_id, TDMA_FRAME_US);
     }
     return ESP_OK;
 }
@@ -519,7 +524,7 @@ esp_err_t peer_info_save(void)
     }
 
     fprintf(fp, "%d,%02X,%02X,%02X,%02X,%02X,%02X",
-            ESPNOW_CHANNEL,
+            g_espnow_channel,
             Drone_mac[0], Drone_mac[1], Drone_mac[2],
             Drone_mac[3], Drone_mac[4], Drone_mac[5]);
     fclose(fp);
@@ -567,7 +572,7 @@ esp_err_t peer_info_load(void)
     }
 
     ESP_LOGI(TAG, "ピア情報読込: CH=%d, MAC=%02X:%02X:%02X:%02X:%02X:%02X",
-             ESPNOW_CHANNEL,
+             g_espnow_channel,
              Drone_mac[0], Drone_mac[1], Drone_mac[2],
              Drone_mac[3], Drone_mac[4], Drone_mac[5]);
     return ESP_OK;
@@ -590,9 +595,46 @@ const uint8_t* get_drone_peer_addr(void)
 
 bool is_beacon_lost(void)
 {
-    if (TDMA_DEVICE_ID == 0 || !first_beacon_received) {
+    if (g_tdma_device_id == 0 || !first_beacon_received) {
         return false;
     }
     int64_t time_since_beacon = esp_timer_get_time() - last_beacon_time_us;
     return (time_since_beacon > BEACON_TIMEOUT_US);
+}
+
+// ============================================================================
+// Channel / Device ID getter/setter
+// チャンネル / デバイスID getter/setter
+// ============================================================================
+
+void espnow_set_channel(uint8_t channel)
+{
+    if (channel >= ESPNOW_CHANNEL_MIN && channel <= ESPNOW_CHANNEL_MAX) {
+        g_espnow_channel = channel;
+        ESP_LOGI(TAG, "チャンネル設定: %d", channel);
+    } else {
+        ESP_LOGW(TAG, "無効なチャンネル: %d (範囲: %d-%d)",
+                 channel, ESPNOW_CHANNEL_MIN, ESPNOW_CHANNEL_MAX);
+    }
+}
+
+uint8_t espnow_get_channel(void)
+{
+    return g_espnow_channel;
+}
+
+void tdma_set_device_id(uint8_t device_id)
+{
+    if (device_id >= TDMA_DEVICE_ID_MIN && device_id <= TDMA_DEVICE_ID_MAX) {
+        g_tdma_device_id = device_id;
+        ESP_LOGI(TAG_TDMA, "デバイスID設定: %d", device_id);
+    } else {
+        ESP_LOGW(TAG_TDMA, "無効なデバイスID: %d (範囲: %d-%d)",
+                 device_id, TDMA_DEVICE_ID_MIN, TDMA_DEVICE_ID_MAX);
+    }
+}
+
+uint8_t tdma_get_device_id(void)
+{
+    return g_tdma_device_id;
 }
