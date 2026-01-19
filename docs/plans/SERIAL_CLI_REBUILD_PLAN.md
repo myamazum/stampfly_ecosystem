@@ -1,5 +1,45 @@
 # Serial CLI 再構築プラン
 
+**ステータス: ✅ 完了**
+
+---
+
+## 完了サマリー
+
+### 実施内容
+
+| Phase | 内容 | 状態 |
+|-------|------|------|
+| Phase 1 | 既存 Serial CLI の削除 | ✅ 完了 |
+| Phase 2 | ESP-IDF 標準コンソールで再構築 | ✅ 完了 |
+| Phase 3 | 動作確認 | ✅ 完了 |
+
+### 変更ファイル
+
+| ファイル | 変更内容 |
+|----------|----------|
+| `sf_svc_serial_cli/` | ディレクトリ全体を削除 |
+| `main/tasks/cli_task.cpp` | ESP-IDF 標準コンソール使用に変更 |
+| `main/CMakeLists.txt` | sf_svc_serial_cli 依存削除 |
+| `main/config.hpp` | STACK_SIZE_CLI を 4096 に復元 |
+
+### 実装上の注意点
+
+1. **マクロ名**: `ESP_CONSOLE_DEV_CDC_CONFIG_DEFAULT()` を使用（`USB_CDC` ではない）
+2. **コマンド登録順序**: REPL 作成後にコマンドを登録することでデフォルト help を上書き
+3. **タスク終了**: REPL は独自タスクで動作するため CLITask は `vTaskDelete()` で終了
+
+### 動作確認結果
+
+- ✅ プロンプト表示
+- ✅ 文字エコー
+- ✅ コマンド実行（help, status, version 等）
+- ✅ 履歴（上下矢印）
+- ✅ Tab 補完
+- ✅ WiFi CLI と同じ help 形式
+
+---
+
 ## 1. 現状分析
 
 ### WiFi CLI 仕様（動作確認済み）
