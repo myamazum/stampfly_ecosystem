@@ -63,11 +63,11 @@ def send_command(cmd, ip, silent=False):
             print(f"📤 Sending command: {cmd}")
         sock.send(f"{cmd}\n".encode())
 
-        # Wait a bit for response
-        time.sleep(0.1)
+        # Wait for command to process (WiFi latency + command execution)
+        time.sleep(1.0)
 
-        # Read response
-        response = sock.recv(2048).decode('utf-8', errors='ignore')
+        # Read response with larger buffer
+        response = sock.recv(4096).decode('utf-8', errors='ignore')
 
         sock.close()
 
@@ -76,18 +76,22 @@ def send_command(cmd, ip, silent=False):
 
         return True, response
 
-    except socket.timeout:
+    except socket.timeout as e:
         if not silent:
-            print("❌ Timeout: StampFly not responding")
-        return False, "Timeout"
-    except ConnectionRefusedError:
+            print(f"❌ Timeout: StampFly not responding ({e})")
+        return False, f"Timeout: {e}"
+    except ConnectionRefusedError as e:
         if not silent:
-            print("❌ Connection refused: Is StampFly powered on and WiFi enabled?")
-        return False, "Connection refused"
+            print(f"❌ Connection refused: {e}")
+        return False, f"Connection refused: {e}"
+    except OSError as e:
+        if not silent:
+            print(f"❌ Network error: {e}")
+        return False, f"Network error: {e}"
     except Exception as e:
         if not silent:
-            print(f"❌ Error: {e}")
-        return False, str(e)
+            print(f"❌ Error: {type(e).__name__}: {e}")
+        return False, f"{type(e).__name__}: {e}"
 
 def main():
     # Parse command line arguments

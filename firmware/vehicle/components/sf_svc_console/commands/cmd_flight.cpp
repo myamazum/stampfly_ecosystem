@@ -36,24 +36,15 @@ static int cmd_jump(int argc, char** argv) {
         }
     }
 
-    float hover_duration = 0.5f;  // Default 0.5s
-    if (argc >= 3) {
-        hover_duration = atof(argv[2]);
-        if (hover_duration < 0.1f || hover_duration > 10.0f) {
-            console.print("Error: Hover duration must be 0.1-10.0 [s]\r\n");
-            return 1;
-        }
-    }
-
     FlightCommandParams params;
     params.target_altitude = altitude;
-    params.duration_s = hover_duration;
+    params.duration_s = 0.0f;      // Not used (hovering phase skipped in JUMP)
     params.climb_rate = 0.4f;      // 0.4 m/s climb
     params.descent_rate = 0.3f;    // 0.3 m/s descent
 
     if (flight.executeCommand(FlightCommandType::JUMP, params)) {
-        console.print("Jump command started (alt: %.2f m, hover: %.1f s)\r\n",
-                     altitude, hover_duration);
+        console.print("Jump command started: climb to %.2f m then descend\r\n",
+                     altitude);
         return 0;
     } else {
         console.print("Failed to start jump command\r\n");
