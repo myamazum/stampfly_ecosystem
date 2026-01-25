@@ -125,6 +125,15 @@ void FlightCommandService::update(float dt) {
     // 現在の高度を取得
     float current_altitude = getCurrentAltitude();
 
+    // Debug log every 100 cycles (~250ms @ 400Hz)
+    static int update_log_counter = 0;
+    if (++update_log_counter >= 100) {
+        ESP_LOGI(TAG, "FlightCommand::update() - cmd=%d, phase=%d, alt=%.3f m, elapsed=%.1f s",
+                 static_cast<int>(current_command_), static_cast<int>(phase_),
+                 current_altitude, elapsed_time_);
+        update_log_counter = 0;
+    }
+
     // Command-specific state machine
     // コマンド固有の状態マシン
     switch (current_command_) {
@@ -197,7 +206,12 @@ void FlightCommandService::sendControlInput(float throttle, float roll, float pi
     auto& arbiter = ControlArbiter::getInstance();
     arbiter.updateFromWebSocket(throttle, roll, pitch, yaw, 0);
 
-    ESP_LOGD(TAG, "Control input: T=%.2f R=%.2f P=%.2f Y=%.2f", throttle, roll, pitch, yaw);
+    // Debug log every 100 cycles (~250ms @ 400Hz)
+    static int send_log_counter = 0;
+    if (++send_log_counter >= 100) {
+        ESP_LOGI(TAG, "→ ControlArbiter: T=%.2f R=%.2f P=%.2f Y=%.2f", throttle, roll, pitch, yaw);
+        send_log_counter = 0;
+    }
 }
 
 // Get current altitude estimate
@@ -225,7 +239,8 @@ void FlightCommandService::updateJumpCommand(float dt, float current_altitude) {
         case ExecutionPhase::INIT:
             // Start climbing
             // 上昇開始
-            ESP_LOGI(TAG, "JUMP: Starting climb to %.2f m", params_.target_altitude);
+            ESP_LOGI(TAG, "JUMP: Starting climb to %.2f m (current: %.2f m)",
+                     params_.target_altitude, current_altitude);
             phase_ = ExecutionPhase::CLIMBING;
             break;
 
@@ -249,6 +264,14 @@ void FlightCommandService::updateJumpCommand(float dt, float current_altitude) {
                     // シンプルな比例制御：誤差が大きいほど高いスロットル
                     float throttle = 0.55f + (altitude_error * 0.2f);
                     throttle = constrain(throttle, 0.5f, 0.75f);  // Limit range
+
+                    // Debug log every 100 cycles (~250ms @ 400Hz)
+                    static int log_counter = 0;
+                    if (++log_counter >= 100) {
+                        ESP_LOGI(TAG, "JUMP CLIMBING: alt=%.3f m, target=%.2f m, error=%.3f m, throttle=%.2f",
+                                 current_altitude, params_.target_altitude, altitude_error, throttle);
+                        log_counter = 0;
+                    }
 
                     sendControlInput(throttle, 0.0f, 0.0f, 0.0f);
                 }

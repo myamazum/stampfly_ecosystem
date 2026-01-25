@@ -341,6 +341,14 @@ void ControlTask(void* pvParameters)
             roll_cmd = ctrl_input.roll;
             pitch_cmd = ctrl_input.pitch;
             yaw_cmd = ctrl_input.yaw;
+
+            // Debug log every 100 cycles (~250ms @ 400Hz) when throttle > 0
+            static int ctrl_log_counter = 0;
+            if (throttle > 0.01f && ++ctrl_log_counter >= 100) {
+                ESP_LOGI(TAG, "← ControlArbiter: T=%.2f R=%.2f P=%.2f Y=%.2f (src=%d)",
+                         throttle, roll_cmd, pitch_cmd, yaw_cmd, static_cast<int>(ctrl_input.source));
+                ctrl_log_counter = 0;
+            }
         } else {
             // No active control input (timeout or no source)
             // アクティブな制御入力なし（タイムアウトまたはソースなし）
@@ -348,6 +356,13 @@ void ControlTask(void* pvParameters)
             roll_cmd = 0.0f;
             pitch_cmd = 0.0f;
             yaw_cmd = 0.0f;
+
+            // Log timeout every 400 cycles (~1s)
+            static int timeout_log_counter = 0;
+            if (++timeout_log_counter >= 400) {
+                ESP_LOGW(TAG, "No active control input (timeout or no source)");
+                timeout_log_counter = 0;
+            }
         }
 
         // =====================================================================
