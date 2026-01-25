@@ -367,7 +367,17 @@ stampfly> flight cancel
 Flight command cancelled
 ```
 
-**Python/ROS経由（将来）:**
+**Pythonヘルパースクリプト経由:**
+```bash
+# tools/stampfly_cli.py を使用
+$ python tools/stampfly_cli.py jump 0.3 0.5
+Connecting to StampFly at 192.168.4.1:23...
+Connected.
+Sending command: jump 0.3 0.5
+Response: Jump command started (alt: 0.30 m, hover: 0.5 s)
+```
+
+**Python/ROS経由（プログラム内）:**
 ```python
 import socket
 
@@ -384,32 +394,262 @@ def send_flight_command(command):
 send_flight_command("jump 0.3 0.5")
 ```
 
+### 3.5 Hooksジョークアプリ 🎉
+
+**コンセプト:**
+Claude Codeのhooks機能を使って、作業完了時にStampFlyが喜んでジャンプする遊び心のある機能。
+
+**トリガー例:**
+- ✅ `git commit` 成功時 → 「コミット成功を祝ってジャンプ！」
+- ✅ 全タスク完了時 → 「タスク完了おめでとう！ジャンプで祝福！」
+- ✅ ビルド成功時 → 「ビルド成功、ジャンプで喜びを表現！」
+
+**実装:**
+
+#### ステップ1: Pythonヘルパースクリプト作成
+
+```python
+#!/usr/bin/env python3
+# tools/stampfly_cli.py
+"""
+StampFly CLI Helper - Send commands to StampFly via WiFi CLI
+
+Usage:
+    python tools/stampfly_cli.py jump 0.3 0.5
+    python tools/stampfly_cli.py takeoff 0.5
+    python tools/stampfly_cli.py land
+"""
+
+import socket
+import sys
+import time
+
+STAMPFLY_IP = "192.168.4.1"
+STAMPFLY_PORT = 23
+TIMEOUT = 2.0
+
+def send_command(cmd, silent=False):
+    """Send a command to StampFly and return response"""
+    try:
+        if not silent:
+            print(f"🚁 Connecting to StampFly at {STAMPFLY_IP}:{STAMPFLY_PORT}...")
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(TIMEOUT)
+        sock.connect((STAMPFLY_IP, STAMPFLY_PORT))
+
+        if not silent:
+            print("✅ Connected.")
+
+        # Read welcome message
+        welcome = sock.recv(1024).decode('utf-8', errors='ignore')
+
+        # Send command
+        if not silent:
+            print(f"📤 Sending command: {cmd}")
+        sock.send(f"{cmd}\n".encode())
+
+        # Wait a bit for response
+        time.sleep(0.1)
+
+        # Read response
+        response = sock.recv(2048).decode('utf-8', errors='ignore')
+
+        sock.close()
+
+        if not silent:
+            print(f"📥 Response: {response.strip()}")
+
+        return True, response
+
+    except socket.timeout:
+        if not silent:
+            print("❌ Timeout: StampFly not responding")
+        return False, "Timeout"
+    except ConnectionRefusedError:
+        if not silent:
+            print("❌ Connection refused: Is StampFly powered on and WiFi enabled?")
+        return False, "Connection refused"
+    except Exception as e:
+        if not silent:
+            print(f"❌ Error: {e}")
+        return False, str(e)
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage:")
+        print("  python tools/stampfly_cli.py jump [altitude] [hover_duration]")
+        print("  python tools/stampfly_cli.py takeoff [altitude]")
+        print("  python tools/stampfly_cli.py land")
+        print("  python tools/stampfly_cli.py flight status")
+        print("")
+        print("Examples:")
+        print("  python tools/stampfly_cli.py jump 0.3 0.5")
+        print("  python tools/stampfly_cli.py takeoff 0.5")
+        sys.exit(1)
+
+    # Build command from arguments
+    cmd = " ".join(sys.argv[1:])
+
+    success, response = send_command(cmd)
+
+    if success:
+        sys.exit(0)
+    else:
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+```
+
+#### ステップ2: Hook設定
+
+`.claude/settings.local.json` に以下のhooksを追加：
+
+```json
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "Edit",
+      "Read",
+      "Write",
+      "Glob",
+      "Grep",
+      "Task",
+      "Bash(git:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)"
+    ]
+  },
+  "hooks": {
+    "afterToolUse": {
+      "Bash(git commit*)": {
+        "command": "python3 tools/stampfly_cli.py jump 0.25 0.3 2>/dev/null || true",
+        "description": "🎉 Celebrate git commit with StampFly jump!"
+      }
+    }
+  }
+}
+```
+
+**より洗練されたhook例（条件付き実行）:**
+
+```bash
+# tools/celebrate.sh
+#!/bin/bash
+# StampFly celebration script - only jump if StampFly is online
+
+# Check if StampFly is reachable
+if timeout 1 bash -c "echo > /dev/tcp/192.168.4.1/23" 2>/dev/null; then
+    echo "🎉 Celebrating with StampFly jump!"
+    python3 tools/stampfly_cli.py jump 0.25 0.3 2>/dev/null &
+else
+    echo "ℹ️  StampFly offline, skipping celebration jump"
+fi
+```
+
+Hook設定:
+```json
+{
+  "hooks": {
+    "afterToolUse": {
+      "Bash(git commit*)": {
+        "command": "bash tools/celebrate.sh",
+        "description": "🎉 Celebrate successful work!"
+      }
+    }
+  }
+}
+```
+
+#### ステップ3: トリガー例
+
+**1. Git commit時にジャンプ:**
+```bash
+$ git commit -m "feat: implement awesome feature"
+[main abc1234] feat: implement awesome feature
+🎉 Celebrating with StampFly jump!
+🚁 Connecting to StampFly at 192.168.4.1:23...
+✅ Connected.
+📤 Sending command: jump 0.25 0.3
+📥 Response: Jump command started (alt: 0.25 m, hover: 0.3 s)
+```
+
+**2. タスク完了時にジャンプ:**
+```json
+{
+  "hooks": {
+    "afterToolUse": {
+      "TaskUpdate(status:completed)": {
+        "command": "python3 tools/stampfly_cli.py jump 0.2 0.5",
+        "description": "🎊 Task completed! StampFly celebrates!"
+      }
+    }
+  }
+}
+```
+
+**3. ビルド成功時にジャンプ:**
+```json
+{
+  "hooks": {
+    "afterToolUse": {
+      "Bash(sf build*)": {
+        "command": "if [ $? -eq 0 ]; then python3 tools/stampfly_cli.py jump 0.3 0.5; fi",
+        "description": "🚀 Build success celebration!"
+      }
+    }
+  }
+}
+```
+
+**安全機能:**
+- タイムアウト設定（2秒）- StampFlyがオフラインでも処理が止まらない
+- `2>/dev/null || true` でエラーを無視（StampFly未接続時もClaude Codeの動作に影響なし）
+- バックグラウンド実行（`&`）で非同期化
+
+**デモシナリオ（Phase 1完了時）:**
+1. JUMPコマンドを実装
+2. WiFi CLI経由で動作確認
+3. `tools/stampfly_cli.py` を作成
+4. `.claude/settings.local.json` にhook設定
+5. **デモ**: Claude Codeで何かコミット → StampFlyがジャンプ！ 🎉
+
 ---
 
 ## 4. 実装順序
 
-### Phase 1: 基本実装（1-2日）
+### Phase 1: 基本実装 + Hooks連携ジョークアプリ（1-2日）
 1. ✅ `sf_svc_flight_command` コンポーネント作成
 2. ✅ `FlightCommandService` 基本クラス実装
 3. ✅ JUMP コマンド実装（テストケース）
 4. ✅ CLI コマンド登録 (`cmd_flight.cpp`)
 5. ✅ 動作確認（WiFi CLI経由でジャンプ）
+6. ✅ **Pythonヘルパースクリプト作成** (`tools/stampfly_cli.py`)
+7. ✅ **Hooksジョークアプリ設定** (作業完了時にジャンプ)
+8. ✅ **動作デモ確認**（git commit → StampFlyジャンプ 🎉）
 
 ### Phase 2: コマンド拡張（1日）
-6. ✅ TAKEOFF コマンド実装
-7. ✅ LAND コマンド実装
-8. ✅ HOVER コマンド実装
-9. ✅ 安全チェック強化（バッテリー、姿勢等）
+9. ✅ TAKEOFF コマンド実装
+10. ✅ LAND コマンド実装
+11. ✅ HOVER コマンド実装
+12. ✅ 安全チェック強化（バッテリー、姿勢等）
 
 ### Phase 3: 外部連携準備（1日）
-10. ✅ Python サンプルスクリプト作成
-11. ✅ ドキュメント整備
-12. ✅ 実機テスト
+13. ✅ Python サンプルスクリプト拡張
+14. ✅ ドキュメント整備
+15. ✅ 実機テスト
 
 ### Phase 4: プロトコル拡張（将来・ROS統合時）
-13. `protocol/spec/flight_commands.yaml` 作成
-14. WebSocket経由のバイナリコマンド実装
-15. ROSノード作成
+16. `protocol/spec/flight_commands.yaml` 作成
+17. WebSocket経由のバイナリコマンド実装
+18. ROSノード作成
 
 ---
 
@@ -502,10 +742,11 @@ FlightCommandPacket:
 ## 8. まとめ
 
 ### 推奨アプローチ
-**ハイブリッド実装（提案3）** を推奨：
+**ハイブリッド実装（提案3）+ Hooksジョークアプリ** を推奨：
 1. **短期**: CLIコマンドとして実装（即座に使用可能）
-2. **長期**: プロトコルメッセージ追加（ROS統合時）
-3. **共通**: 再利用可能なサービス層（FlightCommandService）
+2. **中期**: Pythonヘルパー + Hooks連携（作業完了を祝福 🎉）
+3. **長期**: プロトコルメッセージ追加（ROS統合時）
+4. **共通**: 再利用可能なサービス層（FlightCommandService）
 
 ### 利点
 - ✅ 段階的実装が可能（リスク低減）
@@ -513,11 +754,29 @@ FlightCommandPacket:
 - ✅ プロトコル SSOT の原則に従う
 - ✅ 既存のアーキテクチャを活用
 - ✅ 将来のROS統合に対応
+- ✅ **遊び心のあるデモで開発が楽しくなる！**
+
+### Phase 1完了時のデモ（🎉 ジョークアプリ）
+```bash
+# StampFlyを起動してWiFi接続
+$ sf flash vehicle -m
+
+# Claude Codeで作業
+$ git commit -m "feat: awesome new feature"
+[main abc1234] feat: awesome new feature
+
+# 🎉 StampFlyが喜んでジャンプ！
+🎉 Celebrating with StampFly jump!
+🚁 Connecting to StampFly at 192.168.4.1:23...
+✅ Connected.
+📤 Sending command: jump 0.25 0.3
+📥 Response: Jump command started
+```
 
 ### 次のステップ
 1. このプランをレビュー
-2. Phase 1の実装開始（JUMPコマンド）
-3. 実機テスト
+2. Phase 1の実装開始（JUMPコマンド + Hooksアプリ）
+3. 実機テスト + デモ動画撮影 🎥
 4. Phase 2以降に進む
 
 ---
@@ -654,10 +913,11 @@ See Japanese section for detailed API design, CLI implementation, usage examples
 ## 8. Summary
 
 ### Recommended Approach
-**Hybrid Implementation (Proposal 3)**:
+**Hybrid Implementation (Proposal 3) + Hooks Joke App**:
 1. **Short-term**: Implement as CLI commands (immediately usable)
-2. **Long-term**: Add protocol messages (for ROS integration)
-3. **Common**: Reusable service layer (FlightCommandService)
+2. **Mid-term**: Python helper + Hooks integration (celebrate work completion 🎉)
+3. **Long-term**: Add protocol messages (for ROS integration)
+4. **Common**: Reusable service layer (FlightCommandService)
 
 ### Benefits
 - ✅ Incremental implementation (risk reduction)
@@ -665,9 +925,27 @@ See Japanese section for detailed API design, CLI implementation, usage examples
 - ✅ Follows protocol SSOT principle
 - ✅ Leverages existing architecture
 - ✅ Ready for future ROS integration
+- ✅ **Fun demo makes development enjoyable!**
+
+### Phase 1 Demo (🎉 Joke App)
+```bash
+# Start StampFly with WiFi
+$ sf flash vehicle -m
+
+# Work with Claude Code
+$ git commit -m "feat: awesome new feature"
+[main abc1234] feat: awesome new feature
+
+# 🎉 StampFly celebrates with a jump!
+🎉 Celebrating with StampFly jump!
+🚁 Connecting to StampFly at 192.168.4.1:23...
+✅ Connected.
+📤 Sending command: jump 0.25 0.3
+📥 Response: Jump command started
+```
 
 ### Next Steps
 1. Review this plan
-2. Start Phase 1 implementation (JUMP command)
-3. Real-world testing
+2. Start Phase 1 implementation (JUMP command + Hooks app)
+3. Real-world testing + demo video 🎥
 4. Proceed to Phase 2+
