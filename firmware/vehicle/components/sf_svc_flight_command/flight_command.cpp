@@ -292,8 +292,8 @@ void FlightCommandService::updateJumpCommand(float dt, float current_altitude) {
                 // Maintain altitude with proportional control
                 // 比例制御で高度維持
                 float altitude_error = params_.target_altitude - current_altitude;
-                float throttle = 0.70f + (altitude_error * 0.6f);
-                throttle = constrain(throttle, 0.60f, 0.85f);
+                float throttle = 0.55f + (altitude_error * 0.6f);
+                throttle = constrain(throttle, 0.50f, 0.75f);
 
                 sendControlInput(throttle, 0.0f, 0.0f, 0.0f);
             }
@@ -354,7 +354,7 @@ void FlightCommandService::updateTakeoffCommand(float dt, float current_altitude
             current_command_ = FlightCommandType::NONE;
             // Keep motors running at hover throttle
             // ホバースロットルでモーター継続
-            sendControlInput(0.7f, 0.0f, 0.0f, 0.0f);
+            sendControlInput(0.55f, 0.0f, 0.0f, 0.0f);
             break;
 
         default:
@@ -409,8 +409,8 @@ void FlightCommandService::updateHoverCommand(float dt, float current_altitude) 
                 phase_ = ExecutionPhase::DONE;
             } else {
                 float altitude_error = params_.target_altitude - current_altitude;
-                float throttle = 0.70f + (altitude_error * 0.6f);
-                throttle = constrain(throttle, 0.60f, 0.85f);
+                float throttle = 0.55f + (altitude_error * 0.6f);
+                throttle = constrain(throttle, 0.50f, 0.75f);
                 sendControlInput(throttle, 0.0f, 0.0f, 0.0f);
             }
             break;
@@ -418,7 +418,7 @@ void FlightCommandService::updateHoverCommand(float dt, float current_altitude) 
         case ExecutionPhase::DONE:
             state_ = FlightCommandState::COMPLETED;
             current_command_ = FlightCommandType::NONE;
-            sendControlInput(0.7f, 0.0f, 0.0f, 0.0f);  // Keep hovering
+            sendControlInput(0.55f, 0.0f, 0.0f, 0.0f);  // Keep hovering
             break;
 
         default:
