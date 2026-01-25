@@ -27,7 +27,7 @@ static int cmd_jump(int argc, char** argv) {
         return 1;
     }
 
-    float altitude = 0.3f;  // Default 0.3m
+    float altitude = 0.15f;  // Default 0.15m (15cm)
     if (argc >= 2) {
         altitude = atof(argv[1]);
         if (altitude < 0.1f || altitude > 2.0f) {

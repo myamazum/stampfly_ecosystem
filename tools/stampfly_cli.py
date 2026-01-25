@@ -11,7 +11,7 @@ Usage:
     python tools/stampfly_cli.py flight cancel
 
 Examples:
-    python tools/stampfly_cli.py jump 0.3 0.5
+    python tools/stampfly_cli.py jump 0.15 0.5
     python tools/stampfly_cli.py takeoff 0.5
     python tools/stampfly_cli.py land
 """
@@ -83,7 +83,7 @@ def main():
         print("  python tools/stampfly_cli.py flight cancel")
         print("")
         print("Examples:")
-        print("  python tools/stampfly_cli.py jump 0.3 0.5")
+        print("  python tools/stampfly_cli.py jump 0.15 0.5")
         print("  python tools/stampfly_cli.py takeoff 0.5")
         print("  python tools/stampfly_cli.py land")
         sys.exit(1)
