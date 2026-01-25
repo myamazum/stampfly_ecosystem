@@ -19,6 +19,7 @@
 #include "controller_comm.hpp"  // for CTRL_FLAG_MODE
 #include "led_manager.hpp"      // for flight mode LED indication
 #include "flight_command.hpp"   // for high-level flight commands
+#include "control_arbiter.hpp"  // for multi-source control input arbitration
 #include <algorithm>            // for std::clamp
 
 // Trim values (defined in cli.cpp)
@@ -325,12 +326,29 @@ void ControlTask(void* pvParameters)
         }
 
         // =====================================================================
-        // 1. コントローラ入力取得
+        // 1. コントローラ入力取得（ControlArbiter経由）
+        // Get control input from ControlArbiter (supports ESP-NOW, UDP, WebSocket)
         // =====================================================================
         // throttle: 0.0 ~ 1.0
         // roll, pitch, yaw: -1.0 ~ +1.0
+        stampfly::ControlInput ctrl_input;
         float throttle, roll_cmd, pitch_cmd, yaw_cmd;
-        state.getControlInput(throttle, roll_cmd, pitch_cmd, yaw_cmd);
+
+        if (stampfly::ControlArbiter::getInstance().getActiveControl(ctrl_input)) {
+            // Active control input available from arbiter
+            // アクティブな制御入力がアービターから取得できた
+            throttle = ctrl_input.throttle;
+            roll_cmd = ctrl_input.roll;
+            pitch_cmd = ctrl_input.pitch;
+            yaw_cmd = ctrl_input.yaw;
+        } else {
+            // No active control input (timeout or no source)
+            // アクティブな制御入力なし（タイムアウトまたはソースなし）
+            throttle = 0.0f;
+            roll_cmd = 0.0f;
+            pitch_cmd = 0.0f;
+            yaw_cmd = 0.0f;
+        }
 
         // =====================================================================
         // 2. 目標角速度計算
