@@ -10,6 +10,7 @@ StampFlyの通信機能を拡張し、以下を実現する：
 
 1. **Phase 1**: Controller-Vehicle間のUDP通信
 2. **Phase 2**: WiFi CLI（Telnetサーバー）
+3. **Phase 3**: WiFi STA Mode（ルーター接続）
 
 ### ステータス
 
@@ -18,6 +19,7 @@ StampFlyの通信機能を拡張し、以下を実現する：
 | 計画策定 | ✅ 完了 (2026-01) |
 | Phase 1: UDP通信 | ✅ 完了 (2026-01) |
 | Phase 2: WiFi CLI | ✅ 完了 (2026-01) |
+| Phase 3: WiFi STA | ✅ 完了 (2026-01) |
 
 ### 背景
 
@@ -887,6 +889,207 @@ comm               Communication mode
 
 ---
 
+# Phase 3: WiFi STA Mode（ルーター接続）
+
+## WiFi STA Mode概要
+
+StampFly VehicleにWiFi STAモードを追加し、WiFiルーター（アクセスポイント）に接続できるようにする。これにより、以下が可能になる：
+
+| 機能 | 説明 |
+|------|------|
+| ROS2連携 | 外部PCのROS2ノードと通信（STA IP経由） |
+| インターネットアクセス | OTA更新、クラウドロギング、NTP時刻同期 |
+| 複数環境対応 | 研究室と自宅など、複数のWiFi環境を保存（最大5個） |
+| 群制御準備 | 複数ドローンを同じルーターに接続（将来） |
+| APモード併用 | デバッグ用APモード（192.168.4.1）も維持 |
+
+### WiFi APSTA Mode
+
+ESP32の **APSTA Mode** を活用し、AP（アクセスポイント）とSTA（ステーション）を同時に動作させる。
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     WiFi APSTA Mode Architecture                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  【APモード（既存）】                                                    │
+│  ┌────────────┐                  ┌────────────────────────────┐        │
+│  │ PC/Phone   │ ◄── WiFi AP ───► │  Vehicle (StampFly)        │        │
+│  │            │   192.168.4.x    │  - AP: 192.168.4.1         │        │
+│  │            │                  │  - Telnet: 23              │        │
+│  └────────────┘                  │  - WebSocket: 80           │        │
+│                                  │  - UDP: 8888/8889          │        │
+│  【STAモード（新規）】            │                            │        │
+│  ┌────────────────┐              │                            │        │
+│  │ WiFi Router    │              │  ┌──────────────────────┐  │        │
+│  │ (Lab/Home)     │ ◄── STA ───► │  │  WiFi STA Client     │  │        │
+│  │ 192.168.x.x    │              │  │  - Connect to AP     │  │        │
+│  │                │              │  │  - Multi-AP (max 5)  │  │        │
+│  └────┬───────────┘              │  │  - Auto failover     │  │        │
+│       │                          │  └──────────────────────┘  │        │
+│       │ Router                   │                            │        │
+│       ▼                          │  STA IP: 192.168.x.y       │        │
+│  ┌────────────┐                  └────────────────────────────┘        │
+│  │ ROS2 Node  │ ◄────── UDP ──────────┐                                │
+│  │ (PC)       │    via STA IP         │                                │
+│  └────────────┘                       │                                │
+│                                       │                                │
+└───────────────────────────────────────┼────────────────────────────────┘
+                                        │
+                                        ▼
+                              ROS2制御、インターネット接続
+```
+
+### Multi-AP対応
+
+複数のWiFi環境（研究室、自宅、カフェなど）を保存し、優先順位順に自動接続：
+
+```
+【保存例】
+  [0] Lab-WiFi        (優先度1)
+  [1] Home-WiFi       (優先度2)
+  [2] Mobile-Hotspot  (優先度3)
+
+【動作】
+  起動時:
+    1. Lab-WiFiに接続試行 → 成功 → 使用
+    2. 失敗 → Home-WiFiに接続試行 → 成功 → 使用
+    3. 失敗 → Mobile-Hotspotに接続試行 → ...
+    4. 全て失敗 → 最初から再試行（5秒待機）
+```
+
+## 実装内容
+
+### データ構造
+
+```cpp
+// controller_comm.hpp
+struct STAConfig {
+    char ssid[32];
+    char password[64];
+    bool is_valid;
+};
+
+static constexpr int MAX_STA_CONFIGS = 5;  // 最大5個のAP設定
+
+STAConfig sta_configs_[MAX_STA_CONFIGS] = {};
+int sta_config_count_ = 0;
+int current_sta_index_ = -1;  // 現在接続中のAP index
+bool sta_auto_connect_ = true;  // デフォルトON
+bool sta_connected_ = false;
+char sta_ip_addr_[16] = {0};
+```
+
+### WiFi/IPイベントハンドラ
+
+```cpp
+// 自動フェイルオーバー機能
+void onSTADisconnected(void* event_data) {
+    // 切断時、次のAPを試行
+    if (sta_auto_connect_ && sta_config_count_ > 0) {
+        connection_attempt_index_++;
+        if (connection_attempt_index_ >= sta_config_count_) {
+            connection_attempt_index_ = 0;  // 最初に戻る
+            vTaskDelay(pdMS_TO_TICKS(5000));  // 5秒待機
+        }
+        connectSTA(connection_attempt_index_);
+    }
+}
+```
+
+### CLIコマンド
+
+| コマンド | 説明 |
+|---------|------|
+| `wifi sta list` | 保存されたAP一覧を優先順位順に表示 |
+| `wifi sta add <ssid> <password>` | 新しいAP設定を追加（最大5個） |
+| `wifi sta remove <index>` | インデックス指定でAP削除 |
+| `wifi sta connect [index]` | 接続（自動または指定） |
+| `wifi sta disconnect` | 切断 |
+| `wifi sta auto [on\|off]` | 起動時自動接続の有効/無効 |
+| `wifi status` | WiFi全体の状態（AP + STA） |
+
+### NVS永続化
+
+```cpp
+// NVSキー
+static constexpr const char* NVS_KEY_STA_COUNT = "sta_count";  // u8
+static constexpr const char* NVS_KEY_STA_AUTO  = "sta_auto";   // u8
+static constexpr const char* NVS_KEY_STA_SSID_FMT = "sta_%d_ssid";  // string (0-4)
+static constexpr const char* NVS_KEY_STA_PASS_FMT = "sta_%d_pass";  // string (0-4)
+```
+
+- 起動時に自動的にNVSからAP設定を読み込み
+- `wifi sta add/remove` 時に自動的にNVSに保存
+- 再起動後も設定を保持
+
+### チャンネル制約
+
+ESP32のAPSTA制約により、**STAとAPは同じチャンネル**を使用：
+
+- STAが接続したAPのチャンネルに、自機のAPも自動的に追従
+- ESP-NOW通信もチャンネルに依存するため、チャンネル変更を検出してログで警告
+
+```cpp
+// チャンネル変更警告
+if (sta_connected_) {
+    ESP_LOGW(TAG, "STA is connected - channel change may disconnect AP");
+    ESP_LOGW(TAG, "STA will override this channel when reconnected");
+}
+```
+
+## 使用シナリオ
+
+### シナリオ1: ROS2開発（STA IP経由）
+
+```bash
+# StampFly側
+wifi sta add "Lab-WiFi" "lab-password"
+wifi sta connect
+
+# PC側（同じLab-WiFiに接続）
+ping 192.168.1.123  # StampFlyのSTA IP
+ros2 topic echo /stampfly/telemetry
+```
+
+### シナリオ2: 研究室と自宅の行き来
+
+```bash
+# 初回設定
+wifi sta add "Lab-WiFi" "lab-pass"
+wifi sta add "Home-WiFi" "home-pass"
+wifi sta auto on
+
+# 研究室で起動 → Lab-WiFiに自動接続
+# 自宅で起動 → Home-WiFiに自動接続
+```
+
+### シナリオ3: フィールド飛行（STA不要）
+
+```bash
+# 自動接続を無効化して起動高速化
+wifi sta auto off
+reboot
+```
+
+## 実装ファイル
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `controller_comm.hpp` | STAConfig構造体、公開インターフェース追加 |
+| `controller_comm.cpp` | WiFi/IPイベントハンドラ、init()修正、STA接続/NVS関数実装 |
+| `cmd_comm.cpp` | `wifi sta` コマンド追加（6つのサブコマンド） |
+
+## 参考資料
+
+| ドキュメント | 説明 |
+|-------------|------|
+| [wifi-sta-setup.md](../wifi-sta-setup.md) | ユーザー向けセットアップガイド |
+| [ESP-IDF WiFi Driver](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html) | WiFi APIリファレンス |
+| [APSTA Mode](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#station-ap-coexistence) | APSTAモード公式ドキュメント |
+
+---
+
 ## 10. 実装スケジュール
 
 ### Phase 1: UDP通信
@@ -908,6 +1111,19 @@ comm               Communication mode
 | 2.2 | CLI出力抽象化 | `cli.hpp/cpp` 修正 |
 | 2.3 | sf CLI統合 | `lib/sfcli/` |
 | 2.4 | テスト・検証 | - |
+
+### Phase 3: WiFi STA Mode
+
+| Step | 内容 | ファイル |
+|------|------|----------|
+| 3.1 | データ構造追加 | `controller_comm.hpp` |
+| 3.2 | WiFi/IPイベントハンドラ | `controller_comm.cpp` |
+| 3.3 | STA接続/切断関数 | `controller_comm.cpp` |
+| 3.4 | NVS永続化 | `controller_comm.cpp` |
+| 3.5 | CLIコマンド追加 | `cmd_comm.cpp` |
+| 3.6 | チャンネル警告 | `controller_comm.cpp` |
+| 3.7 | テスト・検証 | - |
+| 3.8 | ドキュメント整備 | `docs/wifi-sta-setup.md` |
 
 ---
 
@@ -1010,6 +1226,7 @@ Extend StampFly communication capabilities:
 
 1. **Phase 1**: UDP communication between Controller and Vehicle
 2. **Phase 2**: WiFi CLI (Telnet server)
+3. **Phase 3**: WiFi STA Mode (Router connection)
 
 ### Status
 
@@ -1018,6 +1235,7 @@ Extend StampFly communication capabilities:
 | Planning | ✅ Complete (2026-01) |
 | Phase 1: UDP Comm | ✅ Complete (2026-01) |
 | Phase 2: WiFi CLI | ✅ Complete (2026-01) |
+| Phase 3: WiFi STA | ✅ Complete (2026-01) |
 
 ## 2. Current vs Target Architecture
 
