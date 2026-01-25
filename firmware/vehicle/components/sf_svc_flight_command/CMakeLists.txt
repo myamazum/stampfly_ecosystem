@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "flight_command.cpp"
+        "command_queue.cpp"
     INCLUDE_DIRS
         "include"
     REQUIRES
