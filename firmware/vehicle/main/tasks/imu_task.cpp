@@ -304,8 +304,9 @@ void IMUTask(void* pvParameters)
                         if (g_tof_bottom_data_ready) {
                             g_tof_bottom_data_ready = false;
 
-                            // 接地中は位置更新を停止（センサー更新を呼ばない）
-                            if (!is_grounded && g_tof_task_healthy) {
+                            // ToF更新は常に行う（接地中でも高度情報は必要）
+                            // 位置のドリフト防止は predictIMU の skip_position フラグで対応
+                            if (g_tof_task_healthy) {
                                 if (tof_takeoff_skip_counter > 0) {
                                     tof_takeoff_skip_counter--;
                                     // 共分散リセット直後は過剰補正防止のためスキップ
