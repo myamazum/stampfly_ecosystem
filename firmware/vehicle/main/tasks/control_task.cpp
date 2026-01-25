@@ -268,6 +268,31 @@ void ControlTask(void* pvParameters)
             g_attitude_controller.reset();
             ESP_LOGI(TAG, "PID reset on ARM");
         }
+
+        // =====================================================================
+        // モータードライバーARMの同期（WiFiコマンド対応）
+        // Sync MotorDriver ARM state (for WiFi command support)
+        // =====================================================================
+        // StampFlyState が ARMED に遷移したら MotorDriver も ARM する
+        // WiFi コマンドでの自動ARM に対応するため
+        if (prev_flight_state != stampfly::FlightState::ARMED &&
+            flight_state == stampfly::FlightState::ARMED) {
+            if (!g_motor.isArmed()) {
+                g_motor.arm();  // Enable motor driver
+                ESP_LOGI(TAG, "MotorDriver auto-armed (WiFi command or controller)");
+            }
+        }
+        // DISARM に遷移したら MotorDriver も DISARM する
+        else if ((prev_flight_state == stampfly::FlightState::ARMED ||
+                  prev_flight_state == stampfly::FlightState::FLYING) &&
+                 flight_state != stampfly::FlightState::ARMED &&
+                 flight_state != stampfly::FlightState::FLYING) {
+            if (g_motor.isArmed()) {
+                g_motor.disarm();  // Disable motor driver
+                ESP_LOGI(TAG, "MotorDriver auto-disarmed");
+            }
+        }
+
         prev_flight_state = flight_state;
 
         // =====================================================================
