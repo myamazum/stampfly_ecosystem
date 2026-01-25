@@ -3,6 +3,25 @@
 
 > **Note:** [English version follows after the Japanese section.](#english) / 日本語の後に英語版があります。
 
+## 実装ステータス
+
+**✅ Phase 1-3完了 (2026-01-25)**
+
+| Phase | ステータス | 完了日 |
+|-------|----------|--------|
+| Phase 1: 基本実装 + Hooks連携 | ✅ 完了 | 2026-01-25 |
+| Phase 2: コマンド拡張 | ✅ 完了 | 2026-01-25 |
+| Phase 3: 外部連携準備 | ✅ 完了 | 2026-01-25 |
+| Phase 4: プロトコル拡張 | 🔜 将来 | - |
+
+**実装済み機能:**
+- ✅ WiFi CLI経由の高レベルコマンド（jump, takeoff, land, hover）
+- ✅ Pythonヘルパースクリプト（tools/stampfly_cli.py）
+- ✅ Hooksジョークアプリ（git commit時に自動ジャンプ 🎉）
+- ✅ 実機テスト・デバッグ完了
+
+---
+
 ## 1. 背景と目的
 
 ### 現状
