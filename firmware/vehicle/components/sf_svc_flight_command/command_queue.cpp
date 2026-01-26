@@ -5,6 +5,7 @@
  */
 
 #include "command_queue.hpp"
+#include "flight_command.hpp"
 #include "system_state.hpp"
 #include "esp_log.h"
 #include "esp_timer.h"

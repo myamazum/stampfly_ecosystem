@@ -1,6 +1,8 @@
 // High-Level Flight Command Service Implementation
 // 高レベル飛行コマンドサービス実装
 #include "flight_command.hpp"
+#include "command_queue.hpp"
+#include "system_state.hpp"
 #include "control_arbiter.hpp"
 #include "sensor_fusion.hpp"
 #include "landing_handler.hpp"
@@ -42,24 +44,29 @@ esp_err_t FlightCommandService::init() {
 // Execute command (non-blocking)
 // コマンド実行（非ブロッキング）
 bool FlightCommandService::executeCommand(FlightCommandType type, const FlightCommandParams& params) {
-    if (!canExecute()) {
-        ESP_LOGW(TAG, "Cannot execute command: preconditions not met");
-        return false;
+    // Enqueue command to CommandQueue
+    // CommandQueueにコマンドを登録
+    auto& queue = CommandQueue::getInstance();
+
+    // Check if another command is running or queued
+    // 他のコマンドが実行中またはキュー待ちかチェック
+    if (isRunning() || !queue.isEmpty()) {
+        ESP_LOGW(TAG, "Command queue not empty (running or queued commands exist)");
+        // Still allow enqueueing - queue will handle priority
+        // キューイング自体は許可 - キューが優先度を処理
     }
 
-    if (isRunning()) {
-        ESP_LOGW(TAG, "Another command is already running");
-        return false;
-    }
-
-    // Auto-ARM for WiFi commands
-    // WiFiコマンド用の自動ARM機能
+    // Auto-ARM for WiFi commands (enable debug mode)
+    // WiFiコマンド用の自動ARM機能（デバッグモード有効化）
     auto& state_mgr = StampFlyState::getInstance();
-    FlightState current_state = state_mgr.getFlightState();
+    auto& sys_state_mgr = SystemStateManager::getInstance();
 
-    // Enable debug mode to allow ARM even with errors (WiFi user responsibility)
-    // デバッグモードを有効化してエラー状態でもARMを許可（WiFiユーザーの責任）
+    // Enable debug mode to bypass some safety checks for WiFi commands
+    // WiFiコマンド用に一部の安全チェックをバイパス
     state_mgr.setDebugMode(true);
+    sys_state_mgr.setDebugMode(true);
+
+    FlightState current_state = state_mgr.getFlightState();
 
     if (current_state != FlightState::ARMED && current_state != FlightState::FLYING) {
         // Need to ARM first
@@ -70,6 +77,7 @@ bool FlightCommandService::executeCommand(FlightCommandType type, const FlightCo
         if (current_state != FlightState::IDLE && current_state != FlightState::ERROR) {
             ESP_LOGW(TAG, "Cannot ARM from state %d, transitioning to IDLE", static_cast<int>(current_state));
             state_mgr.setFlightState(FlightState::IDLE);
+            sys_state_mgr.setFlightState(FlightState::IDLE);
         }
 
         // Request ARM
@@ -77,22 +85,30 @@ bool FlightCommandService::executeCommand(FlightCommandType type, const FlightCo
         if (!state_mgr.requestArm()) {
             ESP_LOGE(TAG, "Failed to ARM vehicle for WiFi command");
             state_mgr.setDebugMode(false);
+            sys_state_mgr.setDebugMode(false);
             return false;
         }
+
+        // Also ARM in SystemStateManager
+        // SystemStateManagerでもARM
+        sys_state_mgr.requestArm();
 
         ESP_LOGI(TAG, "Auto-ARMed for WiFi command");
     }
 
-    // Save command and parameters
-    // コマンドとパラメータを保存
-    current_command_ = type;
-    params_ = params;
-    state_ = FlightCommandState::RUNNING;
-    phase_ = ExecutionPhase::INIT;
-    elapsed_time_ = 0.0f;
-    hover_timer_ = 0.0f;
+    // Enqueue to CommandQueue
+    // CommandQueueに登録
+    int cmd_id = queue.enqueue(type, params.target_altitude, params.duration_s);
 
-    ESP_LOGI(TAG, "Starting command: %d", static_cast<int>(type));
+    if (cmd_id < 0) {
+        ESP_LOGE(TAG, "Failed to enqueue command (queue full)");
+        state_mgr.setDebugMode(false);
+        sys_state_mgr.setDebugMode(false);
+        return false;
+    }
+
+    current_command_id_ = cmd_id;
+    ESP_LOGI(TAG, "Command enqueued: ID=%d, type=%d", cmd_id, static_cast<int>(type));
 
     return true;
 }
@@ -100,6 +116,15 @@ bool FlightCommandService::executeCommand(FlightCommandType type, const FlightCo
 // Cancel current command
 // 現在のコマンドをキャンセル
 void FlightCommandService::cancel() {
+    // Cancel current command in queue
+    // キュー内の現在のコマンドをキャンセル
+    auto& queue = CommandQueue::getInstance();
+
+    if (current_command_id_ >= 0) {
+        queue.cancel(current_command_id_);
+        current_command_id_ = -1;
+    }
+
     if (isRunning()) {
         ESP_LOGI(TAG, "Cancelling command: %d", static_cast<int>(current_command_));
         state_ = FlightCommandState::IDLE;
@@ -115,8 +140,40 @@ void FlightCommandService::cancel() {
 // Update command execution (called from control task at 400Hz)
 // 定期更新（制御タスクから400Hzで呼ばれる）
 void FlightCommandService::update(float dt) {
-    if (!isRunning()) {
+    // Get current command from CommandQueue
+    // CommandQueueから現在のコマンドを取得
+    auto& queue = CommandQueue::getInstance();
+    const CommandEntry* cmd = queue.getCurrentCommand();
+
+    if (cmd == nullptr) {
+        // No command running - reset state
+        // コマンド実行中でない - 状態リセット
+        if (isRunning()) {
+            state_ = FlightCommandState::IDLE;
+            current_command_ = FlightCommandType::NONE;
+            phase_ = ExecutionPhase::INIT;
+            elapsed_time_ = 0.0f;
+            hover_timer_ = 0.0f;
+            current_command_id_ = -1;
+        }
         return;
+    }
+
+    // New command started - initialize
+    // 新しいコマンド開始 - 初期化
+    if (current_command_id_ != cmd->command_id) {
+        ESP_LOGI(TAG, "Starting command from queue: ID=%d, type=%d",
+                 cmd->command_id, static_cast<int>(cmd->type));
+        current_command_id_ = cmd->command_id;
+        current_command_ = cmd->type;
+        params_.target_altitude = cmd->target_altitude;
+        params_.duration_s = cmd->duration_s;
+        params_.climb_rate = cmd->climb_rate;
+        params_.descent_rate = cmd->descent_rate;
+        state_ = FlightCommandState::RUNNING;
+        phase_ = ExecutionPhase::INIT;
+        elapsed_time_ = 0.0f;
+        hover_timer_ = 0.0f;
     }
 
     elapsed_time_ += dt;
@@ -158,7 +215,28 @@ void FlightCommandService::update(float dt) {
             // 未知のコマンド、失敗
             ESP_LOGW(TAG, "Unknown command type: %d", static_cast<int>(current_command_));
             state_ = FlightCommandState::FAILED;
+            queue.markFailed();
+            current_command_id_ = -1;
             break;
+    }
+
+    // Check if command completed or failed
+    // コマンドが完了または失敗したかチェック
+    if (state_ == FlightCommandState::COMPLETED || phase_ == ExecutionPhase::DONE) {
+        ESP_LOGI(TAG, "Command completed: ID=%d", current_command_id_);
+        queue.markCompleted();
+        state_ = FlightCommandState::IDLE;
+        current_command_ = FlightCommandType::NONE;
+        phase_ = ExecutionPhase::INIT;
+        current_command_id_ = -1;
+    } else if (state_ == FlightCommandState::FAILED) {
+        ESP_LOGW(TAG, "Command failed: ID=%d", current_command_id_);
+        queue.markFailed();
+        state_ = FlightCommandState::IDLE;
+        current_command_ = FlightCommandType::NONE;
+        phase_ = ExecutionPhase::INIT;
+        current_command_id_ = -1;
+        sendControlInput(0.0f, 0.0f, 0.0f, 0.0f);  // Stop motors
     }
 
     // Safety timeout - fail if command takes too long
@@ -167,6 +245,8 @@ void FlightCommandService::update(float dt) {
     if (elapsed_time_ > MAX_COMMAND_TIME) {
         ESP_LOGW(TAG, "Command timeout after %.1f seconds", elapsed_time_);
         state_ = FlightCommandState::FAILED;
+        queue.markFailed();
+        current_command_id_ = -1;
         sendControlInput(0.0f, 0.0f, 0.0f, 0.0f);  // Stop motors
     }
 }

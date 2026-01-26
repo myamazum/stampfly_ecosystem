@@ -26,6 +26,21 @@ namespace stampfly {
 enum class ControlSource : uint8_t;
 
 /**
+ * @brief Flight command type (defined here to avoid circular dependency)
+ * @brief フライトコマンドタイプ（循環依存回避のためここで定義）
+ *
+ * NOTE: This is duplicated from flight_command.hpp
+ * 注意: flight_command.hppと重複定義（値は同一）
+ */
+enum class FlightCommandType {
+    NONE = 0,
+    TAKEOFF,      ///< Takeoff / 離陸
+    LAND,         ///< Land / 着陸
+    HOVER,        ///< Hover at specified altitude / ホバリング
+    JUMP,         ///< Jump (takeoff → hover → land) / ジャンプ
+};
+
+/**
  * @brief Calibration state
  * @brief キャリブレーション状態
  */
@@ -45,18 +60,6 @@ enum class CommandState : uint8_t {
     RUNNING,    ///< Executing command / コマンド実行中
     COMPLETED,  ///< Completed successfully / 正常完了
     FAILED,     ///< Failed / 失敗
-};
-
-/**
- * @brief Flight command type
- * @brief フライトコマンドタイプ
- */
-enum class FlightCommandType : uint8_t {
-    NONE = 0,
-    TAKEOFF,      ///< Takeoff / 離陸
-    LAND,         ///< Land / 着陸
-    HOVER,        ///< Hover at specified altitude / ホバリング
-    JUMP,         ///< Jump (takeoff → hover → land) / ジャンプ
 };
 
 /**

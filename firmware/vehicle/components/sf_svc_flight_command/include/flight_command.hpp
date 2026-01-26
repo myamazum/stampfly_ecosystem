@@ -4,18 +4,12 @@
 
 #include <cstdint>
 #include "esp_err.h"
+#include "system_state.hpp"  // For FlightCommandType
 
 namespace stampfly {
 
-// Command types
-// コマンドタイプ
-enum class FlightCommandType {
-    NONE = 0,
-    TAKEOFF,      // Takeoff / 離陸
-    LAND,         // Land / 着陸
-    HOVER,        // Hover at specified altitude / ホバリング（指定高度で維持）
-    JUMP,         // Jump (takeoff → hover → land) / ジャンプ（離陸→ホバリング→着陸）
-};
+// FlightCommandType is now defined in system_state.hpp to avoid circular dependency
+// FlightCommandTypeは循環依存回避のためsystem_state.hppで定義
 
 // Command state
 // コマンド状態
@@ -91,6 +85,10 @@ private:
 
     float elapsed_time_ = 0.0f;
     float hover_timer_ = 0.0f;
+
+    // CommandQueue integration
+    // CommandQueue統合
+    int current_command_id_ = -1;  ///< Current command ID from queue / キューからの現在のコマンドID
 
     // Send control input to ControlArbiter
     // 制御出力を ControlArbiter に送る
