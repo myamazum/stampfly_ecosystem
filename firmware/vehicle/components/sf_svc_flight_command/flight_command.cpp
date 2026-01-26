@@ -14,6 +14,13 @@
 namespace globals {
     extern stampfly::LandingHandler g_landing_handler;
     extern sf::SensorFusion g_fusion;
+
+    // ToF sensor buffer (for open-loop climb altitude check)
+    // ToFセンサーバッファ（開ループ上昇の高度チェック用）
+    constexpr int REF_BUFFER_SIZE = 100;
+    extern float g_tof_bottom_buffer[REF_BUFFER_SIZE];
+    extern int g_tof_bottom_buffer_index;
+    extern int g_tof_bottom_buffer_count;
 }
 
 static const char* TAG = "FlightCmd";
@@ -335,11 +342,19 @@ void FlightCommandService::updateJumpCommand(float dt, float current_altitude) {
                 constexpr float TAKEOFF_HEIGHT = 0.10f;  // Height to enable flow sensor / フローセンサー有効高度
                 constexpr float OPEN_LOOP_THROTTLE = 0.75f;  // Fixed throttle for initial climb / 初期上昇の固定スロットル
 
-                if (current_altitude >= TAKEOFF_HEIGHT) {
+                // Use raw ToF altitude during open-loop climb (ESKF position estimation not yet active)
+                // 開ループ上昇中はToF生値を使用（ESKF位置推定はまだ非アクティブ）
+                float tof_altitude = 0.0f;
+                if (globals::g_tof_bottom_buffer_count > 0) {
+                    int tof_latest_idx = (globals::g_tof_bottom_buffer_index - 1 + globals::REF_BUFFER_SIZE) % globals::REF_BUFFER_SIZE;
+                    tof_altitude = globals::g_tof_bottom_buffer[tof_latest_idx];
+                }
+
+                if (tof_altitude >= TAKEOFF_HEIGHT) {
                     // Reached takeoff height, switch to closed-loop control
                     // 離陸高度到達、フィードバック制御に切り替え
-                    ESP_LOGI(TAG, "JUMP: Reached takeoff height %.2f m, switching to closed-loop control",
-                             current_altitude);
+                    ESP_LOGI(TAG, "JUMP: Reached takeoff height %.2f m (ToF), switching to closed-loop control",
+                             tof_altitude);
                     phase_ = ExecutionPhase::CLIMBING;
                 } else {
                     // Continue open-loop climb
