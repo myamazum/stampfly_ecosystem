@@ -76,6 +76,7 @@ private:
     // 内部状態（コマンド実行中の段階）
     enum class ExecutionPhase {
         INIT,
+        OPEN_LOOP_CLIMB,  // Open-loop climb to enable flow sensor / フローセンサー有効化のための開ループ上昇
         CLIMBING,
         HOVERING,
         DESCENDING,

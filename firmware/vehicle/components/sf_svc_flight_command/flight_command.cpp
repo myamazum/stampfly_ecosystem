@@ -316,16 +316,37 @@ float FlightCommandService::getCurrentAltitude() const {
 // ============================================================================
 
 void FlightCommandService::updateJumpCommand(float dt, float current_altitude) {
-    // JUMP command state machine: INIT → CLIMBING → HOVERING → DESCENDING → DONE
-    // JUMPコマンド状態マシン: INIT → CLIMBING → HOVERING → DESCENDING → DONE
+    // JUMP command state machine: INIT → OPEN_LOOP_CLIMB → CLIMBING → DESCENDING → DONE
+    // JUMPコマンド状態マシン: INIT → 開ループ上昇 → フィードバック上昇 → 降下 → 完了
 
     switch (phase_) {
         case ExecutionPhase::INIT:
-            // Start climbing
-            // 上昇開始
-            ESP_LOGI(TAG, "JUMP: Starting climb to %.2f m (current: %.2f m)",
-                     params_.target_altitude, current_altitude);
-            phase_ = ExecutionPhase::CLIMBING;
+            // Start open-loop climb to enable flow sensor
+            // 開ループ上昇開始（フローセンサー有効化のため）
+            ESP_LOGI(TAG, "JUMP: Starting open-loop climb to 0.10m (target: %.2f m)",
+                     params_.target_altitude);
+            phase_ = ExecutionPhase::OPEN_LOOP_CLIMB;
+            break;
+
+        case ExecutionPhase::OPEN_LOOP_CLIMB:
+            // Open-loop climb to ~10cm to enable optical flow sensor
+            // フローセンサー有効化のため~10cmまで開ループ上昇
+            {
+                constexpr float TAKEOFF_HEIGHT = 0.10f;  // Height to enable flow sensor / フローセンサー有効高度
+                constexpr float OPEN_LOOP_THROTTLE = 0.75f;  // Fixed throttle for initial climb / 初期上昇の固定スロットル
+
+                if (current_altitude >= TAKEOFF_HEIGHT) {
+                    // Reached takeoff height, switch to closed-loop control
+                    // 離陸高度到達、フィードバック制御に切り替え
+                    ESP_LOGI(TAG, "JUMP: Reached takeoff height %.2f m, switching to closed-loop control",
+                             current_altitude);
+                    phase_ = ExecutionPhase::CLIMBING;
+                } else {
+                    // Continue open-loop climb
+                    // 開ループ上昇継続
+                    sendControlInput(OPEN_LOOP_THROTTLE, 0.0f, 0.0f, 0.0f);
+                }
+            }
             break;
 
         case ExecutionPhase::CLIMBING:
