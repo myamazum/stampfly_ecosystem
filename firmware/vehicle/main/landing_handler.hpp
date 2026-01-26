@@ -15,6 +15,7 @@
 #include "stationary_detector.hpp"
 #include "level_calibrator.hpp"
 #include "stampfly_math.hpp"
+#include "system_state.hpp"
 
 namespace stampfly {
 
@@ -22,13 +23,10 @@ class LandingHandler {
 public:
     /**
      * @brief Calibration state
+     * @note Now uses CalibrationState from system_state.hpp (Single Source of Truth)
+     * @note system_state.hppのCalibrationStateを使用（単一の真実の源）
      */
-    enum class CalibrationState {
-        NOT_STARTED,      // Initial state or after arm
-        WAITING_LANDING,  // Waiting for landing (flying)
-        CALIBRATING,      // Calibration in progress (white LED, arm blocked)
-        COMPLETED         // Calibration done (green LED, arm allowed)
-    };
+    // CalibrationState enum removed - use stampfly::CalibrationState from system_state.hpp
 
     struct Config {
         float landing_altitude_threshold;
@@ -60,6 +58,10 @@ public:
         just_landed_ = false;
         just_calibrated_ = false;
         stationary_detector_.reset();
+
+        // Sync to SystemStateManager
+        // SystemStateManagerに同期
+        syncToSystemStateManager();
     }
 
     /**
@@ -128,6 +130,10 @@ public:
                 just_calibrated_ = true;
             }
         }
+
+        // Sync to SystemStateManager
+        // SystemStateManagerに同期
+        syncToSystemStateManager();
     }
 
     // === State queries ===
@@ -186,6 +192,24 @@ public:
     const LevelCalibrator& getLevelCalibrator() const { return level_calibrator_; }
 
 private:
+    /**
+     * @brief Sync local state to SystemStateManager
+     * @brief ローカル状態をSystemStateManagerに同期
+     */
+    void syncToSystemStateManager() {
+        auto& sys_state_mgr = SystemStateManager::getInstance();
+
+        // Update calibration state
+        // キャリブレーション状態を更新
+        sys_state_mgr.updateCalibrationState(calibration_state_);
+
+        // Update readiness flags
+        // 準備フラグを更新
+        sys_state_mgr.setReady(ReadinessFlags::CALIBRATED,
+                               calibration_state_ == CalibrationState::COMPLETED);
+        sys_state_mgr.setReady(ReadinessFlags::LANDED, is_landed_);
+    }
+
     Config config_;
     StationaryDetector stationary_detector_;
     LevelCalibrator level_calibrator_;
