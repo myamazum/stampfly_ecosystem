@@ -323,113 +323,77 @@ float FlightCommandService::getCurrentAltitude() const {
 // ============================================================================
 
 void FlightCommandService::updateJumpCommand(float dt, float current_altitude) {
-    // JUMP command state machine: INIT → OPEN_LOOP_CLIMB → CLIMBING → DESCENDING → DONE
-    // JUMPコマンド状態マシン: INIT → 開ループ上昇 → フィードバック上昇 → 降下 → 完了
+    // JUMP command state machine: INIT → CLIMBING → DESCENDING → DONE
+    // JUMPコマンド状態マシン: INIT → 上昇 → 降下 → 完了
+    //
+    // Simple proportional control using raw ToF altitude:
+    // シンプルな比例制御（ToF生値を使用）:
+    //   duty = hover_throttle + Kp * (target - tof_altitude)
+
+    // Get raw ToF altitude (used throughout jump command)
+    // ToF生値を取得（Jumpコマンド全体で使用）
+    float tof_altitude = 0.0f;
+    if (globals::g_tof_bottom_buffer_count > 0) {
+        int tof_latest_idx = (globals::g_tof_bottom_buffer_index - 1 + globals::REF_BUFFER_SIZE) % globals::REF_BUFFER_SIZE;
+        tof_altitude = globals::g_tof_bottom_buffer[tof_latest_idx];
+    }
 
     switch (phase_) {
         case ExecutionPhase::INIT:
-            // Start open-loop climb to enable flow sensor
-            // 開ループ上昇開始（フローセンサー有効化のため）
-            ESP_LOGI(TAG, "JUMP: Starting open-loop climb to 0.10m (target: %.2f m)",
-                     params_.target_altitude);
-            phase_ = ExecutionPhase::OPEN_LOOP_CLIMB;
-            break;
-
-        case ExecutionPhase::OPEN_LOOP_CLIMB:
-            // Open-loop climb to ~10cm to enable optical flow sensor
-            // フローセンサー有効化のため~10cmまで開ループ上昇
-            {
-                constexpr float TAKEOFF_HEIGHT = 0.10f;  // Height to enable flow sensor / フローセンサー有効高度
-                constexpr float OPEN_LOOP_THROTTLE = 0.75f;  // Fixed throttle for initial climb / 初期上昇の固定スロットル
-
-                // Use raw ToF altitude during open-loop climb (ESKF position estimation not yet active)
-                // 開ループ上昇中はToF生値を使用（ESKF位置推定はまだ非アクティブ）
-                float tof_altitude = 0.0f;
-                if (globals::g_tof_bottom_buffer_count > 0) {
-                    int tof_latest_idx = (globals::g_tof_bottom_buffer_index - 1 + globals::REF_BUFFER_SIZE) % globals::REF_BUFFER_SIZE;
-                    tof_altitude = globals::g_tof_bottom_buffer[tof_latest_idx];
-                }
-
-                if (tof_altitude >= TAKEOFF_HEIGHT) {
-                    // Reached takeoff height, switch to closed-loop control
-                    // 離陸高度到達、フィードバック制御に切り替え
-                    ESP_LOGI(TAG, "JUMP: Reached takeoff height %.2f m (ToF), switching to closed-loop control",
-                             tof_altitude);
-                    phase_ = ExecutionPhase::CLIMBING;
-                } else {
-                    // Continue open-loop climb
-                    // 開ループ上昇継続
-                    sendControlInput(OPEN_LOOP_THROTTLE, 0.0f, 0.0f, 0.0f);
-                }
-            }
+            ESP_LOGI(TAG, "JUMP: Starting climb to %.2f m (current ToF: %.2f m)",
+                     params_.target_altitude, tof_altitude);
+            phase_ = ExecutionPhase::CLIMBING;
             break;
 
         case ExecutionPhase::CLIMBING:
-            // Climb until target altitude reached
-            // 目標高度に到達するまで上昇
+            // Climb with proportional control using raw ToF altitude
+            // ToF生値を使った比例制御で上昇
             {
-                float altitude_error = params_.target_altitude - current_altitude;
+                constexpr float HOVER_THROTTLE = 0.60f;  // Hover thrust / ホバリング推力
+                constexpr float KP = 0.8f;               // Proportional gain / 比例ゲイン
 
-                if (altitude_error < 0.05f) {  // Within 5cm of target
-                    // Reached target, start descending (skip hovering to prevent overshoot)
-                    // 目標到達、降下開始（オーバーシュート防止のためホバリングスキップ）
-                    ESP_LOGI(TAG, "JUMP: Reached %.2f m, starting descent",
-                             current_altitude);
+                float altitude_error = params_.target_altitude - tof_altitude;
+
+                if (tof_altitude >= params_.target_altitude - 0.02f) {  // Within 2cm of target
+                    // Reached target, start descending
+                    // 目標到達、降下開始
+                    ESP_LOGI(TAG, "JUMP: Reached %.2f m (ToF), starting descent", tof_altitude);
                     phase_ = ExecutionPhase::DESCENDING;
                 } else {
-                    // Continue climbing with throttle based on climb rate
-                    // 上昇速度に基づいたスロットルで上昇継続
-                    // Simple proportional control: higher throttle for larger error
-                    // シンプルな比例制御：誤差が大きいほど高いスロットル
-                    float throttle = 0.75f + (altitude_error * 0.6f);
-                    throttle = constrain(throttle, 0.70f, 0.95f);  // Limit range
+                    // Proportional control: duty = hover + Kp * error
+                    // 比例制御: duty = ホバリング推力 + Kp * 誤差
+                    float throttle = HOVER_THROTTLE + (KP * altitude_error);
+                    throttle = constrain(throttle, 0.50f, 0.90f);
+
+                    sendControlInput(throttle, 0.0f, 0.0f, 0.0f);
 
                     // Debug log every 100 cycles (~250ms @ 400Hz)
                     static int log_counter = 0;
                     if (++log_counter >= 100) {
-                        ESP_LOGI(TAG, "JUMP CLIMBING: alt=%.3f m, target=%.2f m, error=%.3f m, throttle=%.2f",
-                                 current_altitude, params_.target_altitude, altitude_error, throttle);
+                        ESP_LOGI(TAG, "JUMP CLIMBING: tof=%.3f m, target=%.2f m, error=%.3f m, throttle=%.2f",
+                                 tof_altitude, params_.target_altitude, altitude_error, throttle);
                         log_counter = 0;
                     }
-
-                    sendControlInput(throttle, 0.0f, 0.0f, 0.0f);
                 }
             }
             break;
 
         case ExecutionPhase::HOVERING:
-            // Hover at target altitude for specified duration
-            // 指定時間、目標高度でホバリング
-            hover_timer_ += dt;
-
-            if (hover_timer_ >= params_.duration_s) {
-                // Hover complete, start descending
-                // ホバリング完了、降下開始
-                ESP_LOGI(TAG, "JUMP: Hover complete, descending");
-                phase_ = ExecutionPhase::DESCENDING;
-            } else {
-                // Maintain altitude with proportional control
-                // 比例制御で高度維持
-                float altitude_error = params_.target_altitude - current_altitude;
-                float throttle = 0.55f + (altitude_error * 0.6f);
-                throttle = constrain(throttle, 0.50f, 0.75f);
-
-                sendControlInput(throttle, 0.0f, 0.0f, 0.0f);
-            }
+            // Not used in JUMP command (直接DESCENDINGへ遷移)
+            // Jumpコマンドでは使用しない
+            phase_ = ExecutionPhase::DESCENDING;
             break;
 
         case ExecutionPhase::DESCENDING:
-            // Descend until landed
-            // 着陸するまで降下
-            if (current_altitude < 0.05f) {  // Below 5cm = landed
-                // Landed, command complete
-                // 着陸、コマンド完了
-                ESP_LOGI(TAG, "JUMP: Landed, command complete");
+            // Free fall until landed
+            // 自由落下で着陸まで
+            if (tof_altitude < 0.05f) {  // Below 5cm = landed
+                ESP_LOGI(TAG, "JUMP: Landed (ToF: %.2f m), command complete", tof_altitude);
                 phase_ = ExecutionPhase::DONE;
                 sendControlInput(0.0f, 0.0f, 0.0f, 0.0f);  // Stop motors
             } else {
-                // Rapid descent with zero throttle (free fall)
-                // ゼロスロットルで急降下（自由落下）
+                // Free fall with zero throttle
+                // ゼロスロットルで自由落下
                 sendControlInput(0.0f, 0.0f, 0.0f, 0.0f);
             }
             break;
