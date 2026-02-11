@@ -50,8 +50,8 @@ class motor_prop():
         self.Bm = 6.33e-4
         self.Cm = 1.53e-2
         #LCRメータで測定したパラメータ
-        self.Lm = 1.0e-6
-        self.Rm = 0.34
+        self.Lm = 7.5e-6 #1.0e-6
+        self.Rm = 0.63 #0.34
         #回転数と推力・トルク測定実験から求めたパラメータ
         self.Ct = 1.00e-8
         self.Cq = 9.71e-11
