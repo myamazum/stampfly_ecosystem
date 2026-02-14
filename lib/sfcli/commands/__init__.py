@@ -16,6 +16,7 @@ from . import setup
 from . import sysid
 from . import flight
 from . import query
+from . import rc
 
 __all__ = [
     "version",
@@ -30,4 +31,5 @@ __all__ = [
     "sysid",
     "flight",
     "query",
+    "rc",
 ]

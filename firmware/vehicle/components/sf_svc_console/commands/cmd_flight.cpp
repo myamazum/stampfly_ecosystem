@@ -11,9 +11,12 @@
 #include "motor_driver.hpp"
 #include "stampfly_state.hpp"
 #include "sensor_fusion.hpp"
+#include "control_arbiter.hpp"
+#include "udp_protocol.hpp"  // for CTRL_FLAG_ALT_MODE
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
 
 using namespace stampfly;
 
@@ -603,6 +606,41 @@ static int cmd_stop(int argc, char** argv) {
     }
 }
 
+// RC control command: rc <a> <b> <c> <d>
+// RC制御コマンド: rc <左右> <前後> <上下> <ヨー> (-100~100)
+static int cmd_rc(int argc, char** argv) {
+    auto& console = Console::getInstance();
+
+    if (argc < 5) {
+        console.print("Usage: rc <a> <b> <c> <d>  (-100~100)\r\n");
+        console.print("  a: left/right (roll)\r\n");
+        console.print("  b: forward/backward (pitch)\r\n");
+        console.print("  c: up/down (throttle)\r\n");
+        console.print("  d: yaw\r\n");
+        return 1;
+    }
+
+    // Parse and clamp to [-100, 100]
+    // 解析して [-100, 100] にクランプ
+    int a = std::clamp(atoi(argv[1]), -100, 100);  // left/right → roll
+    int b = std::clamp(atoi(argv[2]), -100, 100);  // fwd/back → pitch
+    int c = std::clamp(atoi(argv[3]), -100, 100);  // up/down → throttle
+    int d = std::clamp(atoi(argv[4]), -100, 100);  // yaw
+
+    // Normalize: roll/pitch/yaw [-1, 1], throttle [0, 1]
+    // 正規化: roll/pitch/yaw [-1, 1], throttle [0, 1]
+    float roll     = a / 100.0f;
+    float pitch    = b / 100.0f;
+    float throttle = (c + 100.0f) / 200.0f;  // [-100,100] → [0,1]
+    float yaw      = d / 100.0f;
+
+    auto& arbiter = ControlArbiter::getInstance();
+    arbiter.updateFromWebSocket(throttle, roll, pitch, yaw, stampfly::udp::CTRL_FLAG_ALT_MODE);
+
+    console.print("ok\r\n");
+    return 0;
+}
+
 // Register flight commands
 // 飛行コマンドを登録
 extern "C" void register_flight_commands() {
@@ -725,4 +763,12 @@ extern "C" void register_flight_commands() {
         .func = &cmd_stop,
     };
     esp_console_cmd_register(&stop_cmd);
+
+    const esp_console_cmd_t rc_cmd = {
+        .command = "rc",
+        .help = "RC control [rc <a> <b> <c> <d>] (-100~100: roll pitch throttle yaw)",
+        .hint = NULL,
+        .func = &cmd_rc,
+    };
+    esp_console_cmd_register(&rc_cmd);
 }
