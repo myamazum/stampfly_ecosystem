@@ -8,7 +8,7 @@
 
 | ルール | 理由 |
 |--------|------|
-| プロペラガードを必ず装着 | 手指の怪我防止 |
+| プロペラガードの損傷がないか確認 | 手指の怪我防止（StampFly は一体型ガード標準搭載） |
 | 飛行エリアを確保（2m x 2m 以上） | 衝突回避 |
 | バッテリー 30% 以下で飛行しない | 制御不能リスク |
 | 緊急停止方法を事前に確認 | 即座に停止できるように |
@@ -32,7 +32,7 @@ drone.emergency()
 
 | # | 確認項目 | チェック |
 |---|---------|---------|
-| 1 | プロペラガードが装着されている | [ ] |
+| 1 | プロペラガードに破損・変形がない | [ ] |
 | 2 | プロペラに損傷がない | [ ] |
 | 3 | バッテリーが十分に充電されている（30%以上） | [ ] |
 | 4 | 飛行エリアが確保されている（障害物なし） | [ ] |
@@ -86,7 +86,7 @@ drone.emergency()
 
 | Rule | Reason |
 |------|--------|
-| Always attach propeller guards | Prevent finger injuries |
+| Check propeller guards for damage | Prevent finger injuries (StampFly has built-in guards) |
 | Ensure flight area (2m x 2m minimum) | Collision avoidance |
 | Do not fly below 30% battery | Risk of loss of control |
 | Confirm emergency stop method beforehand | Immediate stop capability |
@@ -106,7 +106,7 @@ drone.emergency()
 
 | # | Check Item | Done |
 |---|-----------|------|
-| 1 | Propeller guards attached | [ ] |
+| 1 | Propeller guards undamaged | [ ] |
 | 2 | No propeller damage | [ ] |
 | 3 | Battery sufficiently charged (>30%) | [ ] |
 | 4 | Flight area clear (no obstacles) | [ ] |
