@@ -84,6 +84,10 @@ int CommandQueue::enqueue(FlightCommandType type,
         case FlightCommandType::LAND:
             entry.precondition_flags = ReadinessFlags::NONE;
             break;
+        case FlightCommandType::MOVE_VERTICAL:
+        case FlightCommandType::ROTATE_YAW:
+            entry.precondition_flags = ReadinessFlags::NONE;  // Allowed while flying
+            break;
         default:
             entry.precondition_flags = ReadinessFlags::NONE;
             break;
@@ -304,9 +308,10 @@ bool CommandQueue::isReadyToExecute(const CommandEntry& cmd) const
 
     FlightState flight_state = state_mgr.getFlightState();
 
-    // Must be IDLE or ARMED (not already FLYING, ERROR, etc.)
-    // IDLE または ARMED 状態である必要がある（FLYING, ERROR等ではない）
-    if (flight_state != FlightState::IDLE && flight_state != FlightState::ARMED) {
+    // Must be IDLE, ARMED, or FLYING (for in-flight commands like MOVE_VERTICAL, ROTATE_YAW)
+    // IDLE、ARMED、または FLYING 状態である必要がある（飛行中コマンド対応）
+    if (flight_state != FlightState::IDLE && flight_state != FlightState::ARMED &&
+        flight_state != FlightState::FLYING) {
         return false;
     }
 

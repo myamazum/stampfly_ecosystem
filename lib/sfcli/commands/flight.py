@@ -1,5 +1,6 @@
 """
-sf takeoff / land / hover / jump - Flight commands
+sf takeoff / land / hover / jump / up / down / cw / ccw / emergency / stop
+Flight commands
 
 Send flight commands to StampFly via WiFi CLI and monitor in real-time.
 WiFi CLI経由でフライトコマンドを送信し、リアルタイムで監視します。
@@ -9,6 +10,12 @@ Commands:
     land                - Land the vehicle
     hover [alt] [dur]   - Hover at altitude for duration (default: 0.5m, 5.0s)
     jump [alt]          - Quick jump: climb then descend (default: 0.15m)
+    up <cm>             - Move up by distance (20-200 cm)
+    down <cm>           - Move down by distance (20-200 cm)
+    cw <deg>            - Rotate clockwise (1-360 degrees)
+    ccw <deg>           - Rotate counter-clockwise (1-360 degrees)
+    emergency           - Emergency motor stop (kill all motors)
+    stop                - Stop and hover at current position
 """
 
 import argparse
@@ -90,6 +97,80 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     )
     _add_common_args(jump_parser)
     jump_parser.set_defaults(func=run_jump)
+
+    # --- up ---
+    up_parser = subparsers.add_parser(
+        "up",
+        help="Move up by distance (cm)",
+        description="Move up by specified distance. WiFi CLI経由で上昇コマンドを送信。",
+    )
+    up_parser.add_argument(
+        "distance",
+        type=int,
+        help="Distance in cm (20-200)",
+    )
+    _add_common_args(up_parser)
+    up_parser.set_defaults(func=run_up)
+
+    # --- down ---
+    down_parser = subparsers.add_parser(
+        "down",
+        help="Move down by distance (cm)",
+        description="Move down by specified distance. WiFi CLI経由で降下コマンドを送信。",
+    )
+    down_parser.add_argument(
+        "distance",
+        type=int,
+        help="Distance in cm (20-200)",
+    )
+    _add_common_args(down_parser)
+    down_parser.set_defaults(func=run_down)
+
+    # --- cw ---
+    cw_parser = subparsers.add_parser(
+        "cw",
+        help="Rotate clockwise (degrees)",
+        description="Rotate clockwise by specified angle. WiFi CLI経由で時計回り回転を送信。",
+    )
+    cw_parser.add_argument(
+        "angle",
+        type=int,
+        help="Angle in degrees (1-360)",
+    )
+    _add_common_args(cw_parser)
+    cw_parser.set_defaults(func=run_cw)
+
+    # --- ccw ---
+    ccw_parser = subparsers.add_parser(
+        "ccw",
+        help="Rotate counter-clockwise (degrees)",
+        description="Rotate counter-clockwise by specified angle. WiFi CLI経由で反時計回り回転を送信。",
+    )
+    ccw_parser.add_argument(
+        "angle",
+        type=int,
+        help="Angle in degrees (1-360)",
+    )
+    _add_common_args(ccw_parser)
+    ccw_parser.set_defaults(func=run_ccw)
+
+    # --- emergency ---
+    emergency_parser = subparsers.add_parser(
+        "emergency",
+        help="Emergency motor stop",
+        description="Emergency stop: kill all motors immediately. 緊急停止：全モーター即時停止。",
+    )
+    _add_common_args(emergency_parser)
+    emergency_parser.set_defaults(func=run_emergency)
+
+    # --- stop ---
+    stop_parser = subparsers.add_parser(
+        "stop",
+        help="Stop and hover at current position",
+        description="Cancel current command and hover in place. 現在のコマンドをキャンセルしてその場でホバリング。",
+    )
+    _add_common_args(stop_parser)
+    stop_parser.set_defaults(func=run_stop)
 
 
 def _add_common_args(parser: argparse.ArgumentParser) -> None:
@@ -178,6 +259,95 @@ def run_jump(args: argparse.Namespace) -> int:
         cli_cmd=f"jump {alt}",
         label="JUMP",
         target_alt=alt,
+        args=args,
+    )
+
+
+def run_up(args: argparse.Namespace) -> int:
+    """Execute up command"""
+    cm = args.distance
+    if cm < 20 or cm > 200:
+        console.error("Distance must be 20-200 [cm]")
+        return 1
+
+    console.info(f"Move up {cm} cm", prefix="UP")
+    return _run_flight_command(
+        cli_cmd=f"up {cm}",
+        label="UP",
+        target_alt=0.0,  # Relative move, no fixed target to display
+        args=args,
+    )
+
+
+def run_down(args: argparse.Namespace) -> int:
+    """Execute down command"""
+    cm = args.distance
+    if cm < 20 or cm > 200:
+        console.error("Distance must be 20-200 [cm]")
+        return 1
+
+    console.info(f"Move down {cm} cm", prefix="DOWN")
+    return _run_flight_command(
+        cli_cmd=f"down {cm}",
+        label="DOWN",
+        target_alt=0.0,
+        args=args,
+    )
+
+
+def run_cw(args: argparse.Namespace) -> int:
+    """Execute clockwise rotation command"""
+    deg = args.angle
+    if deg < 1 or deg > 360:
+        console.error("Angle must be 1-360 [deg]")
+        return 1
+
+    console.info(f"Rotate CW {deg} deg", prefix="CW")
+    return _run_flight_command(
+        cli_cmd=f"cw {deg}",
+        label="CW",
+        target_alt=0.0,
+        args=args,
+    )
+
+
+def run_ccw(args: argparse.Namespace) -> int:
+    """Execute counter-clockwise rotation command"""
+    deg = args.angle
+    if deg < 1 or deg > 360:
+        console.error("Angle must be 1-360 [deg]")
+        return 1
+
+    console.info(f"Rotate CCW {deg} deg", prefix="CCW")
+    return _run_flight_command(
+        cli_cmd=f"ccw {deg}",
+        label="CCW",
+        target_alt=0.0,
+        args=args,
+    )
+
+
+def run_emergency(args: argparse.Namespace) -> int:
+    """Execute emergency stop command (fire & forget)"""
+    console.warning("EMERGENCY STOP", prefix="EMERGENCY")
+    # Force no-monitor for emergency (instant response)
+    # 緊急停止はモニタリング不要（即時応答）
+    args.no_monitor = True
+    return _run_flight_command(
+        cli_cmd="emergency",
+        label="EMERGENCY",
+        target_alt=0.0,
+        args=args,
+    )
+
+
+def run_stop(args: argparse.Namespace) -> int:
+    """Execute stop (hover in place) command"""
+    console.info("Stop and hover", prefix="STOP")
+    return _run_flight_command(
+        cli_cmd="stop",
+        label="STOP",
+        target_alt=0.0,
         args=args,
     )
 

@@ -36,6 +36,7 @@ struct CommandEntry {
     float duration_s;                    ///< Duration [s] / 持続時間
     float climb_rate;                    ///< Climb rate [m/s] / 上昇速度
     float descent_rate;                  ///< Descent rate [m/s] / 降下速度
+    float target_yaw_deg;               ///< Target yaw angle [deg] / 目標ヨー角
 
     uint32_t enqueue_time_ms;            ///< Enqueue timestamp / キュー登録時刻
     uint32_t timeout_ms;                 ///< Timeout [ms] / タイムアウト
@@ -52,6 +53,7 @@ struct CommandEntry {
         , duration_s(0.0f)
         , climb_rate(0.5f)
         , descent_rate(0.3f)
+        , target_yaw_deg(0.0f)
         , enqueue_time_ms(0)
         , timeout_ms(30000)
         , priority(100)

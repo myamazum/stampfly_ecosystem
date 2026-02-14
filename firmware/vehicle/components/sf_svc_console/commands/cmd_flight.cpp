@@ -8,10 +8,22 @@
 #include "flight_command.hpp"
 #include "command_queue.hpp"
 #include "system_state.hpp"
+#include "motor_driver.hpp"
+#include "stampfly_state.hpp"
+#include "sensor_fusion.hpp"
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 
 using namespace stampfly;
+
+// External references for emergency stop
+// 緊急停止用の外部参照
+extern MotorDriver* g_motor_ptr;
+
+namespace globals {
+    extern sf::SensorFusion g_fusion;
+}
 
 // Jump command: jump [altitude_m] [hover_sec]
 // ジャンプコマンド: jump [高度_m] [ホバリング_秒]
@@ -173,10 +185,12 @@ static int cmd_flight(int argc, char** argv) {
         if (flight.isRunning()) {
             const char* cmd_name = "UNKNOWN";
             switch (flight.getCurrentCommand()) {
-                case FlightCommandType::JUMP:    cmd_name = "JUMP"; break;
-                case FlightCommandType::TAKEOFF: cmd_name = "TAKEOFF"; break;
-                case FlightCommandType::LAND:    cmd_name = "LAND"; break;
-                case FlightCommandType::HOVER:   cmd_name = "HOVER"; break;
+                case FlightCommandType::JUMP:          cmd_name = "JUMP"; break;
+                case FlightCommandType::TAKEOFF:       cmd_name = "TAKEOFF"; break;
+                case FlightCommandType::LAND:          cmd_name = "LAND"; break;
+                case FlightCommandType::HOVER:         cmd_name = "HOVER"; break;
+                case FlightCommandType::MOVE_VERTICAL: cmd_name = "MOVE_VERTICAL"; break;
+                case FlightCommandType::ROTATE_YAW:    cmd_name = "ROTATE_YAW"; break;
                 default: break;
             }
             console.print("Flight command: %s\r\n", cmd_name);
@@ -202,6 +216,212 @@ static int cmd_flight(int argc, char** argv) {
     } else {
         console.print("Unknown subcommand: %s\r\n", argv[1]);
         console.print("Usage: flight [status|cancel]\r\n");
+        return 1;
+    }
+}
+
+// Up command: up <cm>
+// 上昇コマンド: up <cm>
+static int cmd_up(int argc, char** argv) {
+    auto& console = Console::getInstance();
+    auto& flight = FlightCommandService::getInstance();
+
+    if (argc < 2) {
+        console.print("Usage: up <cm>  (20-200)\r\n");
+        return 1;
+    }
+
+    int cm = atoi(argv[1]);
+    if (cm < 20 || cm > 200) {
+        console.print("Error: Distance must be 20-200 [cm]\r\n");
+        return 1;
+    }
+
+    // Calculate absolute target altitude = current + distance
+    // 絶対目標高度 = 現在高度 + 移動距離
+    float current_alt = -globals::g_fusion.getState().position.z;
+    float target_alt = current_alt + (float)cm / 100.0f;
+
+    FlightCommandParams params{};
+    params.target_altitude = target_alt;
+
+    if (flight.executeCommand(FlightCommandType::MOVE_VERTICAL, params)) {
+        console.print("Up %d cm enqueued (target: %.2f m)\r\n", cm, target_alt);
+        return 0;
+    } else {
+        console.print("Failed to enqueue up command\r\n");
+        return 1;
+    }
+}
+
+// Down command: down <cm>
+// 降下コマンド: down <cm>
+static int cmd_down(int argc, char** argv) {
+    auto& console = Console::getInstance();
+    auto& flight = FlightCommandService::getInstance();
+
+    if (argc < 2) {
+        console.print("Usage: down <cm>  (20-200)\r\n");
+        return 1;
+    }
+
+    int cm = atoi(argv[1]);
+    if (cm < 20 || cm > 200) {
+        console.print("Error: Distance must be 20-200 [cm]\r\n");
+        return 1;
+    }
+
+    // Calculate absolute target altitude = current - distance
+    // 絶対目標高度 = 現在高度 - 移動距離
+    float current_alt = -globals::g_fusion.getState().position.z;
+    float target_alt = current_alt - (float)cm / 100.0f;
+    if (target_alt < 0.05f) target_alt = 0.05f;  // Minimum safe altitude / 最低安全高度
+
+    FlightCommandParams params{};
+    params.target_altitude = target_alt;
+
+    if (flight.executeCommand(FlightCommandType::MOVE_VERTICAL, params)) {
+        console.print("Down %d cm enqueued (target: %.2f m)\r\n", cm, target_alt);
+        return 0;
+    } else {
+        console.print("Failed to enqueue down command\r\n");
+        return 1;
+    }
+}
+
+// CW command: cw <deg>
+// 時計回りコマンド: cw <deg>
+static int cmd_cw(int argc, char** argv) {
+    auto& console = Console::getInstance();
+    auto& flight = FlightCommandService::getInstance();
+
+    if (argc < 2) {
+        console.print("Usage: cw <deg>  (1-360)\r\n");
+        return 1;
+    }
+
+    int deg = atoi(argv[1]);
+    if (deg < 1 || deg > 360) {
+        console.print("Error: Angle must be 1-360 [deg]\r\n");
+        return 1;
+    }
+
+    // Calculate absolute target yaw = current + angle
+    // 絶対目標ヨー角 = 現在ヨー角 + 回転角
+    float current_yaw_deg = globals::g_fusion.getState().yaw * 180.0f / 3.14159265f;
+    float target_yaw_deg = current_yaw_deg + (float)deg;
+
+    // Maintain current altitude during rotation
+    // 回転中は現在高度を維持
+    float current_alt = -globals::g_fusion.getState().position.z;
+
+    FlightCommandParams params{};
+    params.target_altitude = current_alt;
+    params.target_yaw_deg = target_yaw_deg;
+
+    if (flight.executeCommand(FlightCommandType::ROTATE_YAW, params)) {
+        console.print("CW %d deg enqueued (target yaw: %.1f deg)\r\n", deg, target_yaw_deg);
+        return 0;
+    } else {
+        console.print("Failed to enqueue cw command\r\n");
+        return 1;
+    }
+}
+
+// CCW command: ccw <deg>
+// 反時計回りコマンド: ccw <deg>
+static int cmd_ccw(int argc, char** argv) {
+    auto& console = Console::getInstance();
+    auto& flight = FlightCommandService::getInstance();
+
+    if (argc < 2) {
+        console.print("Usage: ccw <deg>  (1-360)\r\n");
+        return 1;
+    }
+
+    int deg = atoi(argv[1]);
+    if (deg < 1 || deg > 360) {
+        console.print("Error: Angle must be 1-360 [deg]\r\n");
+        return 1;
+    }
+
+    // Calculate absolute target yaw = current - angle
+    // 絶対目標ヨー角 = 現在ヨー角 - 回転角
+    float current_yaw_deg = globals::g_fusion.getState().yaw * 180.0f / 3.14159265f;
+    float target_yaw_deg = current_yaw_deg - (float)deg;
+
+    // Maintain current altitude during rotation
+    // 回転中は現在高度を維持
+    float current_alt = -globals::g_fusion.getState().position.z;
+
+    FlightCommandParams params{};
+    params.target_altitude = current_alt;
+    params.target_yaw_deg = target_yaw_deg;
+
+    if (flight.executeCommand(FlightCommandType::ROTATE_YAW, params)) {
+        console.print("CCW %d deg enqueued (target yaw: %.1f deg)\r\n", deg, target_yaw_deg);
+        return 0;
+    } else {
+        console.print("Failed to enqueue ccw command\r\n");
+        return 1;
+    }
+}
+
+// Emergency command: emergency
+// 緊急停止コマンド: emergency
+static int cmd_emergency(int argc, char** argv) {
+    auto& console = Console::getInstance();
+    auto& flight = FlightCommandService::getInstance();
+
+    // Cancel any running command
+    // 実行中のコマンドをキャンセル
+    flight.cancel();
+
+    // Cancel all queued commands
+    // キュー内の全コマンドをキャンセル
+    CommandQueue::getInstance().cancelAll();
+
+    // Force motor stop via disarm
+    // disarm で強制モーター停止
+    if (g_motor_ptr) {
+        g_motor_ptr->disarm();
+    }
+
+    // Reset flight state to IDLE
+    // フライト状態を IDLE にリセット
+    StampFlyState::getInstance().setFlightState(FlightState::IDLE);
+    SystemStateManager::getInstance().setFlightState(FlightState::IDLE);
+
+    console.print("EMERGENCY: All motors stopped, state reset to IDLE\r\n");
+    return 0;
+}
+
+// Stop command: stop (hover at current position)
+// 停止コマンド: stop（現在位置でホバリング）
+static int cmd_stop(int argc, char** argv) {
+    auto& console = Console::getInstance();
+    auto& flight = FlightCommandService::getInstance();
+
+    // Cancel current command first
+    // まず現在のコマンドをキャンセル
+    if (flight.isRunning()) {
+        flight.cancel();
+    }
+
+    // Hover at current altitude indefinitely (9999s)
+    // 現在高度で無期限ホバリング（9999秒）
+    float current_alt = -globals::g_fusion.getState().position.z;
+    if (current_alt < 0.1f) current_alt = 0.1f;  // Minimum hover altitude / 最低ホバリング高度
+
+    FlightCommandParams params{};
+    params.target_altitude = current_alt;
+    params.duration_s = 9999.0f;
+
+    if (flight.executeCommand(FlightCommandType::HOVER, params)) {
+        console.print("Stop: hovering at %.2f m\r\n", current_alt);
+        return 0;
+    } else {
+        console.print("Failed to enqueue stop (hover) command\r\n");
         return 1;
     }
 }
@@ -248,4 +468,52 @@ extern "C" void register_flight_commands() {
         .func = &cmd_flight,
     };
     esp_console_cmd_register(&flight_status_cmd);
+
+    const esp_console_cmd_t up_cmd = {
+        .command = "up",
+        .help = "Move up [up <cm>] (20-200)",
+        .hint = NULL,
+        .func = &cmd_up,
+    };
+    esp_console_cmd_register(&up_cmd);
+
+    const esp_console_cmd_t down_cmd = {
+        .command = "down",
+        .help = "Move down [down <cm>] (20-200)",
+        .hint = NULL,
+        .func = &cmd_down,
+    };
+    esp_console_cmd_register(&down_cmd);
+
+    const esp_console_cmd_t cw_cmd = {
+        .command = "cw",
+        .help = "Rotate clockwise [cw <deg>] (1-360)",
+        .hint = NULL,
+        .func = &cmd_cw,
+    };
+    esp_console_cmd_register(&cw_cmd);
+
+    const esp_console_cmd_t ccw_cmd = {
+        .command = "ccw",
+        .help = "Rotate counter-clockwise [ccw <deg>] (1-360)",
+        .hint = NULL,
+        .func = &cmd_ccw,
+    };
+    esp_console_cmd_register(&ccw_cmd);
+
+    const esp_console_cmd_t emergency_cmd = {
+        .command = "emergency",
+        .help = "Emergency stop (kill all motors immediately)",
+        .hint = NULL,
+        .func = &cmd_emergency,
+    };
+    esp_console_cmd_register(&emergency_cmd);
+
+    const esp_console_cmd_t stop_cmd = {
+        .command = "stop",
+        .help = "Stop and hover at current position",
+        .hint = NULL,
+        .func = &cmd_stop,
+    };
+    esp_console_cmd_register(&stop_cmd);
 }

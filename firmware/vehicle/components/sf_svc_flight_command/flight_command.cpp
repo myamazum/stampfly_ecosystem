@@ -8,6 +8,7 @@
 #include "landing_handler.hpp"
 #include "stampfly_state.hpp"
 #include "esp_log.h"
+#include <cmath>
 
 // Forward declarations for globals
 // グローバル変数の前方宣言
@@ -180,6 +181,7 @@ void FlightCommandService::update(float dt) {
         params_.duration_s = cmd->duration_s;
         params_.climb_rate = cmd->climb_rate;
         params_.descent_rate = cmd->descent_rate;
+        params_.target_yaw_deg = cmd->target_yaw_deg;
         state_ = FlightCommandState::RUNNING;
         phase_ = ExecutionPhase::INIT;
         elapsed_time_ = 0.0f;
@@ -218,6 +220,14 @@ void FlightCommandService::update(float dt) {
 
         case FlightCommandType::HOVER:
             updateHoverCommand(dt, current_altitude);
+            break;
+
+        case FlightCommandType::MOVE_VERTICAL:
+            updateMoveVerticalCommand(dt, current_altitude);
+            break;
+
+        case FlightCommandType::ROTATE_YAW:
+            updateRotateYawCommand(dt, current_altitude);
             break;
 
         default:
@@ -406,6 +416,9 @@ void FlightCommandService::updateJumpCommand(float dt, float current_altitude) {
             current_command_ = FlightCommandType::NONE;
             phase_ = ExecutionPhase::INIT;
             break;
+
+        default:
+            break;
     }
 }
 
@@ -514,12 +527,162 @@ void FlightCommandService::updateHoverCommand(float dt, float current_altitude) 
     }
 }
 
+void FlightCommandService::updateMoveVerticalCommand(float dt, float current_altitude) {
+    // MOVE_VERTICAL: INIT → CLIMBING or DESCENDING → DONE
+    // 垂直移動: INIT → 上昇 or 降下 → 完了
+    //
+    // target_altitude is absolute altitude set by CLI handler (current ± distance)
+    // target_altitude は CLI ハンドラで設定された絶対高度（現在値 ± 移動距離）
+    switch (phase_) {
+        case ExecutionPhase::INIT:
+            {
+                float diff = params_.target_altitude - current_altitude;
+                if (diff > 0.0f) {
+                    ESP_LOGI(TAG, "MOVE_VERTICAL: Climbing to %.2f m (current: %.2f m)",
+                             params_.target_altitude, current_altitude);
+                    phase_ = ExecutionPhase::CLIMBING;
+                } else {
+                    ESP_LOGI(TAG, "MOVE_VERTICAL: Descending to %.2f m (current: %.2f m)",
+                             params_.target_altitude, current_altitude);
+                    phase_ = ExecutionPhase::DESCENDING;
+                }
+            }
+            break;
+
+        case ExecutionPhase::CLIMBING:
+            {
+                float altitude_error = params_.target_altitude - current_altitude;
+                if (altitude_error < 0.05f) {
+                    ESP_LOGI(TAG, "MOVE_VERTICAL: Reached %.2f m", current_altitude);
+                    phase_ = ExecutionPhase::DONE;
+                } else {
+                    // Proportional control: hover_throttle + Kp * error
+                    // 比例制御: ホバースロットル + Kp * 誤差
+                    constexpr float HOVER_THROTTLE = 0.55f;
+                    constexpr float KP = 0.6f;
+                    float throttle = HOVER_THROTTLE + (KP * altitude_error);
+                    throttle = constrain(throttle, 0.50f, 0.90f);
+                    sendControlInput(throttle, 0.0f, 0.0f, 0.0f);
+                }
+            }
+            break;
+
+        case ExecutionPhase::DESCENDING:
+            {
+                float altitude_error = current_altitude - params_.target_altitude;
+                if (altitude_error < 0.05f) {
+                    ESP_LOGI(TAG, "MOVE_VERTICAL: Reached %.2f m", current_altitude);
+                    phase_ = ExecutionPhase::DONE;
+                } else {
+                    // Reduced throttle for descent, proportional to error
+                    // 降下用の減少スロットル、誤差に比例
+                    constexpr float HOVER_THROTTLE = 0.55f;
+                    constexpr float KP = 0.4f;
+                    float throttle = HOVER_THROTTLE - (KP * altitude_error);
+                    throttle = constrain(throttle, 0.25f, 0.55f);
+                    sendControlInput(throttle, 0.0f, 0.0f, 0.0f);
+                }
+            }
+            break;
+
+        case ExecutionPhase::DONE:
+            // Keep hovering at target altitude
+            // 目標高度でホバリング維持
+            state_ = FlightCommandState::COMPLETED;
+            current_command_ = FlightCommandType::NONE;
+            sendControlInput(0.55f, 0.0f, 0.0f, 0.0f);
+            break;
+
+        default:
+            break;
+    }
+}
+
+void FlightCommandService::updateRotateYawCommand(float dt, float current_altitude) {
+    // ROTATE_YAW: INIT → ROTATING → DONE
+    // ヨー回転: INIT → 回転中 → 完了
+    //
+    // target_yaw_deg is absolute yaw set by CLI handler (current ± angle)
+    // target_yaw_deg は CLI ハンドラで設定された絶対ヨー角（現在値 ± 回転角）
+    switch (phase_) {
+        case ExecutionPhase::INIT:
+            ESP_LOGI(TAG, "ROTATE_YAW: Rotating to %.1f deg (current: %.1f deg)",
+                     params_.target_yaw_deg, getCurrentYaw() * 180.0f / 3.14159265f);
+            phase_ = ExecutionPhase::ROTATING;
+            break;
+
+        case ExecutionPhase::ROTATING:
+            {
+                float current_yaw_deg = getCurrentYaw() * 180.0f / 3.14159265f;
+                float angle_error = normalizeAngleDeg(params_.target_yaw_deg - current_yaw_deg);
+
+                if (fabsf(angle_error) < 5.0f) {
+                    // Within 5 degrees of target
+                    // 目標の5度以内
+                    ESP_LOGI(TAG, "ROTATE_YAW: Reached %.1f deg (error: %.1f deg)",
+                             current_yaw_deg, angle_error);
+                    phase_ = ExecutionPhase::DONE;
+                } else {
+                    // Proportional yaw control while maintaining hover
+                    // ホバー維持しつつ比例ヨー制御
+                    constexpr float HOVER_THROTTLE = 0.55f;
+                    constexpr float YAW_KP = 0.005f;  // deg → normalized yaw input
+                    float yaw_input = YAW_KP * angle_error;
+                    yaw_input = constrain(yaw_input, -0.5f, 0.5f);
+
+                    // Maintain altitude with proportional control
+                    // 高度を比例制御で維持
+                    float alt_error = params_.target_altitude - current_altitude;
+                    float throttle = HOVER_THROTTLE + (alt_error * 0.6f);
+                    throttle = constrain(throttle, 0.50f, 0.75f);
+
+                    sendControlInput(throttle, 0.0f, 0.0f, yaw_input);
+
+                    // Debug log every 100 cycles (~250ms @ 400Hz)
+                    static int yaw_log_counter = 0;
+                    if (++yaw_log_counter >= 100) {
+                        ESP_LOGI(TAG, "ROTATE_YAW: current=%.1f deg, target=%.1f deg, error=%.1f deg, yaw_in=%.3f",
+                                 current_yaw_deg, params_.target_yaw_deg, angle_error, yaw_input);
+                        yaw_log_counter = 0;
+                    }
+                }
+            }
+            break;
+
+        case ExecutionPhase::DONE:
+            // Keep hovering at current position
+            // 現在位置でホバリング維持
+            state_ = FlightCommandState::COMPLETED;
+            current_command_ = FlightCommandType::NONE;
+            sendControlInput(0.55f, 0.0f, 0.0f, 0.0f);
+            break;
+
+        default:
+            break;
+    }
+}
+
+// Get current yaw angle estimate [rad]
+// 現在のヨー角推定値を取得 [rad]
+float FlightCommandService::getCurrentYaw() const {
+    auto state = globals::g_fusion.getState();
+    return state.yaw;
+}
+
 // Constrain helper function
 // 制約ヘルパー関数
 float FlightCommandService::constrain(float value, float min, float max) {
     if (value < min) return min;
     if (value > max) return max;
     return value;
+}
+
+// Normalize angle to [-180, 180] degrees
+// 角度を [-180, 180] 度に正規化
+float FlightCommandService::normalizeAngleDeg(float angle) {
+    while (angle > 180.0f) angle -= 360.0f;
+    while (angle < -180.0f) angle += 360.0f;
+    return angle;
 }
 
 } // namespace stampfly
