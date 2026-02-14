@@ -23,6 +23,7 @@ void register_comm_commands();
 void register_calib_commands();
 void register_misc_commands();
 void register_flight_commands();
+void register_query_commands();
 }
 
 namespace stampfly {
@@ -90,6 +91,7 @@ void Console::registerAllCommands()
     register_calib_commands();
     register_misc_commands();
     register_flight_commands();
+    register_query_commands();
 
     ESP_LOGI(TAG, "All commands registered");
 }

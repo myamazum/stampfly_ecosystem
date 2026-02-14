@@ -15,6 +15,7 @@ from . import cal
 from . import setup
 from . import sysid
 from . import flight
+from . import query
 
 __all__ = [
     "version",
@@ -28,4 +29,5 @@ __all__ = [
     "setup",
     "sysid",
     "flight",
+    "query",
 ]

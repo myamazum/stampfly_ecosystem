@@ -9,6 +9,7 @@ idf_component_register(
         "commands/cmd_calib.cpp"
         "commands/cmd_misc.cpp"
         "commands/cmd_flight.cpp"
+        "commands/cmd_query.cpp"
     INCLUDE_DIRS
         "include"
     REQUIRES
