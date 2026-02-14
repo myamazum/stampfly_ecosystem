@@ -5,18 +5,18 @@
 // レッスン 8: モデリング - カスタムモーターミキサー - 解答
 // =========================================================================
 
-// Physical parameters
-static const float L = 0.023f;      // Arm length [m]
-static const float kq = 0.01f;      // Torque-to-thrust ratio
+// Physical parameters / 物理パラメータ
+static const float L = 0.023f;      // Arm length [m] / アーム長
+static const float kq = 0.01f;      // Torque-to-thrust ratio / トルク対推力比
 
-// PID gains
+// PID gains / PIDゲイン
 static const float Kp_roll = 0.5f, Ki_roll = 0.3f, Kd_roll = 0.005f;
 static const float Kp_pitch = 0.5f, Ki_pitch = 0.3f, Kd_pitch = 0.005f;
 static const float Kp_yaw = 2.0f, Ki_yaw = 0.5f, Kd_yaw = 0.01f;
 static const float integral_limit = 0.5f;
 static const float rate_max_rp = 1.0f, rate_max_yaw = 5.0f;
 
-// PID state
+// PID state / PID状態変数
 static float roll_integral = 0.0f, roll_prev_error = 0.0f;
 static float pitch_integral = 0.0f, pitch_prev_error = 0.0f;
 static float yaw_integral = 0.0f, yaw_prev_error = 0.0f;
@@ -65,7 +65,7 @@ void loop_400Hz(float dt)
     // PID制御（レッスン6と同じ）
     // =====================================================================
 
-    // Roll PID
+    // Roll PID / ロール軸PID
     float roll_target = ws::rc_roll() * rate_max_rp;
     float roll_error = roll_target - ws::gyro_x();
     float roll_P = Kp_roll * roll_error;
@@ -76,7 +76,7 @@ void loop_400Hz(float dt)
     roll_prev_error = roll_error;
     float roll_cmd = clamp(roll_P + roll_I + roll_D, 1.0f);
 
-    // Pitch PID
+    // Pitch PID / ピッチ軸PID
     float pitch_target = ws::rc_pitch() * rate_max_rp;
     float pitch_error = pitch_target - ws::gyro_y();
     float pitch_P = Kp_pitch * pitch_error;
@@ -87,7 +87,7 @@ void loop_400Hz(float dt)
     pitch_prev_error = pitch_error;
     float pitch_cmd = clamp(pitch_P + pitch_I + pitch_D, 1.0f);
 
-    // Yaw PID
+    // Yaw PID / ヨー軸PID
     float yaw_target = ws::rc_yaw() * rate_max_yaw;
     float yaw_error = yaw_target - ws::gyro_z();
     float yaw_P = Kp_yaw * yaw_error;
@@ -117,12 +117,12 @@ void loop_400Hz(float dt)
     //   F3 = T/4 - tau_roll/(4*L) + tau_pitch/(4*L) - tau_yaw/(4*kq)
     //   F4 = T/4 - tau_roll/(4*L) - tau_pitch/(4*L) + tau_yaw/(4*kq)
 
-    float T = throttle;        // Total thrust command
-    float tau_r = roll_cmd;    // Roll torque command
-    float tau_p = pitch_cmd;   // Pitch torque command
-    float tau_y = yaw_cmd;     // Yaw torque command
+    float T = throttle;        // Total thrust command / 推力指令
+    float tau_r = roll_cmd;    // Roll torque command / ロールトルク指令
+    float tau_p = pitch_cmd;   // Pitch torque command / ピッチトルク指令
+    float tau_y = yaw_cmd;     // Yaw torque command / ヨートルク指令
 
-    // Pre-compute divisors
+    // Pre-compute divisors / 除算の事前計算
     float inv_4L  = 1.0f / (4.0f * L);   // = 1/(4*0.023) ~ 10.87
     float inv_4kq = 1.0f / (4.0f * kq);  // = 1/(4*0.01)  = 25.0
 
@@ -153,7 +153,7 @@ void loop_400Hz(float dt)
     ws::motor_set_duty(4, m4);
 
     // =====================================================================
-    // Telemetry (10Hz)
+    // Telemetry (10Hz) / テレメトリ送信 (10Hz)
     // =====================================================================
     if (tick % 40 == 0) {
         ws::telemetry_send("m1_duty", m1);
@@ -166,7 +166,7 @@ void loop_400Hz(float dt)
         ws::telemetry_send("throttle", throttle);
     }
 
-    // Debug print (2Hz)
+    // Debug print (2Hz) / デバッグ出力 (2Hz)
     if (tick % 200 == 0) {
         ws::print("M1:%.2f M2:%.2f M3:%.2f M4:%.2f  T:%.2f R:%.2f P:%.2f Y:%.2f",
                   m1, m2, m3, m4, throttle, roll_cmd, pitch_cmd, yaw_cmd);

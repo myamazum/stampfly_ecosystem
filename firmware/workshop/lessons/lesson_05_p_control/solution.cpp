@@ -20,11 +20,11 @@ void loop_400Hz(float dt)
     // 安全: ARM状態のときだけ制御を実行
     if (!ws::is_armed()) {
         ws::motor_stop_all();
-        ws::led_color(0, 0, 50);  // Blue = disarmed / 青 = ディスアーム
+        ws::led_color(0, 0, 50);  // Blue = disarmed / 青 = 非ARM
         return;
     }
 
-    ws::led_color(0, 50, 0);  // Green = armed / 緑 = アーム
+    ws::led_color(0, 50, 0);  // Green = armed / 緑 = ARM
 
     float throttle = ws::rc_throttle();
 
@@ -65,7 +65,7 @@ void loop_400Hz(float dt)
     ws::motor_mixer(throttle, roll_output, pitch_output, yaw_output);
 
     // --- Telemetry (10Hz) ---
-    // テレメトリ (10Hz)
+    // テレメトリ送信 (10Hz)
     if (tick % 40 == 0) {
         ws::telemetry_send("roll_target", roll_target);
         ws::telemetry_send("roll_actual", roll_actual);
@@ -78,7 +78,7 @@ void loop_400Hz(float dt)
     }
 
     // --- Debug print (2Hz) ---
-    // デバッグ出力 (2Hz)
+    // デバッグ出力 (2Hz): 実測値/目標値
     if (tick % 200 == 0) {
         ws::print("R:%.2f/%.2f P:%.2f/%.2f Y:%.2f/%.2f T:%.2f",
                   roll_actual, roll_target,
