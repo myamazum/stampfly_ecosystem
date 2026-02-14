@@ -1,24 +1,21 @@
 """
 sf competition - Workshop competition tools
 
-Tools for the StampFly workshop competition day (Day 5).
-StampFly 勉強会 競技会（Day 5）のためのツール。
+Tools for the StampFly workshop hover time competition (Day 5).
+StampFly 勉強会 ホバリングタイム競技（Day 5）のためのツール。
 
 Subcommands:
-    timer  - Time trial stopwatch
-    hover  - Hovering stability test (altitude sigma measurement)
-    score  - Display competition scores
+    hover-time - Hover time stopwatch (competition timer)
+    score      - Display competition scores and rankings
 """
 
 import argparse
-import asyncio
 import json
-import math
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from ..utils import console, paths
 
@@ -64,60 +61,31 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         metavar="<subcommand>",
     )
 
-    # --- timer ---
-    timer_parser = comp_subparsers.add_parser(
-        "timer",
-        help="Time trial stopwatch",
-        description="Stopwatch for time trial competition. Press Enter to record laps.",
+    # --- hover-time ---
+    hover_time_parser = comp_subparsers.add_parser(
+        "hover-time",
+        help="Hover time stopwatch",
+        description="Stopwatch for hover time competition. "
+        "Press Enter to start, Enter again to stop.",
     )
-    timer_parser.add_argument(
+    hover_time_parser.add_argument(
         "--team",
         default=None,
-        help="Team name for score recording",
+        help="Team/participant name for score recording",
     )
-    timer_parser.add_argument(
-        "--gates",
-        type=int,
-        default=4,
-        help="Number of gates (default: 4)",
-    )
-    timer_parser.set_defaults(func=run_timer)
-
-    # --- hover ---
-    hover_parser = comp_subparsers.add_parser(
-        "hover",
-        help="Hovering stability test",
-        description="Measure altitude stability during hover (10-second window).",
-    )
-    hover_parser.add_argument(
-        "--team",
-        default=None,
-        help="Team name for score recording",
-    )
-    hover_parser.add_argument(
-        "--duration",
+    hover_time_parser.add_argument(
+        "--max-time",
         type=float,
-        default=10.0,
-        help="Test duration in seconds (default: 10.0)",
+        default=60.0,
+        help="Maximum hover time in seconds (default: 60.0)",
     )
-    hover_parser.add_argument(
-        "--target",
-        type=float,
-        default=0.3,
-        help="Target altitude in meters (default: 0.3)",
-    )
-    hover_parser.add_argument(
-        "--ip",
-        default="192.168.4.1",
-        help="StampFly WiFi IP (default: 192.168.4.1)",
-    )
-    hover_parser.set_defaults(func=run_hover)
+    hover_time_parser.set_defaults(func=run_hover_time)
 
     # --- score ---
     score_parser = comp_subparsers.add_parser(
         "score",
         help="Display competition scores",
-        description="Show competition scores and rankings.",
+        description="Show hover time competition scores and rankings.",
     )
     score_parser.add_argument(
         "--clear",
@@ -130,21 +98,21 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     parser.set_defaults(func=lambda args: (parser.print_help(), 0)[1])
 
 
-def run_timer(args: argparse.Namespace) -> int:
-    """Time trial stopwatch"""
-    console.header("Time Trial Timer")
-    console.print()
-    console.print("  Controls:")
-    console.print("    Enter  - Record lap / Start timer")
-    console.print("    q      - Stop and save")
+def run_hover_time(args: argparse.Namespace) -> int:
+    """Hover time competition stopwatch"""
+    console.header("Hover Time Competition")
     console.print()
 
     if args.team:
-        console.info(f"Team: {args.team}")
+        console.info(f"Participant: {args.team}")
 
-    console.print(f"  Gates: {args.gates}")
+    console.print(f"  Max time: {args.max_time:.0f} seconds")
     console.print()
-    console.info("Press Enter to START...")
+    console.print("  Controls:")
+    console.print("    Enter  - Start / Stop timer")
+    console.print("    Ctrl+C - Cancel")
+    console.print()
+    console.info("Press Enter when the drone takes off...")
 
     try:
         input()
@@ -152,182 +120,75 @@ def run_timer(args: argparse.Namespace) -> int:
         return 0
 
     start_time = time.monotonic()
-    laps: List[float] = []
-
-    console.success("STARTED!")
+    console.success("TIMER STARTED!")
     console.print()
+    console.info("Press Enter when the drone lands/crashes...")
 
-    for gate in range(1, args.gates + 1):
-        prompt = f"  Gate {gate}/{args.gates} - Press Enter..."
-        try:
-            console.print(prompt, end="")
-            line = input()
-            if line.strip().lower() == "q":
-                break
-        except (EOFError, KeyboardInterrupt):
-            break
-
-        lap_time = time.monotonic() - start_time
-        laps.append(lap_time)
-        console.print(f"    Lap {gate}: {lap_time:.3f}s")
-
-    total_time = time.monotonic() - start_time
-
-    console.print()
-    console.header("Results")
-    console.print()
-    console.print(f"  Total time: {total_time:.3f}s")
-    console.print(f"  Gates cleared: {len(laps)}/{args.gates}")
-
-    if len(laps) > 1:
-        for i, lap in enumerate(laps):
-            if i == 0:
-                console.print(f"    Gate {i+1}: {lap:.3f}s")
-            else:
-                console.print(f"    Gate {i+1}: {lap:.3f}s (+{lap - laps[i-1]:.3f}s)")
-
-    # Save score if team specified
-    if args.team:
-        scores = _load_scores()
-        if args.team not in scores["teams"]:
-            scores["teams"][args.team] = {}
-        scores["teams"][args.team]["timer"] = {
-            "total_time": round(total_time, 3),
-            "gates_cleared": len(laps),
-            "gates_total": args.gates,
-            "laps": [round(t, 3) for t in laps],
-            "timestamp": datetime.now().isoformat(),
-        }
-        _save_scores(scores)
-        console.success(f"Score saved for team: {args.team}")
-
-    return 0
-
-
-def run_hover(args: argparse.Namespace) -> int:
-    """Hovering stability test via WiFi telemetry"""
     try:
-        import websockets
-    except ImportError:
-        console.error("websockets package required: pip install websockets")
-        return 1
+        # Wait for Enter or timeout
+        import select
 
-    console.header("Hovering Stability Test")
-    console.print()
-    console.print(f"  Target altitude: {args.target:.2f} m")
-    console.print(f"  Test duration:   {args.duration:.1f} s")
-    console.print(f"  StampFly IP:     {args.ip}")
-    console.print()
-
-    async def _collect_altitude():
-        """Collect altitude data via WebSocket"""
-        uri = f"ws://{args.ip}/ws"
-        altitudes: List[float] = []
-
-        console.info(f"Connecting to {uri}...")
-
-        try:
-            async with websockets.connect(uri, open_timeout=5) as ws:
-                console.success("Connected! Collecting altitude data...")
+        while True:
+            elapsed = time.monotonic() - start_time
+            if elapsed >= args.max_time:
+                console.print(f"\r  Time: {elapsed:5.1f}s - MAX TIME REACHED!", end="")
                 console.print()
+                break
 
-                start = time.monotonic()
-                while time.monotonic() - start < args.duration:
-                    try:
-                        msg = await asyncio.wait_for(ws.recv(), timeout=1.0)
-                        data = json.loads(msg)
+            console.print(f"\r  Time: {elapsed:5.1f}s", end="")
 
-                        # Extract altitude from telemetry
-                        # Support multiple field names
-                        alt = None
-                        for key in ("alt", "altitude", "pos_z", "z"):
-                            if key in data:
-                                alt = float(data[key])
-                                break
+            # Check for input (non-blocking on Unix)
+            ready, _, _ = select.select([sys.stdin], [], [], 0.1)
+            if ready:
+                sys.stdin.readline()
+                break
 
-                        if alt is not None:
-                            altitudes.append(alt)
-                            elapsed = time.monotonic() - start
-                            console.print(
-                                f"\r  [{elapsed:5.1f}s] alt={alt:6.3f}m  "
-                                f"samples={len(altitudes)}",
-                                end="",
-                            )
+    except KeyboardInterrupt:
+        console.print()
+        console.info("Cancelled")
+        return 0
 
-                    except asyncio.TimeoutError:
-                        continue
-                    except json.JSONDecodeError:
-                        continue
-
-                console.print()
-
-        except (ConnectionRefusedError, OSError) as e:
-            console.error(f"Connection failed: {e}")
-            console.print("  Make sure StampFly WiFi AP is connected")
-            return None
-
-        return altitudes
-
-    # Run async collection
-    altitudes = asyncio.run(_collect_altitude())
-
-    if altitudes is None:
-        return 1
-
-    if len(altitudes) < 10:
-        console.error(f"Not enough data points ({len(altitudes)}). Need at least 10.")
-        return 1
-
-    # Calculate statistics
-    mean_alt = sum(altitudes) / len(altitudes)
-    variance = sum((a - mean_alt) ** 2 for a in altitudes) / len(altitudes)
-    sigma = math.sqrt(variance)
-    min_alt = min(altitudes)
-    max_alt = max(altitudes)
-    error_from_target = abs(mean_alt - args.target)
+    hover_time = min(time.monotonic() - start_time, args.max_time)
 
     console.print()
-    console.header("Hover Test Results")
+    console.header("Result")
     console.print()
-    console.print(f"  Samples:          {len(altitudes)}")
-    console.print(f"  Target altitude:  {args.target:.3f} m")
-    console.print(f"  Mean altitude:    {mean_alt:.3f} m")
-    console.print(f"  Altitude sigma:   {sigma:.4f} m ({sigma*100:.2f} cm)")
-    console.print(f"  Min / Max:        {min_alt:.3f} / {max_alt:.3f} m")
-    console.print(f"  Range:            {(max_alt - min_alt)*100:.2f} cm")
-    console.print(f"  Error from target: {error_from_target*100:.2f} cm")
+    console.print(f"  Hover time: {hover_time:.2f} seconds")
     console.print()
 
-    # Rating
-    if sigma < 0.01:
-        rating = "Excellent"
-    elif sigma < 0.02:
-        rating = "Good"
-    elif sigma < 0.05:
-        rating = "Fair"
+    if hover_time >= args.max_time:
+        console.success("PERFECT! Maximum time reached!")
+    elif hover_time >= 30.0:
+        console.success("Great hover!")
+    elif hover_time >= 10.0:
+        console.info("Good attempt!")
     else:
-        rating = "Needs improvement"
-    console.info(f"Rating: {rating} (sigma={sigma*100:.2f} cm)")
+        console.info("Keep tuning those PID gains!")
 
     # Save score if team specified
     if args.team:
         scores = _load_scores()
         if args.team not in scores["teams"]:
-            scores["teams"][args.team] = {}
-        scores["teams"][args.team]["hover"] = {
-            "mean_altitude": round(mean_alt, 4),
-            "sigma": round(sigma, 4),
-            "target": args.target,
-            "error": round(error_from_target, 4),
-            "min": round(min_alt, 4),
-            "max": round(max_alt, 4),
-            "samples": len(altitudes),
-            "duration": args.duration,
-            "rating": rating,
+            scores["teams"][args.team] = {"attempts": []}
+
+        team_data = scores["teams"][args.team]
+        if "attempts" not in team_data:
+            team_data["attempts"] = []
+
+        team_data["attempts"].append({
+            "hover_time": round(hover_time, 2),
             "timestamp": datetime.now().isoformat(),
-        }
+        })
+
+        # Track best time
+        best = max(a["hover_time"] for a in team_data["attempts"])
+        team_data["best_time"] = best
+        team_data["attempt_count"] = len(team_data["attempts"])
+
         _save_scores(scores)
-        console.success(f"Score saved for team: {args.team}")
+        console.print()
+        console.success(f"Score saved for: {args.team}")
+        console.print(f"  Best time: {best:.2f}s ({len(team_data['attempts'])} attempts)")
 
     return 0
 
@@ -347,47 +208,28 @@ def run_score(args: argparse.Namespace) -> int:
 
     if not scores["teams"]:
         console.info("No competition scores recorded yet")
-        console.print("  Use 'sf competition timer --team <name>' to start")
+        console.print("  Use 'sf competition hover-time --team <name>' to record")
         return 0
 
-    console.header("Competition Scores")
+    console.header("Hover Time Competition Rankings")
     console.print()
 
-    # Timer rankings
-    timer_teams = []
+    # Build ranking list
+    rankings = []
     for team, data in scores["teams"].items():
-        if "timer" in data:
-            timer_teams.append((team, data["timer"]))
+        best = data.get("best_time", 0)
+        attempts = data.get("attempt_count", 0)
+        rankings.append((team, best, attempts))
 
-    if timer_teams:
-        # Sort by total time (lower is better)
-        timer_teams.sort(key=lambda x: x[1]["total_time"])
+    # Sort by best time (higher is better)
+    rankings.sort(key=lambda x: x[1], reverse=True)
 
-        console.info("Time Trial Rankings:")
-        console.print()
-        for rank, (team, t) in enumerate(timer_teams, 1):
-            gates = f"{t['gates_cleared']}/{t['gates_total']}"
-            console.print(f"  {rank}. {team:20s}  {t['total_time']:8.3f}s  gates: {gates}")
-        console.print()
+    console.print(f"  {'Rank':>4}  {'Name':<20}  {'Best Time':>10}  {'Attempts':>8}")
+    console.print(f"  {'----':>4}  {'----':<20}  {'---------':>10}  {'--------':>8}")
 
-    # Hover rankings
-    hover_teams = []
-    for team, data in scores["teams"].items():
-        if "hover" in data:
-            hover_teams.append((team, data["hover"]))
+    for rank, (team, best, attempts) in enumerate(rankings, 1):
+        time_str = f"{best:.2f}s"
+        console.print(f"  {rank:>4}  {team:<20}  {time_str:>10}  {attempts:>8}")
 
-    if hover_teams:
-        # Sort by sigma (lower is better)
-        hover_teams.sort(key=lambda x: x[1]["sigma"])
-
-        console.info("Hover Stability Rankings:")
-        console.print()
-        for rank, (team, h) in enumerate(hover_teams, 1):
-            sigma_cm = h["sigma"] * 100
-            console.print(
-                f"  {rank}. {team:20s}  sigma={sigma_cm:5.2f}cm  "
-                f"mean={h['mean_altitude']:.3f}m  [{h['rating']}]"
-            )
-        console.print()
-
+    console.print()
     return 0

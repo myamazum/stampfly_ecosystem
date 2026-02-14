@@ -143,7 +143,7 @@ M1(FR): CCW  M2(RR): CW  M3(RL): CCW  M4(FL): CW
 | Day 3 | 08 | モデリング/制御系設計 | Loop Shaping Tool |
 | | 09 | 姿勢推定 | 相補フィルタ, ESKF 比較 |
 | Day 4 | 10 | Python SDK | `StampFly`, Jupyter |
-| | 11 | 競技会 | 全ツール |
+| | 11 | ホバリングタイム競技 | PIDゲイン最適化 |
 
 ## 5. sf CLI コマンド
 
@@ -156,9 +156,8 @@ sf lesson build             # ビルド
 sf lesson flash             # フラッシュ（モニタ付き）
 
 # 競技会ツール
-sf competition timer        # タイムトライアル
-sf competition hover        # ホバリング安定性テスト
-sf competition score        # スコア表示
+sf competition hover-time   # ホバリングタイム計測
+sf competition score        # スコア・ランキング表示
 
 # テレメトリ
 sf log wifi                 # WiFi テレメトリ取得
@@ -228,5 +227,5 @@ See the Japanese section above for the complete API reference table.
 
 ```bash
 sf lesson list / switch / solution / build / flash
-sf competition timer / hover / score
+sf competition hover-time / score
 ```

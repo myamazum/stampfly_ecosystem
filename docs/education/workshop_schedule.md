@@ -86,27 +86,25 @@
 | 13:00-13:30 | **Lesson 11: 競技会ルール説明** | スライド | |
 | 13:30-16:00 | 競技会準備・自由練習・予選 | 全ツール | |
 
-## 6. Day 5: ドローンレース競技会 (半日〜1日)
+## 6. Day 5: ホバリングタイム競技会 (半日〜1日)
 
 ### 種目
 
 | 種目 | 内容 | 評価基準 | ツール |
 |------|------|---------|--------|
-| タイムトライアル | 4 ゲート通過コース | 通過時間 | `sf competition timer` |
-| 精密ホバリング | 高度 30cm で 10 秒間保持 | 高度 σ (cm) | `sf competition hover` |
-| 精密着陸 | 50cm から目標マーカーに着陸 | 着地点誤差 (cm) | 手動計測 |
+| ホバリングタイム | 角速度フィードバック制御でホバリング | 滞空時間（最長60秒） | `sf competition hover-time` |
 
 ### タイムスケジュール例
 
 | 時間 | 内容 |
 |------|------|
-| 9:00-9:30 | 機体調整・最終テスト |
-| 9:30-10:00 | 開会式・ルール確認 |
-| 10:00-11:30 | タイムトライアル |
-| 11:30-12:00 | 精密ホバリング |
-| 13:00-14:00 | 精密着陸 |
-| 14:00-14:30 | 集計 |
-| 14:30-15:00 | 表彰式・講評 |
+| 9:00-9:30 | 機体調整・最終チューニング |
+| 9:30-10:00 | 開会式・ルール説明 |
+| 10:00-11:00 | 予選ラウンド（全員 1 回ずつ） |
+| 11:00-12:00 | 自由練習・ゲイン調整タイム |
+| 13:00-14:00 | 本選ラウンド（全員 2 回ずつ、ベストタイム採用） |
+| 14:00-14:30 | 集計・結果発表 |
+| 14:30-15:00 | 表彰式・講評・振り返り |
 
 ## 7. 準備物
 
@@ -181,10 +179,8 @@
 | 13:00-13:30 | Lesson 11: Competition rules | Slides |
 | 13:30-16:00 | Competition prep / qualifying | All tools |
 
-## 6. Day 5: Drone Race Competition
+## 6. Day 5: Hover Time Competition
 
 | Event | Criteria | Tool |
 |-------|----------|------|
-| Time trial | 4 gates, total time | `sf competition timer` |
-| Precision hover | 30cm altitude, 10s hold, sigma | `sf competition hover` |
-| Precision landing | 50cm → target marker, error | Manual measurement |
+| Hover Time | Longest hover using rate feedback control (max 60s) | `sf competition hover-time` |

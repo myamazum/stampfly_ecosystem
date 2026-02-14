@@ -6,149 +6,92 @@
 
 ### 競技会について
 
-StampFly 勉強会の最終日（Day 5）に開催するドローンレース競技会のルールブックです。4日間のワークショップで学んだ制御技術を実践で発揮します。
+StampFly 勉強会の最終日（Day 5）に開催するホバリング競技会のルールブックです。4日間のワークショップで学んだ角速度フィードバック制御を実践で発揮します。
 
-### 種目一覧
+### 種目
 
-| 種目 | 内容 | 配点 |
-|------|------|------|
-| タイムトライアル | 4 ゲート通過コース | 40 点 |
-| 精密ホバリング | 指定高度で 10 秒間保持 | 30 点 |
-| 精密着陸 | 50cm からマーカーに着陸 | 30 点 |
+| 種目 | 内容 |
+|------|------|
+| ホバリングタイム | 自分が実装した角速度フィードバック制御でどれだけ長くホバリングできるかを競う |
 
-## 2. タイムトライアル (40点)
+## 2. ホバリングタイム競技
 
 ### ルール
 
 | 項目 | 内容 |
 |------|------|
-| コース | 4 ゲート通過（直線 or L 字） |
-| ゲート | 幅 60cm x 高さ 60cm |
-| ゲート間距離 | 2-3m |
-| 制限時間 | 120 秒 |
-| 試行回数 | 2 回（ベストタイム採用） |
-| 操縦方式 | コントローラ操縦 or Python 自律飛行（選択可） |
+| 競技内容 | 離陸してからできるだけ長くホバリングを維持する |
+| 制限時間 | 60 秒（上限） |
+| 試行回数 | 3 回（ベストタイム採用） |
+| 操縦方式 | コントローラ操縦（スロットルは手動、姿勢安定化は自分のプログラム） |
+| 制御方式 | Lesson 5-6 で実装した角速度フィードバック制御（P制御 or PID制御） |
+
+### ホバリングの定義
+
+以下の条件を**全て**満たしている間がホバリングとみなされます:
+
+| 条件 | 基準 |
+|------|------|
+| 離陸 | 機体が地面から浮いている |
+| 制御維持 | 壁・天井・障害物に接触していない |
+| 飛行高度 | おおよそ 10cm〜1.5m の範囲内 |
+
+### ホバリング終了の判定
+
+以下のいずれかでホバリング終了:
+
+- 機体が地面に着地または墜落
+- 壁・天井に接触
+- フライトエリア外に逸脱
+- 参加者が DISARM した場合
+- 制限時間（60秒）に到達
 
 ### 採点基準
 
-| 順位 | 得点 |
-|------|------|
-| 1 位 | 40 点 |
-| 2 位 | 35 点 |
-| 3 位 | 30 点 |
-| 4 位以降 | 25 点 |
-| ゲート未通過 | 通過数 x 8 点（最大 32 点） |
-| タイムアウト | 通過数 x 5 点 |
+| 順位 | ホバリングタイム |
+|------|----------------|
+| 1 位 | 最長ホバリングタイム |
+| 2 位 | 2番目に長い |
+| 3 位以降 | 順次 |
+| 同タイムの場合 | 安定性（目視判断）で決定 |
 
 ### 計測方法
 
+講師がストップウォッチで計測します:
+
 ```bash
-sf competition timer --team "TeamName" --gates 4
+sf competition hover-time --team "TeamName"
 ```
 
-### コースレイアウト例
+## 3. 参加コードの規定
 
-```
-Start                                                    Goal
-  │                                                        │
-  │    ┌──────┐         ┌──────┐         ┌──────┐         │
-  ●───►│Gate 1│────────►│Gate 2│────────►│Gate 3│────────► ●
-  │    └──────┘         └──────┘         └──────┘         │
-  │         2m               2m               2m           │
-  │                    ┌──────┐                            │
-  │                    │Gate 4│◄───────────────────────────│
-  │                    └──────┘                            │
-```
+### 使用できるコード
 
-## 3. 精密ホバリング (30点)
-
-### ルール
-
-| 項目 | 内容 |
+| 項目 | 規定 |
 |------|------|
-| 目標高度 | 30cm |
-| 計測時間 | 10 秒間 |
-| 評価指標 | 高度の標準偏差（sigma） |
-| 試行回数 | 2 回（ベストスコア採用） |
-| 操縦方式 | C++ 内部制御のみ（コントローラ操縦不可） |
+| ベースコード | Lesson 5（P制御）または Lesson 6（PID制御）で実装したコード |
+| ゲイン調整 | 自由（Kp, Ki, Kd の値は各自最適化してよい） |
+| ヨー制御 | 追加してよい |
+| テレメトリ | `ws::telemetry_send()` の使用可 |
+| LED 表示 | `ws::led_color()` の使用可 |
 
-### 採点基準
+### 禁止事項
 
-| sigma (cm) | 得点 | 評価 |
-|------------|------|------|
-| < 1.0 | 30 点 | Excellent |
-| 1.0 - 2.0 | 25 点 | Good |
-| 2.0 - 3.0 | 20 点 | Fair |
-| 3.0 - 5.0 | 15 点 | Needs improvement |
-| > 5.0 | 10 点 | |
-| 離陸失敗 | 5 点 | |
-
-### 計測方法
-
-```bash
-sf competition hover --team "TeamName" --target 0.3 --duration 10
-```
-
-WiFi テレメトリ経由で高度データを 10 秒間収集し、標準偏差を自動計算します。
-
-### 参加者向けヒント
-
-- Lesson 5-6 の PID チューニングが直接影響
-- 高度制御は ToF センサ（VL53L3CX）を使用
-- `ws::estimated_altitude()` で推定高度を取得可能
-- テレメトリでリアルタイム確認: `sf log wifi`
-
-## 4. 精密着陸 (30点)
-
-### ルール
-
-| 項目 | 内容 |
+| 禁止 | 理由 |
 |------|------|
-| 開始高度 | 50cm |
-| 目標 | 地面のマーカー（直径 10cm の円） |
-| 評価指標 | 着地点からマーカー中心までの距離 |
-| 試行回数 | 3 回（ベストスコア採用） |
-| 操縦方式 | コントローラ操縦 or Python 自律飛行（選択可） |
+| カスケード制御（姿勢→角速度） | Lesson 5-6 の範囲外 |
+| 高度制御の自動化 | スロットルは手動操作 |
+| 他の参加者のコードのコピー | 自分で実装したコードで競う |
+| 機体の物理的改造 | 公平性の確保 |
 
-### 採点基準
+### 推奨する最適化
 
-| 着地誤差 (cm) | 得点 |
-|--------------|------|
-| < 5 | 30 点 |
-| 5 - 10 | 25 点 |
-| 10 - 15 | 20 点 |
-| 15 - 20 | 15 点 |
-| 20 - 30 | 10 点 |
-| > 30 | 5 点 |
-| 着陸失敗 | 0 点 |
+- PID ゲインの調整（P → D → I の順でチューニング）
+- アンチワインドアップの実装（I項の制限）
+- D項のローパスフィルタ追加（ノイズ対策）
+- テレメトリを活用したデータ駆動チューニング
 
-### 計測方法
-
-マーカー中心から機体中心までの距離を定規で計測。
-
-## 5. 総合順位
-
-### 計算方法
-
-```
-総合スコア = タイムトライアル得点 + ホバリング得点 + 着陸得点
-最大: 100 点
-```
-
-### スコア表示
-
-```bash
-sf competition score
-```
-
-### 同点の場合
-
-1. タイムトライアルの順位が上の方を優先
-2. それも同じ場合、ホバリング sigma が小さい方を優先
-
-## 6. 一般ルール
-
-### 機体規定
+## 4. 機体規定
 
 | 項目 | 規定 |
 |------|------|
@@ -158,32 +101,37 @@ sf competition score
 | ファームウェア | Workshop Skeleton ベースのみ |
 | 外部センサ | 追加不可 |
 
-### 禁止事項
+## 5. 安全規定
 
-- 機体の物理的改造
-- 標準外のプロペラ/バッテリーの使用
-- 他チームのコードのコピー
-- 競技中の他チームへの妨害
+| ルール | 詳細 |
+|--------|------|
+| 保護メガネ | フライトエリア内の全員が着用 |
+| フライトエリア | ネット/フェンスで囲った 3m x 3m 以上の空間 |
+| バッテリー | 3.3V 以下で使用禁止 |
+| 異常動作 | 即座に DISARM |
+| 審判の指示 | 必ず従う |
 
-### 安全規定
+> **Note / 注:** StampFly はプロペラガード一体型で、極めて小型のためプロペラの危険性は低いです。
 
-- 保護メガネの着用（フライトエリア内の全員）
-- 審判の指示に従う
-- バッテリー残量 3.3V 以下は使用禁止
-- 異常動作時は即座に DISARM
-
-## 7. タイムスケジュール
+## 6. タイムスケジュール
 
 | 時間 | 内容 |
 |------|------|
-| 9:00-9:30 | 機体調整・最終テスト |
-| 9:30-10:00 | 開会式・ルール確認 |
-| 10:00-11:30 | タイムトライアル |
-| 11:30-12:00 | 精密ホバリング |
-| 12:00-13:00 | 昼休み |
-| 13:00-14:00 | 精密着陸 |
-| 14:00-14:30 | 集計 |
-| 14:30-15:00 | 表彰式・講評 |
+| 9:00-9:30 | 機体調整・最終チューニング |
+| 9:30-10:00 | 開会式・ルール説明 |
+| 10:00-11:00 | 予選ラウンド（全員 1 回ずつ） |
+| 11:00-12:00 | 自由練習・ゲイン調整タイム |
+| 13:00-14:00 | 本選ラウンド（全員 2 回ずつ、ベストタイム採用） |
+| 14:00-14:30 | 集計・結果発表 |
+| 14:30-15:00 | 表彰式・講評・振り返り |
+
+## 7. 進行のヒント（講師向け）
+
+- 予選ラウンドで全員が1回飛ばすことで緊張感を和らげる
+- 予選と本選の間に自由練習時間を設け、チューニングの機会を与える
+- テレメトリのリアルタイム表示をプロジェクターに映すと盛り上がる
+- 60秒ホバリング達成者が出た場合は「完璧！」と称える
+- 全員の記録を順位表にまとめてリアルタイムで更新する
 
 ---
 
@@ -191,65 +139,74 @@ sf competition score
 
 ## 1. Overview
 
-Competition rulebook for the StampFly Workshop final day (Day 5).
+Competition rulebook for the StampFly Workshop final day (Day 5). Participants compete using the angular rate feedback control programs they built during the workshop.
 
-### Events
+### Event
 
-| Event | Description | Points |
-|-------|-------------|--------|
-| Time Trial | 4-gate course | 40 pts |
-| Precision Hover | Hold altitude for 10s | 30 pts |
-| Precision Landing | Land on target marker | 30 pts |
+| Event | Description |
+|-------|-------------|
+| Hover Time | Compete for the longest hover using your own rate feedback controller |
 
-## 2. Time Trial (40 pts)
+## 2. Hover Time Competition
 
-- 4 gates (60cm x 60cm), 2-3m apart
-- Time limit: 120 seconds, 2 attempts (best time)
-- Controller or Python autonomous flight
-- Measured with: `sf competition timer --team "Name"`
+### Rules
 
-## 3. Precision Hover (30 pts)
+| Item | Detail |
+|------|--------|
+| Objective | Take off and maintain hover as long as possible |
+| Time limit | 60 seconds (maximum) |
+| Attempts | 3 (best time counts) |
+| Control | Controller-operated (manual throttle, attitude stabilized by your program) |
+| Code | Angular rate feedback from Lessons 5-6 (P or PID control) |
 
-- Target: 30cm altitude, 10 seconds
-- Evaluation: altitude sigma (standard deviation)
-- C++ internal control only (no controller)
-- Measured with: `sf competition hover --team "Name"`
+### Hover Definition
 
-| Sigma | Points |
-|-------|--------|
-| < 1cm | 30 |
-| 1-2cm | 25 |
-| 2-3cm | 20 |
-| 3-5cm | 15 |
-| > 5cm | 10 |
+Hovering is maintained while ALL of these conditions are met:
 
-## 4. Precision Landing (30 pts)
+- Drone is airborne (off the ground)
+- No contact with walls, ceiling, or obstacles
+- Approximately within 10cm - 1.5m altitude range
 
-- Start at 50cm, land on 10cm diameter marker
-- 3 attempts (best score)
-- Manual distance measurement
+### Hover Ends When
 
-| Error | Points |
-|-------|--------|
-| < 5cm | 30 |
-| 5-10cm | 25 |
-| 10-15cm | 20 |
-| 15-20cm | 15 |
-| 20-30cm | 10 |
-| > 30cm | 5 |
+- Drone lands or crashes
+- Contact with walls/ceiling
+- Exits flight area
+- Participant disarms
+- Time limit (60s) reached
 
-## 5. Overall Ranking
+### Scoring
 
-Total = Time Trial + Hover + Landing (max 100 pts)
+Rankings are determined by longest hover time. Ties broken by stability (visual judgment).
+
+### Measurement
 
 ```bash
-sf competition score
+sf competition hover-time --team "TeamName"
 ```
 
-## 6. General Rules
+## 3. Code Rules
 
-- Standard StampFly only (no modifications)
-- Workshop Skeleton firmware only
-- Safety glasses required
-- Follow referee instructions
+### Allowed
+
+- Code from Lesson 5 (P control) or Lesson 6 (PID control)
+- Gain tuning (any Kp, Ki, Kd values)
+- Yaw control addition
+- Telemetry and LED usage
+
+### Not Allowed
+
+- Cascade control (attitude → rate)
+- Automated altitude control
+- Copying other participants' code
+- Physical drone modifications
+
+## 4. Safety
+
+- Safety glasses required in flight area
+- Flight area enclosed with nets/fences (3m x 3m minimum)
 - Battery cutoff at 3.3V
+- Immediately disarm if unstable
+- Follow referee instructions
+
+> **Note:** StampFly has built-in propeller guards and is small enough that propellers pose minimal risk.
