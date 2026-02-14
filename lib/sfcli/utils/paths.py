@@ -69,6 +69,10 @@ class Paths:
         """Get firmware/controller/ directory"""
         return self.firmware() / "controller"
 
+    def workshop(self) -> Path:
+        """Get firmware/workshop/ directory"""
+        return self.firmware() / "workshop"
+
     def simulator(self) -> Path:
         """Get simulator/ directory"""
         return self.root() / "simulator"

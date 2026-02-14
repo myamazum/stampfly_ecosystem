@@ -17,6 +17,8 @@ from . import sysid
 from . import flight
 from . import query
 from . import rc
+from . import lesson
+from . import competition
 
 __all__ = [
     "version",
@@ -32,4 +34,6 @@ __all__ = [
     "flight",
     "query",
     "rc",
+    "lesson",
+    "competition",
 ]

@@ -25,7 +25,7 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         "target",
         nargs="?",
         default="vehicle",
-        choices=["vehicle", "controller"],
+        choices=["vehicle", "controller", "workshop"],
         help="Target to flash (default: vehicle)",
     )
     parser.add_argument(
@@ -57,6 +57,8 @@ def run(args: argparse.Namespace) -> int:
     # Determine target directory
     if args.target == "vehicle":
         target_dir = paths.vehicle()
+    elif args.target == "workshop":
+        target_dir = paths.workshop()
     else:
         target_dir = paths.controller()
 
