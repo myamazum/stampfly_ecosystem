@@ -86,7 +86,7 @@
 | 13:00-13:30 | **Lesson 11: 競技会ルール説明** | スライド | |
 | 13:30-16:00 | 競技会準備・自由練習・予選 | 全ツール | |
 
-## 6. Day 5: ホバリングタイム競技会 (半日〜1日)
+## 6. Day 5: ホバリングタイム競技会 + アンケート (半日)
 
 ### 種目
 
@@ -94,17 +94,15 @@
 |------|------|---------|--------|
 | ホバリングタイム | 角速度フィードバック制御でホバリング | 滞空時間（最長60秒） | `sf competition hover-time` |
 
-### タイムスケジュール例
+### タイムスケジュール
 
 | 時間 | 内容 |
 |------|------|
-| 9:00-9:30 | 機体調整・最終チューニング |
-| 9:30-10:00 | 開会式・ルール説明 |
-| 10:00-11:00 | 予選ラウンド（全員 1 回ずつ） |
-| 11:00-12:00 | 自由練習・ゲイン調整タイム |
-| 13:00-14:00 | 本選ラウンド（全員 2 回ずつ、ベストタイム採用） |
-| 14:00-14:30 | 集計・結果発表 |
-| 14:30-15:00 | 表彰式・講評・振り返り |
+| 9:00-9:15 | ルール説明・機体確認 |
+| 9:15-9:45 | 自由練習・最終チューニング |
+| 9:45-10:45 | 競技本番（全員 3 回ずつ、ベストタイム採用） |
+| 10:45-11:00 | 結果発表・表彰・講評 |
+| 11:00-11:30 | アンケート記入・振り返り |
 
 ## 7. 準備物
 
@@ -179,8 +177,12 @@
 | 13:00-13:30 | Lesson 11: Competition rules | Slides |
 | 13:30-16:00 | Competition prep / qualifying | All tools |
 
-## 6. Day 5: Hover Time Competition
+## 6. Day 5: Hover Time Competition + Survey (half day)
 
-| Event | Criteria | Tool |
-|-------|----------|------|
-| Hover Time | Longest hover using rate feedback control (max 60s) | `sf competition hover-time` |
+| Time | Content |
+|------|---------|
+| 9:00-9:15 | Rules explanation, drone check |
+| 9:15-9:45 | Free practice, final tuning |
+| 9:45-10:45 | Competition (3 attempts each, best time counts) |
+| 10:45-11:00 | Results, awards, wrap-up |
+| 11:00-11:30 | Survey and feedback |
