@@ -437,128 +437,48 @@ drone.end()                     # 切断
 
 ## 7. 移植戦略（ロードマップ）
 
-### Phase 1: UDP コマンドインターフェース
+> **詳細な実装プランは [`docs/plans/TELLO_COMPAT_PLAN.md`](plans/TELLO_COMPAT_PLAN.md) を参照。**
 
-**目標:** djitellopy の `connect()` / `takeoff()` / `land()` が動作する最小実装
+### 設計方針
 
-| タスク | 実装箇所 | 説明 |
-|--------|---------|------|
-| UDP 8889 リスナー追加 | ファームウェア新コンポーネント | テキストコマンドを受信しパースする UDP サーバー |
-| `command` コマンド | UDP ハンドラ | SDK モード開始。`ok` レスポンスを返す |
-| `takeoff` コマンド | 既存 `FlightCommandService` に委譲 | 離陸完了後に `ok` を返す |
-| `land` コマンド | 既存 `FlightCommandService` に委譲 | 着陸完了後に `ok` を返す |
-| `emergency` コマンド | 全モーター即時停止 | 即座に `ok` を返す |
-| `stop` コマンド | `hover` で代用 | ホバリング後 `ok` を返す |
-| `ok` / `error` レスポンス | UDP 送信 | コマンド送信元にレスポンスを返送 |
-| WiFi AP の IP 変更 | `192.168.4.1` → `192.168.10.1` | Tello 互換 IP（設定で切替可能に） |
-| 15秒タイムアウト | SDK モード中の安全機構 | コマンド途絶時の自動着陸 |
-
-**既存実装との関係:**
+既存の StampFly 通信基盤（TCP CLI + WebSocket）をそのまま活用し、**API レベルの互換性**を優先する。Tello の UDP プロトコル互換は必要になった場合にのみ追加する。
 
 ```
-[djitellopy]                    [StampFly ファームウェア]
-    │                                   │
-    │  UDP "takeoff"                    │
-    │  ────────────────────────────>    │
-    │                           ┌──────┴──────┐
-    │                           │ UDP 8889    │
-    │                           │ リスナー     │
-    │                           │ (新規実装)   │
-    │                           └──────┬──────┘
-    │                                  │
-    │                           ┌──────┴──────┐
-    │                           │ FlightCmd   │
-    │                           │ Service     │
-    │                           │ (既存)       │
-    │                           └──────┬──────┘
-    │                                  │
-    │  UDP "ok"                        │
-    │  <────────────────────────────   │
+教育用 Python スクリプト
+  │  from stampfly import StampFly
+  │
+  ├─── StampFly Python SDK (lib/stampfly/)
+  │      djitellopy 互換メソッド名
+  │      │
+  │      └─── VehicleConnection (lib/sfcli/utils/)
+  │             ├─ VehicleCLI       TCP 23 (コマンド)
+  │             └─ VehicleTelemetry  WebSocket 80 (テレメトリ)
+  │
+  ├─── sf CLI (lib/sfcli/)
+  │      sf takeoff / sf up 100 / sf battery
+  │      │
+  │      └─── VehicleConnection (共有)
+  │
+  └─── StampFly ファームウェア（変更最小）
 ```
 
-### Phase 2: 移動コマンド
-
-**目標:** 距離指定移動と回転が動作する
-
-**前提:** POSITION_HOLD モード（位置制御）の実装が必要。現状の StampFly はスロットル直接制御のみ。
-
-| タスク | 説明 |
-|--------|------|
-| POSITION_HOLD モード実装 | オプティカルフロー + ToF による位置制御ループ |
-| `up x` / `down x` | 高度目標値を ±x cm 変更、目標到達で `ok` |
-| `left x` / `right x` | 左右目標位置を ±x cm 変更、目標到達で `ok` |
-| `forward x` / `back x` | 前後目標位置を ±x cm 変更、目標到達で `ok` |
-| `cw x` / `ccw x` | ヨー角目標を ±x 度変更、目標到達で `ok` |
-| `go x y z speed` | 3D 座標移動、速度指定 |
-| `speed x` | 移動速度のデフォルト値設定 |
-
-### Phase 3: テレメトリ互換
-
-**目標:** Tello フォーマットのテレメトリを UDP 8890 で送信
-
-| タスク | 説明 |
-|--------|------|
-| UDP 8890 テレメトリ送信タスク | 10Hz でクライアントにテレメトリを送信 |
-| テレメトリフォーマット変換 | StampFly バイナリ → Tello テキスト形式 |
-| クォータニオン → オイラー角変換 | pitch/roll/yaw を度単位で出力 |
-| 単位変換 | m → cm, m/s → dm/s 等 |
-| バッテリー残量計算 | 電圧 → % 換算ロジック |
-| 読み取りコマンド実装 | `battery?`, `height?`, `tof?` 等 |
-
-**テレメトリ出力テンプレート:**
-
-```c
-snprintf(buf, sizeof(buf),
-    "pitch:%d;roll:%d;yaw:%d;"
-    "vgx:%d;vgy:%d;vgz:%d;"
-    "templ:%d;temph:%d;"
-    "tof:%d;h:%d;bat:%d;"
-    "baro:%.2f;time:%d;"
-    "agx:%.2f;agy:%.2f;agz:%.2f;\r\n",
-    pitch_deg, roll_deg, yaw_deg,
-    vgx_dms, vgy_dms, vgz_dms,
-    temp_low, temp_high,
-    tof_cm, height_cm, battery_pct,
-    baro_cm, flight_time_s,
-    agx_cmss, agy_cmss, agz_cmss);
-```
-
-### Phase 4: RC 制御
-
-**目標:** リアルタイムスティック入力による飛行制御
-
-| タスク | 説明 |
-|--------|------|
-| `rc a b c d` パーサー | -100~100 の 4 値を受信 |
-| RC → ControlArbiter 変換 | -100~100 → -1.0~1.0 に正規化して ControlArbiter に送信 |
-| 入力レート制限 | 最低 50ms 間隔（20Hz）で制御ループに反映 |
-| フェイルセーフ | RC 入力が 1 秒以上途絶した場合のホバリング復帰 |
-
-### Phase 5: Python SDK 互換ライブラリ
-
-**目標:** `from stampfly import StampFly` で djitellopy 互換 API を提供
-
-| タスク | 説明 |
-|--------|------|
-| `StampFly` クラス作成 | djitellopy の `Tello` と同じメソッドシグネチャ |
-| UDP 通信レイヤー | djitellopy と同じ UDP ソケット通信 |
-| テレメトリパーサー | Tello テキスト形式をパース |
-| StampFly 拡張 API | Tello にない StampFly 固有機能（400Hz テレメトリ、WebSocket 等） |
-| djitellopy 互換テスト | djitellopy のサンプルコードがそのまま動作することを検証 |
-| PyPI パッケージ化 | `pip install stampfly` でインストール可能に |
-
-### ロードマップタイムライン
+### ロードマップ
 
 ```
-Phase 1 ─── UDP コマンド基盤 ──────── connect/takeoff/land が動く
+Phase 0 ✅ 仕様調査・ドキュメント
   │
-Phase 2 ─── 移動コマンド ──────────── up/down/left/right/forward/back/cw/ccw
+Phase 1 ── ファームウェア移動コマンド ─── up/down/left/right/forward/back/cw/ccw
+  │         ※ POSITION_HOLD モード実装が最大のタスク
   │
-Phase 3 ─── テレメトリ互換 ────────── get_battery()/get_height() 等が動く
+Phase 2 ── sf CLI 拡張 ─────────────── sf up 100 / sf cw 90 が動く
   │
-Phase 4 ─── RC 制御 ──────────────── send_rc_control() が動く
+Phase 3 ── テレメトリ・読み取り ───────── sf battery / sf height が動く
   │
-Phase 5 ─── Python SDK ──────────── from stampfly import StampFly
+Phase 4 ── RC 制御 ─────────────────── sf rc でリアルタイム操縦
+  │
+Phase 5 ── Python SDK ─────────────── from stampfly import StampFly
+  │
+Phase 6 ── UDP 互換（任意）─────────── djitellopy 直接利用（必要な場合のみ）
 ```
 
 ## 8. 参考資料
@@ -817,56 +737,49 @@ See the Japanese section above for the complete method mapping table.
 
 ## 7. Migration Roadmap
 
-### Phase 1: UDP Command Interface
+> **See [`docs/plans/TELLO_COMPAT_PLAN.md`](plans/TELLO_COMPAT_PLAN.md) for the detailed implementation plan.**
 
-Minimum implementation for `connect()` / `takeoff()` / `land()` to work with djitellopy.
+### Design Philosophy
 
-| Task | Description |
-|------|-------------|
-| UDP 8889 listener | Text command UDP server in firmware |
-| `command` handler | Enter SDK mode, return `ok` |
-| `takeoff` / `land` | Delegate to existing `FlightCommandService` |
-| `emergency` | Immediate motor kill |
-| `ok` / `error` response | UDP response to command sender |
-| IP change | `192.168.4.1` → `192.168.10.1` (configurable) |
-| 15s timeout | Auto-land safety on command loss |
+Leverage existing StampFly communication infrastructure (TCP CLI + WebSocket) and prioritize **API-level compatibility**. Tello UDP protocol compatibility is deferred and only added if specifically needed.
 
-### Phase 2: Movement Commands
+```
+Educational Python Scripts
+  │  from stampfly import StampFly
+  │
+  ├─── StampFly Python SDK (lib/stampfly/)
+  │      djitellopy-compatible method names
+  │      │
+  │      └─── VehicleConnection (lib/sfcli/utils/)
+  │             ├─ VehicleCLI       TCP 23 (commands)
+  │             └─ VehicleTelemetry  WebSocket 80 (telemetry)
+  │
+  ├─── sf CLI (lib/sfcli/)
+  │      sf takeoff / sf up 100 / sf battery
+  │      │
+  │      └─── VehicleConnection (shared)
+  │
+  └─── StampFly Firmware (minimal changes)
+```
 
-Requires POSITION_HOLD mode (position control with optical flow + ToF).
+### Roadmap
 
-| Task | Description |
-|------|-------------|
-| POSITION_HOLD mode | Position control loop |
-| `up`/`down`/`left`/`right`/`forward`/`back` | Distance-based movement |
-| `cw`/`ccw` | Yaw rotation |
-| `go x y z speed` | 3D coordinate movement |
-
-### Phase 3: Telemetry Compatibility
-
-| Task | Description |
-|------|-------------|
-| UDP 8890 telemetry | Text format at 10Hz |
-| Format conversion | StampFly binary → Tello text |
-| Quaternion → Euler | Attitude conversion |
-| Unit conversion | m → cm, m/s → dm/s |
-| Read commands | `battery?`, `height?`, `tof?`, etc. |
-
-### Phase 4: RC Control
-
-| Task | Description |
-|------|-------------|
-| `rc a b c d` parser | Parse 4 values (-100~100) |
-| RC → ControlArbiter | Normalize and send to control loop |
-| Failsafe | Hover on RC input loss (>1s) |
-
-### Phase 5: Python SDK
-
-| Task | Description |
-|------|-------------|
-| `StampFly` class | djitellopy-compatible API |
-| StampFly extensions | 400Hz telemetry, WebSocket access |
-| PyPI package | `pip install stampfly` |
+```
+Phase 0 ✅ Research & Documentation
+  │
+Phase 1 ── Firmware Movement Commands ── up/down/left/right/forward/back/cw/ccw
+  │         ※ POSITION_HOLD mode is the biggest task
+  │
+Phase 2 ── sf CLI Extension ──────────── sf up 100 / sf cw 90
+  │
+Phase 3 ── Telemetry & Read Commands ─── sf battery / sf height
+  │
+Phase 4 ── RC Control ────────────────── sf rc for real-time control
+  │
+Phase 5 ── Python SDK ────────────────── from stampfly import StampFly
+  │
+Phase 6 ── UDP Compatibility (optional) ── direct djitellopy usage (only if needed)
+```
 
 ## 8. References
 
