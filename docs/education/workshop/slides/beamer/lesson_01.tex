@@ -1,0 +1,115 @@
+\documentclass[aspectratio=169, 14pt]{beamer}
+\usepackage{stampfly_slides}
+
+\lesson{1}{モータ制御}{Motor Control}
+
+\begin{document}
+
+% ------------------------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{今日のゴール / Today's Goal}
+  \begin{block}{目標}
+    モータの番号と配置を理解し、PWM で個別制御する
+  \end{block}
+
+  \vspace{1em}
+
+  \begin{itemize}
+    \item モータ番号 M1--M4 の位置を覚える
+    \item PWM デューティ比でモータ回転数を制御
+    \item 安全な地上テストの方法を学ぶ
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{モータ配置 / Motor Layout}
+  \begin{center}
+    \includegraphics[width=0.45\textwidth]{motor_layout.png}
+  \end{center}
+
+  \begin{itemize}
+    \item 対角のモータが同じ方向に回転（トルクバランス）
+    \item M1(FR), M3(RL) = CW / M2(RR), M4(FL) = CCW
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{PWM とは / What is PWM?}
+  \begin{center}
+    \includegraphics[width=0.55\textwidth]{pwm_waveform.png}
+  \end{center}
+
+  \vspace{0.3em}
+
+  \begin{itemize}
+    \item \textbf{Duty 0\%} = 停止 / \textbf{100\%} = 最大回転
+    \item StampFly API: \api{motor\_set\_duty(id, 0.0\textasciitilde1.0)}
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{モータ制御 API}
+  \begin{table}
+    \centering
+    \begin{tabular}{lll}
+      \hline
+      \textbf{関数} & \textbf{説明} & \textbf{引数} \\
+      \hline
+      \api{motor\_set\_duty(id, duty)} & 個別モータ設定 & id=1--4, duty=0.0--1.0 \\
+      \api{motor\_set\_all(duty)} & 全モータ一括 & duty=0.0--1.0 \\
+      \api{motor\_stop\_all()} & 全モータ停止 & --- \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{1em}
+
+  \begin{alertblock}{安全注意 / Safety}
+    \warn{duty は 0.15（15\%）以下で！機体を手で押さえてテスト！}
+  \end{alertblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{実習: モータを順番に回す / Hands-on}
+  \begin{lstlisting}[style=sfcpp, title={student.cpp}]
+#include "workshop_api.hpp"
+
+static uint32_t timer = 0;
+
+void setup() {
+    ws::print("Lesson 1: Motor Control");
+}
+
+void loop_400Hz(float dt) {
+    timer++;
+    // 800 ticks = 2 seconds at 400Hz
+    int motor_id = (timer / 800) % 4 + 1;
+
+    ws::motor_stop_all();
+    ws::motor_set_duty(motor_id, 0.1f);
+}
+  \end{lstlisting}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{チェックポイント / Checkpoint}
+  \begin{alertblock}{確認事項}
+    \begin{itemize}
+      \item[$\square$] M1 が FR（右前）のプロペラを回す
+      \item[$\square$] M1$\to$M2$\to$M3$\to$M4 の順に回転する
+      \item[$\square$] 各モータ 2 秒ごとに切り替わる
+    \end{itemize}
+  \end{alertblock}
+
+  \vspace{1em}
+
+  \begin{block}{次のレッスン}
+    Lesson 2: コントローラ入力 --- スティックでモータを操作
+  \end{block}
+\end{frame}
+
+\end{document}

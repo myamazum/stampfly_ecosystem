@@ -1,0 +1,118 @@
+\documentclass[aspectratio=169, 14pt]{beamer}
+\usepackage{stampfly_slides}
+
+\lesson{2}{コントローラ入力}{Controller Input}
+
+\begin{document}
+
+% ------------------------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{今日のゴール / Today's Goal}
+  \begin{block}{目標}
+    コントローラのスティック値を読み取り、モータを操作する（オープンループ）
+  \end{block}
+
+  \vspace{1em}
+
+  \begin{itemize}
+    \item ESP-NOW 無線通信の仕組みを理解
+    \item スティック値の正規化（ADC → 浮動小数点）
+    \item オープンループ制御の限界を体感
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{ESP-NOW 通信フロー / Communication Flow}
+  \begin{center}
+    \includegraphics[width=0.8\textwidth]{espnow_dataflow.png}
+  \end{center}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{コントローラ API}
+  \begin{table}
+    \centering
+    \begin{tabular}{lll}
+      \hline
+      \textbf{関数} & \textbf{説明} & \textbf{値域} \\
+      \hline
+      \api{rc\_throttle()} & スロットル & 0.0 -- 1.0 \\
+      \api{rc\_roll()}     & ロール     & -1.0 -- +1.0 \\
+      \api{rc\_pitch()}    & ピッチ     & -1.0 -- +1.0 \\
+      \api{rc\_yaw()}      & ヨー       & -1.0 -- +1.0 \\
+      \api{is\_armed()}    & ARM状態    & true / false \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{0.5em}
+
+  \begin{block}{ペアリング手順}
+    StampFly のボタンを \textbf{3秒長押し} → コントローラと自動ペアリング
+  \end{block}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{オープンループ制御 / Open-Loop Control}
+  \begin{center}
+    \includegraphics[width=0.75\textwidth]{open_loop.png}
+  \end{center}
+
+  \vspace{0.5em}
+
+  \begin{alertblock}{問題点}
+    フィードバックがないため、外乱（風・重心ずれ）に対応できない！\\
+    → Lesson 5--6 で PID 制御を導入して解決
+  \end{alertblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{実習: スロットル → モータ / Hands-on}
+  \begin{lstlisting}[style=sfcpp, title={student.cpp}]
+#include "workshop_api.hpp"
+
+static uint32_t tick = 0;
+
+void setup() {
+    ws::print("Lesson 2: Controller Input");
+}
+
+void loop_400Hz(float dt) {
+    tick++;
+    float throttle = ws::rc_throttle();
+
+    // Direct throttle-to-motor (open loop)
+    ws::motor_set_all(throttle);
+
+    // Print every 200ms
+    if (tick % 80 == 0) {
+        ws::print("T=%.2f R=%.2f P=%.2f Y=%.2f",
+            throttle, ws::rc_roll(),
+            ws::rc_pitch(), ws::rc_yaw());
+    }
+}
+  \end{lstlisting}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{チェックポイント / Checkpoint}
+  \begin{alertblock}{確認事項}
+    \begin{itemize}
+      \item[$\square$] コントローラとペアリングできた
+      \item[$\square$] ARM 後、スロットルでモータが回る
+      \item[$\square$] シリアルモニタに T/R/P/Y 値が表示される
+    \end{itemize}
+  \end{alertblock}
+
+  \vspace{1em}
+
+  \begin{block}{次のレッスン}
+    Lesson 3: LED 制御 --- システム状態を LED で可視化
+  \end{block}
+\end{frame}
+
+\end{document}

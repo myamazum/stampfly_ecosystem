@@ -1,0 +1,13 @@
+# LaTeX build intermediates
+*.aux
+*.nav
+*.out
+*.snm
+*.toc
+*.vrb
+
+# Generated files (rebuild with `make all`)
+tikz/*.pdf
+beamer/*.pdf
+images/*.png
+pptx/output/*.pptx

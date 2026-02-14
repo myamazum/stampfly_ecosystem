@@ -1,0 +1,69 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit, decorations.pathmorphing}
+
+\definecolor{ctrlcolor}{RGB}{0, 120, 200}
+\definecolor{espcolor}{RGB}{120, 80, 180}
+\definecolor{apicolor}{RGB}{50, 140, 50}
+\definecolor{gray1}{RGB}{120, 120, 120}
+
+\begin{document}
+\begin{tikzpicture}[
+    box/.style={
+      rectangle, rounded corners=4pt, draw=#1, line width=1.5pt,
+      fill=#1!8, minimum width=38mm, minimum height=14mm,
+      font=\bfseries, text=#1, align=center
+    },
+    smallbox/.style={
+      rectangle, rounded corners=2pt, draw=#1, line width=1pt,
+      fill=#1!6, minimum width=30mm, minimum height=10mm,
+      font=\small\bfseries, text=#1, align=center
+    },
+    arr/.style={-{Stealth[length=3mm]}, line width=1.5pt, #1},
+    lbl/.style={font=\small, text=gray1, align=center},
+  ]
+
+  % Controller side
+  \node[box=ctrlcolor] (ctrl) at (0, 0) {Controller};
+
+  % Sticks
+  \node[smallbox=ctrlcolor, below left=12mm and 5mm of ctrl] (lstick) {Left Stick};
+  \node[smallbox=ctrlcolor, below right=12mm and 5mm of ctrl] (rstick) {Right Stick};
+
+  \draw[arr=ctrlcolor] (lstick) -- (ctrl);
+  \draw[arr=ctrlcolor] (rstick) -- (ctrl);
+
+  \node[lbl, left=1mm of lstick] {Throttle\\Yaw};
+  \node[lbl, right=1mm of rstick] {Roll\\Pitch};
+
+  % ESP-NOW wireless
+  \node[box=espcolor, right=40mm of ctrl] (espnow) {ESP-NOW\\2.4\,GHz};
+  \draw[arr=espcolor, decorate, decoration={snake, amplitude=1.5mm, segment length=6mm}]
+    (ctrl) -- node[above=3mm, font=\small\bfseries, text=espcolor] {Wireless} (espnow);
+
+  % StampFly
+  \node[box=apicolor, right=40mm of espnow] (stampfly) {StampFly};
+  \draw[arr=apicolor] (espnow) -- (stampfly);
+
+  % API outputs
+  \node[smallbox=apicolor, below left=14mm and -2mm of stampfly] (api1) {rc\_throttle()};
+  \node[smallbox=apicolor, below=14mm of stampfly] (api2) {rc\_roll()};
+  \node[smallbox=apicolor, below right=14mm and -2mm of stampfly] (api3) {rc\_pitch()};
+  \node[smallbox=apicolor, right=8mm of api3] (api4) {rc\_yaw()};
+
+  \draw[arr=apicolor] (stampfly) -- (api1);
+  \draw[arr=apicolor] (stampfly) -- (api2);
+  \draw[arr=apicolor] (stampfly) -- (api3);
+  \draw[arr=apicolor] (stampfly) -- (api4);
+
+  \node[lbl, below=2mm of api1] {0.0\,--\,1.0};
+  \node[lbl, below=2mm of api2] {-1.0\,--\,+1.0};
+  \node[lbl, below=2mm of api3] {-1.0\,--\,+1.0};
+  \node[lbl, below=2mm of api4] {-1.0\,--\,+1.0};
+
+  % Title
+  \node[font=\Large\bfseries, above=12mm of espnow]
+    {Controller $\to$ ESP-NOW $\to$ StampFly API};
+
+\end{tikzpicture}
+\end{document}

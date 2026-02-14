@@ -1,0 +1,121 @@
+\documentclass[aspectratio=169, 14pt]{beamer}
+\usepackage{stampfly_slides}
+
+\lesson{0}{環境セットアップ}{Environment Setup}
+
+\begin{document}
+
+% ------------------------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{今日のゴール / Today's Goal}
+  \begin{block}{目標}
+    ワークショップファームウェアをビルド・書き込み・動作確認する
+  \end{block}
+
+  \vspace{1em}
+
+  \begin{enumerate}
+    \item \code{sf build workshop} でビルド
+    \item \code{sf flash workshop -m} で書き込み
+    \item シリアルモニタで \texttt{"Hello StampFly!"} を確認
+  \end{enumerate}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{開発フロー / Development Flow}
+  \begin{center}
+    \includegraphics[width=0.85\textwidth]{build_flash_flow.png}
+  \end{center}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{sf CLI とは / What is sf CLI?}
+  \begin{itemize}
+    \item StampFly 開発専用のコマンドラインツール
+    \item ESP-IDF のコマンドをシンプルに実行できる
+  \end{itemize}
+
+  \vspace{0.5em}
+
+  \begin{table}
+    \centering\small
+    \begin{tabular}{ll}
+      \hline
+      \textbf{コマンド} & \textbf{説明} \\
+      \hline
+      \code{sf doctor}          & 環境診断 \\
+      \code{sf build workshop}  & ワークショップビルド \\
+      \code{sf flash workshop -m} & 書き込み＋モニタ \\
+      \code{sf lesson switch N} & レッスン切り替え \\
+      \code{sf monitor}         & シリアルモニタ \\
+      \hline
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{ワークショップの構造 / Workshop Structure}
+  \begin{block}{学生が実装する関数は2つだけ！}
+    \begin{itemize}
+      \item \api{setup()} --- 起動時に1回呼ばれる
+      \item \api{loop\_400Hz(dt)} --- 400Hz（2.5ms毎）で呼ばれる
+    \end{itemize}
+  \end{block}
+
+  \vspace{0.5em}
+
+  \begin{itemize}
+    \item ハードウェアの複雑さは \api{ws::} 名前空間で隠蔽
+    \item FreeRTOS, SPI/I2C, センサーフュージョンを意識する必要なし
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{実習: Hello StampFly / Hands-on}
+  \begin{lstlisting}[style=sfcpp, title={student.cpp}]
+#include "workshop_api.hpp"
+
+void setup()
+{
+    ws::print("Hello StampFly!");
+}
+
+void loop_400Hz(float dt)
+{
+    // Nothing to do in Lesson 0
+}
+  \end{lstlisting}
+
+  \vspace{0.5em}
+
+  \begin{exampleblock}{手順}
+    \begin{enumerate}
+      \item \code{sf lesson switch 0}
+      \item 上のコードを \code{student.cpp} に書く
+      \item \code{sf build workshop \&\& sf flash workshop -m}
+    \end{enumerate}
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{チェックポイント / Checkpoint}
+  \begin{alertblock}{確認事項}
+    \begin{itemize}
+      \item[$\square$] \code{sf doctor} がエラーなしで通る
+      \item[$\square$] ビルドが成功する
+      \item[$\square$] シリアルモニタに \texttt{"Hello StampFly!"} が表示される
+    \end{itemize}
+  \end{alertblock}
+
+  \vspace{1em}
+
+  \begin{block}{次のレッスン}
+    Lesson 1: モータ制御 --- モータを回してプロペラの動きを確認
+  \end{block}
+\end{frame}
+
+\end{document}

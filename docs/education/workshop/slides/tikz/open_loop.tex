@@ -1,0 +1,43 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+
+\definecolor{blockcolor}{RGB}{0, 120, 200}
+\definecolor{arrowcolor}{RGB}{80, 80, 80}
+\definecolor{notefg}{RGB}{180, 60, 20}
+
+\begin{document}
+\begin{tikzpicture}[
+    block/.style={
+      rectangle, draw=blockcolor, line width=1.5pt,
+      fill=blockcolor!8, rounded corners=3pt,
+      minimum width=28mm, minimum height=14mm,
+      font=\bfseries, text=blockcolor, align=center
+    },
+    arrow/.style={-{Stealth[length=3mm]}, line width=1.2pt, arrowcolor},
+    lbl/.style={font=\small, above, text=arrowcolor},
+  ]
+
+  % Blocks
+  \node[block] (stick) at (0, 0) {Controller\\Stick};
+  \node[block, right=25mm of stick] (scale) {Scaling\\$\times$ gain};
+  \node[block, right=25mm of scale] (motor) {Motor\\PWM};
+  \node[block, right=25mm of motor] (drone) {StampFly\\Drone};
+
+  % Arrows
+  \draw[arrow] (stick) -- node[lbl] {$-1.0 \sim +1.0$} (scale);
+  \draw[arrow] (scale) -- node[lbl] {$0.0 \sim 1.0$} (motor);
+  \draw[arrow] (motor) -- node[lbl] {duty} (drone);
+
+  % No feedback annotation
+  \node[font=\large\bfseries, text=notefg, below=18mm of scale]
+    (nofb) {No Feedback!};
+  \draw[notefg, line width=1pt, dashed, -{Stealth[length=2mm]}]
+    (nofb.east) to[out=0, in=-90] ++(3, 1);
+
+  % Title
+  \node[font=\Large\bfseries, above=12mm of scale]
+    {Open-Loop Control};
+
+\end{tikzpicture}
+\end{document}

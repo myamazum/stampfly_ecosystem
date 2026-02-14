@@ -1,0 +1,64 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+
+\definecolor{cwcolor}{RGB}{0, 120, 200}    % Blue for CW
+\definecolor{ccwcolor}{RGB}{220, 60, 20}   % Red for CCW
+\definecolor{bodycolor}{RGB}{80, 80, 80}   % Dark gray
+
+\begin{document}
+\begin{tikzpicture}[
+    motor/.style={circle, draw, line width=1.5pt, minimum size=18mm, font=\large\bfseries},
+    cw/.style={motor, draw=cwcolor, text=cwcolor},
+    ccw/.style={motor, draw=ccwcolor, text=ccwcolor},
+    label/.style={font=\small, text=bodycolor},
+    arrow/.style={-{Stealth[length=3mm]}, line width=1.2pt},
+  ]
+
+  % Body (X-frame)
+  \draw[bodycolor, line width=2pt] (-2.5, 2.5) -- (2.5, -2.5);
+  \draw[bodycolor, line width=2pt] (2.5, 2.5) -- (-2.5, -2.5);
+
+  % Center body
+  \fill[bodycolor, rounded corners=3pt] (-0.6, -0.6) rectangle (0.6, 0.6);
+  \node[font=\footnotesize, text=white] at (0, 0) {ESP32};
+
+  % Front direction arrow
+  \draw[arrow, bodycolor] (0, 1.0) -- (0, 2.0);
+  \node[label, above] at (0, 2.0) {Front};
+
+  % M1 - Front Right (CW)
+  \node[cw] (m1) at (2.5, 2.5) {M1};
+  \node[label, above right=-1mm] at (m1.north east) {FR};
+  \draw[arrow, cwcolor] ([shift={(45:1.3)}]m1.center)
+    arc[start angle=45, end angle=315, radius=1.3cm];
+  \node[font=\scriptsize, cwcolor] at (4.2, 2.5) {CW};
+
+  % M2 - Rear Right (CCW)
+  \node[ccw] (m2) at (2.5, -2.5) {M2};
+  \node[label, below right=-1mm] at (m2.south east) {RR};
+  \draw[arrow, ccwcolor] ([shift={(-45:1.3)}]m2.center)
+    arc[start angle=-45, end angle=-315, radius=1.3cm];
+  \node[font=\scriptsize, ccwcolor] at (4.2, -2.5) {CCW};
+
+  % M3 - Rear Left (CW)
+  \node[cw] (m3) at (-2.5, -2.5) {M3};
+  \node[label, below left=-1mm] at (m3.south west) {RL};
+  \draw[arrow, cwcolor] ([shift={(225:1.3)}]m3.center)
+    arc[start angle=225, end angle=-45, radius=1.3cm];
+  \node[font=\scriptsize, cwcolor] at (-4.2, -2.5) {CW};
+
+  % M4 - Front Left (CCW)
+  \node[ccw] (m4) at (-2.5, 2.5) {M4};
+  \node[label, above left=-1mm] at (m4.north west) {FL};
+  \draw[arrow, ccwcolor] ([shift={(135:1.3)}]m4.center)
+    arc[start angle=135, end angle=-135, radius=1.3cm];
+  \node[font=\scriptsize, ccwcolor] at (-4.2, 2.5) {CCW};
+
+  % Legend
+  \node[anchor=west, font=\small] at (-4.5, -4.5) {%
+    \textcolor{cwcolor}{\rule{8pt}{8pt}} CW (clockwise) \quad
+    \textcolor{ccwcolor}{\rule{8pt}{8pt}} CCW (counter-clockwise)};
+
+\end{tikzpicture}
+\end{document}

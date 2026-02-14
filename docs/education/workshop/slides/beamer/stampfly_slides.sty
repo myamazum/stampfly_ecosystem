@@ -1,0 +1,115 @@
+% stampfly_slides.sty — Common style for StampFly workshop slides
+% StampFly ワークショップスライド共通スタイル
+
+\ProvidesPackage{stampfly_slides}[2025/01/01 StampFly Workshop Slides]
+
+% --- Beamer theme ---
+\usetheme{Madrid}
+\usecolortheme{default}
+
+% --- StampFly brand colors ---
+\definecolor{sfblue}{RGB}{0, 120, 200}
+\definecolor{sfdark}{RGB}{0, 60, 100}
+\definecolor{sflight}{RGB}{220, 240, 255}
+\definecolor{sfgray}{RGB}{80, 80, 80}
+\definecolor{sfred}{RGB}{220, 50, 30}
+\definecolor{sfgreen}{RGB}{40, 160, 40}
+
+% Apply color to Beamer elements
+\setbeamercolor{palette primary}{bg=sfblue, fg=white}
+\setbeamercolor{palette secondary}{bg=sfdark, fg=white}
+\setbeamercolor{palette tertiary}{bg=sfdark, fg=white}
+\setbeamercolor{structure}{fg=sfblue}
+\setbeamercolor{title}{fg=white, bg=sfblue}
+\setbeamercolor{frametitle}{fg=white, bg=sfblue}
+\setbeamercolor{block title}{bg=sfblue!90, fg=white}
+\setbeamercolor{block body}{bg=sflight}
+\setbeamercolor{block title alerted}{bg=sfred!90, fg=white}
+\setbeamercolor{block body alerted}{bg=sfred!8}
+\setbeamercolor{block title example}{bg=sfgreen!80, fg=white}
+\setbeamercolor{block body example}{bg=sfgreen!8}
+\setbeamercolor{item}{fg=sfblue}
+
+% --- Fonts ---
+\setbeamerfont{title}{size=\Large, series=\bfseries}
+\setbeamerfont{frametitle}{size=\large, series=\bfseries}
+
+% --- Navigation & footer ---
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{%
+  \leavevmode\hbox{%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,center]{palette primary}%
+      \usebeamerfont{author in head/foot}\insertshortauthor
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.34\paperwidth,ht=2.5ex,dp=1ex,center]{palette secondary}%
+      \usebeamerfont{title in head/foot}\insertshorttitle
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,right]{palette tertiary}%
+      \usebeamerfont{date in head/foot}%
+      \insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
+    \end{beamercolorbox}%
+  }\vskip0pt%
+}
+
+% --- Japanese support (LuaLaTeX + luatexja) ---
+\usepackage{luatexja}
+\usepackage[match]{luatexja-fontspec}
+\setmainjfont{Hiragino Kaku Gothic ProN}
+\setsansjfont{Hiragino Kaku Gothic ProN}
+
+% --- Code listings ---
+\usepackage{listings}
+\lstdefinestyle{sfcpp}{
+  language=C++,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{sfblue}\bfseries,
+  commentstyle=\color{sfgray}\itshape,
+  stringstyle=\color{sfgreen},
+  numberstyle=\tiny\color{sfgray},
+  numbers=left,
+  numbersep=5pt,
+  frame=single,
+  framerule=0.5pt,
+  rulecolor=\color{sfblue!40},
+  backgroundcolor=\color{sflight},
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=4,
+  captionpos=b,
+  morekeywords={uint8_t, uint32_t, float, void, bool, int},
+}
+\lstdefinestyle{sfbash}{
+  language=bash,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{sfblue}\bfseries,
+  commentstyle=\color{sfgray}\itshape,
+  frame=single,
+  framerule=0.5pt,
+  rulecolor=\color{sfblue!40},
+  backgroundcolor=\color{sflight},
+  breaklines=true,
+  showstringspaces=false,
+}
+\lstset{style=sfcpp}
+
+% --- Graphics (for including generated PNG diagrams) ---
+\usepackage{graphicx}
+\graphicspath{{../images/}}
+
+% --- TikZ (for inline diagrams in slides) ---
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+
+% --- Useful macros ---
+\newcommand{\api}[1]{\texttt{\color{sfblue}#1}}
+\newcommand{\warn}[1]{\textcolor{sfred}{\textbf{#1}}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+% --- Lesson command ---
+% Usage: \lesson{number}{title_ja}{title_en}
+\newcommand{\lesson}[3]{%
+  \title{Lesson #1: #2}
+  \subtitle{#3}
+  \author{StampFly Workshop}
+  \date{}
+}

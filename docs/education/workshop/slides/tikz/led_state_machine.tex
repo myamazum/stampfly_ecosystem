@@ -1,0 +1,53 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, automata, calc}
+
+\definecolor{redstate}{RGB}{220, 50, 30}
+\definecolor{greenstate}{RGB}{40, 160, 40}
+\definecolor{orangestate}{RGB}{220, 140, 0}
+\definecolor{gray1}{RGB}{120, 120, 120}
+
+\begin{document}
+\begin{tikzpicture}[
+    state/.style={
+      circle, draw=#1, line width=2pt, fill=#1!10,
+      minimum size=28mm, font=\bfseries\large, text=#1, align=center
+    },
+    trans/.style={-{Stealth[length=3.5mm]}, line width=1.5pt, gray1},
+    tlbl/.style={font=\small, text=gray1, align=center, fill=white, inner sep=2pt},
+    every initial by arrow/.style={trans},
+  ]
+
+  % States
+  \node[state=redstate] (disarm) at (0, 0) {DISARM\\\textcolor{redstate!70}{\rule{8pt}{8pt}} Red};
+  \node[state=greenstate, right=50mm of disarm] (arm) {ARM\\\textcolor{greenstate!70}{\rule{8pt}{8pt}} Green};
+  \node[state=orangestate, below=40mm of disarm] (lowbat) {LOW BAT\\\textcolor{orangestate!70}{\rule{8pt}{8pt}} Orange};
+
+  % Transitions
+  \draw[trans] (disarm) to[bend left=20]
+    node[tlbl, above] {is\_armed() == true} (arm);
+  \draw[trans] (arm) to[bend left=20]
+    node[tlbl, below] {is\_armed() == false} (disarm);
+  \draw[trans] (disarm) to[bend right=0]
+    node[tlbl, left] {battery\_voltage()\\$< 3.5$\,V} (lowbat);
+  \draw[trans] (arm) to[bend left=0]
+    node[tlbl, right] {battery\_voltage()\\$< 3.5$\,V} (lowbat);
+
+  % Initial
+  \draw[trans] (-3.5, 0) -- (disarm)
+    node[midway, above, font=\small, text=gray1] {Power ON};
+
+  % LED color labels
+  \node[font=\scriptsize, text=redstate, below=1mm of disarm]
+    {led\_color(255, 0, 0)};
+  \node[font=\scriptsize, text=greenstate, below=1mm of arm]
+    {led\_color(0, 255, 0)};
+  \node[font=\scriptsize, text=orangestate, below=1mm of lowbat]
+    {led\_color(255, 165, 0)};
+
+  % Title
+  \node[font=\Large\bfseries, above=15mm of {$(disarm)!0.5!(arm)$}]
+    {LED State Machine};
+
+\end{tikzpicture}
+\end{document}
