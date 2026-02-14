@@ -11,8 +11,8 @@
 | Phase 1: ファームウェア移動コマンド | ✅ 完了 | `up`/`down`/`left`/`right`/`forward`/`back`/`cw`/`ccw`/`emergency`/`stop` |
 | Phase 2: sf CLI 拡張 | ✅ 完了 | sf コマンドに Tello 互換コマンドを追加 |
 | Phase 3: テレメトリ・読み取り | ✅ 完了 | `battery?`/`height?`/`tof?`/`baro?`/`attitude?`/`acceleration?`/`speed?` |
-| Phase 4: RC 制御 | 🔜 未着手 | `rc a b c d` リアルタイム制御 |
-| Phase 5: Python SDK | 🔜 未着手 | djitellopy 互換 `StampFly` クラス |
+| Phase 4: RC 制御 | ✅ 完了 | `rc a b c d` リアルタイム制御 |
+| Phase 5: Python SDK | ✅ 完了 | djitellopy 互換 `StampFly` クラス |
 | Phase 6: UDP 互換（任意） | 💤 保留 | djitellopy 直接利用が必要な場合のみ |
 
 ## 1. 背景と目的
@@ -292,9 +292,9 @@ Phase 2 ✅ sf CLI 拡張 ──────────────── sf up
   │
 Phase 3 ✅ テレメトリ・読み取り ────────── sf battery / sf height / sf attitude が動く
   │
-Phase 4 ── RC 制御 ──────────────────── sf rc でリアルタイム操縦
+Phase 4 ✅ RC 制御 ──────────────────── sf rc でリアルタイム操縦
   │
-Phase 5 ── Python SDK ──────────────── from stampfly import StampFly
+Phase 5 ✅ Python SDK ──────────────── from stampfly import StampFly
   │
 Phase 6 ── UDP 互換（任意）──────────── djitellopy 直接利用（必要な場合のみ）
 ```
@@ -325,8 +325,8 @@ Phase 6 ── UDP 互換（任意）──────────── djitel
 | Phase 1: Firmware Movement Commands | ✅ Done | `up`/`down`/`left`/`right`/`forward`/`back`/`cw`/`ccw`/`emergency`/`stop` |
 | Phase 2: sf CLI Extension | ✅ Done | Add Tello-compatible commands to sf CLI |
 | Phase 3: Telemetry & Read Commands | ✅ Done | `battery?`/`height?`/`tof?`/`baro?`/`attitude?`/`acceleration?`/`speed?` |
-| Phase 4: RC Control | 🔜 Not started | `rc a b c d` real-time control |
-| Phase 5: Python SDK | 🔜 Not started | djitellopy-compatible `StampFly` class |
+| Phase 4: RC Control | ✅ Done | `rc a b c d` real-time control |
+| Phase 5: Python SDK | ✅ Done | djitellopy-compatible `StampFly` class |
 | Phase 6: UDP Compatibility (Optional) | 💤 Deferred | Only if direct djitellopy usage is required |
 
 ## 1. Background and Purpose
