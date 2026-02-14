@@ -96,7 +96,7 @@ output = Kp * error
 | Test over soft surface | 柔らかい面の上でテスト |
 | Keep fingers away from propellers | プロペラに指を近づけない |
 
-> **Note / 注:** StampFly has built-in propeller guards that cannot be removed. / StampFly はプロペラガード一体型のため取り外しできません。
+> **Note / 注:** StampFly has built-in propeller guards and is small enough that propellers pose minimal risk. / StampFly はプロペラガード一体型で、極めて小型のためプロペラの危険性は低いです。
 
 ## Challenge / チャレンジ
 - Try different Kp values (0.2, 0.5, 1.0, 2.0) and observe the response
