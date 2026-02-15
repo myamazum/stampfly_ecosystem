@@ -1,0 +1,117 @@
+\documentclass[aspectratio=169, 14pt]{beamer}
+\usepackage{stampfly_slides}
+
+\lesson{11}{ホバリングタイム競技会}{Hover Time Competition}
+
+\begin{document}
+
+% ------------------------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{競技会概要 / Competition Overview}
+  \begin{block}{ホバリングタイム競技}
+    PID 制御で安定ホバリングし、滞空時間を競う
+  \end{block}
+
+  \vspace{1em}
+
+  \begin{itemize}
+    \item \textbf{種目}: ホバリングタイム（角速度フィードバック制御）
+    \item \textbf{目標}: 最長 60 秒の安定ホバリング
+    \item \textbf{評価}: 滞空時間（ベストタイム採用）
+    \item \textbf{ツール}: \api{sf competition hover-time}
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{競技ルール詳細 / Competition Rules}
+  \centering
+  \begin{tabular}{ll}
+    \hline
+    \textbf{項目} & \textbf{内容} \\
+    \hline
+    種目  & ホバリングタイム（角速度フィードバック制御） \\
+    制限時間 & 最長 60 秒 \\
+    試行回数 & 3 回（ベストタイム採用） \\
+    判定  & 離陸〜接地までの滞空時間 \\
+    失格条件 & 安全エリア外への飛行、手による介入 \\
+    \hline
+  \end{tabular}
+
+  \vspace{1.5em}
+
+  \begin{alertblock}{注意}
+    安全第一！\ 周囲に人がいないことを確認してから飛行
+  \end{alertblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{タイムスケジュール / Schedule}
+  \centering
+  \begin{tabular}{ll}
+    \hline
+    \textbf{時間} & \textbf{内容} \\
+    \hline
+    \multicolumn{2}{l}{\textbf{Day 4（本日）}} \\
+    13:00--13:30 & ルール説明（このスライド） \\
+    13:30--16:00 & 準備・自由練習・予選 \\
+    \hline
+    \multicolumn{2}{l}{\textbf{Day 5（最終日）}} \\
+    \phantom{0}9:00--\phantom{0}9:15 & ルール確認・機体チェック \\
+    \phantom{0}9:15--\phantom{0}9:45 & 最終チューニング \\
+    \phantom{0}9:45--10:45 & 競技本番 \\
+    10:45--11:30 & 結果発表・表彰・振り返り \\
+    \hline
+  \end{tabular}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{攻略のヒント / Tips for Success}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{PID ゲイン調整}
+        \begin{itemize}
+          \item まず P ゲインだけで安定させる
+          \item 振動が出たら D ゲインを追加
+          \item 定常偏差があれば I ゲインを微調整
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{バッテリ\,\&\,安全}
+        \begin{itemize}
+          \item フル充電で本番に臨む
+          \item プロペラの取付を再確認
+          \item 異常振動はすぐに着陸
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+
+  \smallskip
+  {\small \textbf{テレメトリ活用:}
+    \api{sf log wifi} でリアルタイムデータを確認し、ゲインを追い込む}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{チェックポイント / Checkpoint}
+  \begin{alertblock}{準備確認}
+    \begin{itemize}
+      \item[$\square$] 競技ルールと失格条件を理解した
+      \item[$\square$] バッテリがフル充電されている
+      \item[$\square$] PID ゲインの調整方法を把握している
+      \item[$\square$] 安全チェックリストを確認した
+    \end{itemize}
+  \end{alertblock}
+
+  \vspace{1em}
+
+  \begin{block}{さあ、練習を始めよう！}
+    13:30 から自由練習 → 最高のホバリングを目指そう
+  \end{block}
+\end{frame}
+
+\end{document}
