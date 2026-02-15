@@ -14,13 +14,13 @@
 \begin{frame}{ワークショップカリキュラム / Workshop Curriculum}
   \begin{table}
     \centering
-    \begin{tabular}{llp{60mm}}
+    \begin{tabular}{lll}
       \hline
       \textbf{Day} & \textbf{Lesson} & \textbf{テーマ} \\
       \hline
-      Day 1 & 0\,--\,4  & 環境セットアップ + ハードウェア入門 \\
-      Day 2 & 5\,--\,7  & フィードバック制御 + 初フライト \\
-      Day 3 & 8\,--\,9  & モデリング + 姿勢推定 \\
+      Day 1 & 0\,--\,4   & 環境セットアップ + ハードウェア入門 \\
+      Day 2 & 5\,--\,7   & フィードバック制御 + 初フライト \\
+      Day 3 & 8\,--\,9   & モデリング + 姿勢推定 \\
       Day 4 & 10\,--\,11 & Python SDK + 競技会 \\
       \hline
     \end{tabular}
@@ -52,17 +52,18 @@
   \begin{columns}[T]
     \begin{column}{0.52\textwidth}
       \centering
+      \vspace{-2mm}
       \resizebox{0.95\columnwidth}{!}{\input{../tikz/ecosystem_layers}}
     \end{column}
     \begin{column}{0.45\textwidth}
-      \small
-      \begin{itemize}
-        \item \texttt{firmware/} --- 機体・送信機の組込みコード
-        \item \texttt{control/} --- 制御設計（PID, MPC）
-        \item \texttt{simulator/} --- 3D 物理シミュレータ
-        \item \texttt{analysis/} --- データ解析（Jupyter）
-        \item \texttt{tools/} --- 開発ツール（sf CLI）
-        \item \texttt{protocol/} --- 通信仕様（SSOT）
+      \footnotesize
+      \begin{itemize}\setlength{\itemsep}{2pt}
+        \item \texttt{firmware/} --- 組込みコード
+        \item \texttt{control/} --- 制御設計
+        \item \texttt{simulator/} --- 3D シミュレータ
+        \item \texttt{analysis/} --- データ解析
+        \item \texttt{tools/} --- sf CLI
+        \item \texttt{protocol/} --- 通信仕様
       \end{itemize}
     \end{column}
   \end{columns}
@@ -171,7 +172,7 @@ void loop_400Hz(float dt)
     // Nothing to do in Lesson 0
 }
   \end{lstlisting}
-
+  \vspace{-0.8em}
   \begin{exampleblock}{手順}\small
     \textbf{1.}~\code{sf lesson switch 0}\\
     \textbf{2.}~上のコードを \code{student.cpp} に書く\\
