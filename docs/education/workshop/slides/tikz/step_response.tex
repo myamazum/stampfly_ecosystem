@@ -47,7 +47,7 @@
     .. controls (6.0, 3.9) and (6.5, 4.2) .. (7.0, 4.15)  % settle
     .. controls (7.5, 4.05) and (8.0, 3.95) .. (8.5, 4.0)
     -- (12, 4.0);
-  \node[font=\small\bfseries, respcolor, below right] at (9, 4.2) {Response};
+  \node[font=\small\bfseries, respcolor, above right] at (9, 4.1) {Response};
 
   % --- Annotations ---
 
@@ -73,11 +73,7 @@
 
   % Settling band (5%)
   \fill[annocolor, opacity=0.08] (0, 3.8) rectangle (12, 4.2);
-  \node[font=\scriptsize, annocolor, right] at (10, 3.6) {$\pm 5\%$ band};
-
-  % Title
-  \node[font=\Large\bfseries, labelcolor, anchor=south] at (6, 6.8)
-    {Step Response};
+  \node[font=\scriptsize, annocolor, right] at (10, 3.2) {$\pm 5\%$ band};
 
 \end{tikzpicture}
 \end{document}
