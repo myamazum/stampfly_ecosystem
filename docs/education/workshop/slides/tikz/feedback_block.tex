@@ -37,13 +37,15 @@
   \draw[arrow] (kp) -- node[lbl] {$u$} (mixer);
   \draw[arrow] (mixer) -- (drone);
 
-  % Output
-  \draw[arrow] (drone.east) -- ++(1.5, 0) node[lbl, right] {response};
+  % Output line with feedback tap point
+  \draw[arrow] (drone.east) -- ++(2.5, 0) node[lbl, right] {response};
+  \coordinate (fb_tap) at ($(drone.east)+(1.2, 0)$);
+  \fill[arrowcolor] (fb_tap) circle (2.5pt);
 
-  % Feedback path
+  % Feedback path (branches from output line, not from inside drone)
   \node[block, fill=fbcolor!8, draw=fbcolor, text=fbcolor]
     (gyro) at (8, -3) {Gyro\\Sensor};
-  \draw[arrow, fbcolor] (13, 0) -- (13, -3) -- (gyro);
+  \draw[arrow, fbcolor] (fb_tap) -- (fb_tap |- gyro) -- (gyro);
   \draw[arrow, fbcolor] (gyro) -- (3, -3) -- (sum);
 
   % Sum signs
@@ -51,7 +53,7 @@
   \node[font=\scriptsize, fbcolor, anchor=north east] at ($(sum.south)+(210:0.4)$) {$-$};
 
   % Labels
-  \node[font=\small, arrowcolor, above] at ($(drone.east)+(0.75, 0.5)$) {angular rate};
+  \node[font=\small, arrowcolor, above] at ($(drone.east)+(1.2, 0.5)$) {angular rate};
   \node[font=\small, fbcolor, below] at (8, -3.8) {feedback};
 
   % Title
