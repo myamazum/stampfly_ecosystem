@@ -920,15 +920,33 @@ def build_lesson_08() -> Presentation:
         "• motor_mixer() を使わず個別モータ制御",
     ])
 
-    add_content_slide(
-        prs, "ミキサー行列 / Motor Mixer Matrix",
-        [
-            "T/R/P/Y → M1-M4 の符号付き結線",
-            "アーム長 L = 0.023 m",
-            "トルク対推力比 kq = 0.01",
-        ],
-        image_path=IMAGES_DIR / "mixer_matrix.png",
+    # Motor layout + Mixer matrix side by side (matching Beamer columns layout)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+    title_shape = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE, Inches(0), Inches(0),
+        SLIDE_WIDTH, Inches(1.1),
     )
+    title_shape.fill.solid()
+    title_shape.fill.fore_color.rgb = SF_BLUE
+    title_shape.line.fill.background()
+    tf = title_shape.text_frame
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    p = tf.paragraphs[0]
+    p.text = "  ミキサー行列 / Motor Mixer Matrix"
+    p.font.size = Pt(28)
+    p.font.bold = True
+    p.font.color.rgb = WHITE
+    p.font.name = FONT_JP
+    motor_img = IMAGES_DIR / "motor_layout.png"
+    mixer_img = IMAGES_DIR / "mixer_matrix.png"
+    if motor_img.exists():
+        slide.shapes.add_picture(
+            str(motor_img), Inches(0.3), Inches(1.3), width=Inches(4.5),
+        )
+    if mixer_img.exists():
+        slide.shapes.add_picture(
+            str(mixer_img), Inches(5.5), Inches(1.3), width=Inches(7.3),
+        )
 
     add_table_slide(prs, "物理パラメータ / Physical Parameters", [
         "パラメータ", "値", "説明",
