@@ -39,22 +39,24 @@
   \draw[ref] (0, 0) -- (2, 0) -- (2, 4) -- (12, 4);
   \node[font=\small\bfseries, refcolor, above left] at (1, 0.3) {Target};
 
-  % Response curve (second-order underdamped)
-  \draw[resp] (0, 0) -- (2, 0)
-    .. controls (2.5, 0) and (3, 2) .. (3.5, 5.0)   % rise
-    .. controls (3.8, 5.6) and (4.2, 5.2) .. (4.5, 4.8)   % overshoot peak
-    .. controls (5.0, 4.0) and (5.2, 3.6) .. (5.5, 3.7)   % undershoot
-    .. controls (6.0, 3.9) and (6.5, 4.2) .. (7.0, 4.15)  % settle
-    .. controls (7.5, 4.05) and (8.0, 3.95) .. (8.5, 4.0)
-    -- (12, 4.0);
+  % Response curve — exact second-order underdamped step response
+  % y(τ) = A · [1 − exp(−ζωₙτ) / √(1−ζ²) · sin(ωd·τ + φ)]
+  % ζ = 0.3, ωₙ = 6.5 rad/s, ωd = 6.20 rad/s, φ = arccos(ζ), A = 4.0
+  \pgfmathsetmacro{\zetawn}{1.95}       % ζωₙ = 0.3 × 6.5
+  \pgfmathsetmacro{\wddeg}{355.24}      % ωd [deg/s] = 6.20 × 180/π
+  \pgfmathsetmacro{\phideg}{acos(0.3)}  % φ = arccos(ζ) [deg]
+  \pgfmathsetmacro{\invsqrt}{1/sqrt(1-0.09)} % 1/√(1−ζ²)
+  \draw[resp] (0, 0) -- (2, 0);
+  \draw[resp] plot[domain=0:2.5, samples=200]
+    ({2 + \x*4}, {4*(1 - \invsqrt*exp(-\zetawn*\x)*sin(\wddeg*\x + \phideg))});
   \node[font=\small\bfseries, respcolor, above right] at (9, 4.1) {Response};
 
   % --- Annotations ---
 
-  % Overshoot (at the actual peak of the response curve, ~x=3.9)
-  \draw[anno] (3.9, 4) -- (3.9, 5.3);
-  \draw[dim] (4.1, 4) -- (4.1, 5.3);
-  \node[annolbl, right] at (4.2, 4.65) {Overshoot};
+  % Overshoot (peak: τ=π/ωd=0.507s → x=4.03, y=5.49)
+  \draw[anno] (4.0, 4) -- (4.0, 5.5);
+  \draw[dim] (4.2, 4) -- (4.2, 5.5);
+  \node[annolbl, right] at (4.3, 4.75) {Overshoot};
 
   % Rise time
   \draw[anno] (2, -0.8) -- (2, -0.3);
@@ -64,8 +66,8 @@
 
   % Settling time
   \draw[anno] (2, -1.8) -- (2, -1.5);
-  \draw[anno] (8.0, -1.8) -- (8.0, -1.5);
-  \draw[dim] (2, -1.65) -- (8.0, -1.65);
+  \draw[anno] (8.2, -1.8) -- (8.2, -1.5);
+  \draw[dim] (2, -1.65) -- (8.2, -1.65);
   \node[annolbl, below] at (5, -1.85) {Settling Time};
 
   % Steady-state value line
