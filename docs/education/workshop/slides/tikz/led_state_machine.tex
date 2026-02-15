@@ -2,12 +2,12 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta, positioning, automata, calc}
 
+\begin{document}
+
 \definecolor{redstate}{RGB}{220, 50, 30}
 \definecolor{greenstate}{RGB}{40, 160, 40}
 \definecolor{orangestate}{RGB}{220, 140, 0}
 \definecolor{gray1}{RGB}{120, 120, 120}
-
-\begin{document}
 \begin{tikzpicture}[
     state/.style={
       circle, draw=#1, line width=2pt, fill=#1!10,

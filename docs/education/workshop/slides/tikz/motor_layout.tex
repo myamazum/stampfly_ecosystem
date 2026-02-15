@@ -2,11 +2,11 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta, positioning}
 
+\begin{document}
+
 \definecolor{cwcolor}{RGB}{0, 120, 200}    % Blue for CW
 \definecolor{ccwcolor}{RGB}{220, 60, 20}   % Red for CCW
 \definecolor{bodycolor}{RGB}{80, 80, 80}   % Dark gray
-
-\begin{document}
 \begin{tikzpicture}[
     motor/.style={circle, draw, line width=1.5pt, minimum size=18mm, font=\large\bfseries},
     cw/.style={motor, draw=cwcolor, text=cwcolor},
