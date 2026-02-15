@@ -571,16 +571,6 @@ def build_lesson_03() -> Presentation:
     ])
 
     add_content_slide(
-        prs, "モータ配置 / Motor Layout",
-        [
-            "対角のモータが同じ方向に回転（トルクバランス）",
-            "M1(FR), M3(RL) = CW（時計回り）",
-            "M2(RR), M4(FL) = CCW（反時計回り）",
-        ],
-        image_path=IMAGES_DIR / "motor_layout.png",
-    )
-
-    add_content_slide(
         prs, "LED 状態遷移 / LED State Machine",
         [
             "DISARM → 赤、ARM → 緑、低バッテリー → 橙",
