@@ -28,18 +28,20 @@
 % ------------------------------------------------------------------
 \begin{frame}{ジャイロドリフト問題 / Gyro Drift Problem}
   \begin{columns}[c]
-    \begin{column}{0.55\textwidth}
+    \begin{column}{0.48\textwidth}
       \centering
-      \resizebox{!}{0.65\textheight}{\input{../tikz/gyro_drift}}
+      \resizebox{\linewidth}{!}{\input{../tikz/gyro_drift}}
     \end{column}
-    \begin{column}{0.45\textwidth}
+    \begin{column}{0.50\textwidth}
       \begin{itemize}
-        \item ジャイロは\textbf{角速度}を測定
-        \item 角度を得るには積分 $\theta = \int \omega\,dt$
-        \item バイアス（微小な定常誤差）が蓄積
-        \item 時間と共にドリフトが増大
-        \item \warn{ジャイロ単体では姿勢推定不可}
+        \item ジャイロは\textbf{角速度} $\omega$ を測定
+        \item 角度 $\theta = \int \omega\,dt$（積分が必要）
+        \item バイアスが蓄積 → ドリフト増大
       \end{itemize}
+      \vspace{0.5em}
+      \begin{alertblock}{問題}
+        ジャイロ単体では長時間の姿勢推定が不可能
+      \end{alertblock}
     \end{column}
   \end{columns}
 \end{frame}
@@ -47,22 +49,21 @@
 % ------------------------------------------------------------------
 \begin{frame}{相補フィルタ / Complementary Filter}
   \begin{columns}[c]
-    \begin{column}{0.55\textwidth}
+    \begin{column}{0.50\textwidth}
       \centering
-      \resizebox{!}{0.6\textheight}{\input{../tikz/comp_filter}}
+      \resizebox{\linewidth}{!}{\input{../tikz/comp_filter}}
     \end{column}
-    \begin{column}{0.45\textwidth}
+    \begin{column}{0.48\textwidth}
       \begin{block}{数式}
         $\hat{\theta}_k = \alpha\,(\hat{\theta}_{k-1} + \omega\,\Delta t) + (1-\alpha)\,\theta_{\mathrm{accel}}$
       \end{block}
 
-      \vspace{0.5em}
+      \vspace{0.3em}
 
       \begin{itemize}
-        \item $\alpha = 0.98$（ジャイロ重視）
-        \item ジャイロ: 短期精度◎、長期ドリフト✕
-        \item 加速度: 長期安定◎、振動ノイズ✕
-        \item 両者の長所を融合
+        \item $\alpha = 0.98$（ジャイロ 98\% + 加速度 2\%）
+        \item ジャイロ: 短期精度◎ / 長期ドリフト✕
+        \item 加速度: 長期安定◎ / 振動ノイズ✕
       \end{itemize}
     \end{column}
   \end{columns}

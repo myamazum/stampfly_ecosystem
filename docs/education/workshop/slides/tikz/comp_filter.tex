@@ -1,6 +1,6 @@
 \documentclass[border=10pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+\usetikzlibrary{arrows.meta, positioning, calc}
 
 \begin{document}
 
@@ -11,74 +11,59 @@
 \definecolor{sflight}{RGB}{220, 240, 255}
 
 \begin{tikzpicture}[
-    node distance=1.8cm and 2.2cm,
-    block/.style={draw, sfblue, line width=1.2pt, fill=sflight,
-                  minimum width=2.2cm, minimum height=1cm,
-                  font=\small\bfseries, rounded corners=3pt},
-    gain/.style={draw, sfblue, line width=1.2pt, fill=sflight,
+    node distance=1.5cm and 2.0cm,
+    block/.style={draw, #1, line width=1.2pt, fill=#1!8,
+                  minimum width=2.0cm, minimum height=0.9cm,
+                  font=\normalsize\bfseries, rounded corners=3pt},
+    block/.default=sfblue,
+    gain/.style={draw, #1, line width=1.2pt, fill=#1!8,
                  circle, minimum size=0.9cm,
-                 font=\small\bfseries},
+                 font=\normalsize\bfseries},
+    gain/.default=sfblue,
     sum/.style={draw, sfblue, line width=1.2pt, fill=white,
                 circle, minimum size=0.8cm,
-                font=\small\bfseries},
-    input/.style={font=\small\bfseries, sfgray},
-    output/.style={font=\small\bfseries, sfblue},
-    line/.style={-{Stealth[length=2.5mm]}, line width=1pt, sfgray},
-    gyro/.style={sfred, line width=1.5pt},
-    accel/.style={sfgreen, line width=1.5pt},
-    label/.style={font=\scriptsize, sfgray},
+                font=\normalsize\bfseries},
+    input/.style={font=\normalsize\bfseries, sfgray},
+    output/.style={font=\large\bfseries, sfblue},
+    line/.style={-{Stealth[length=2.5mm]}, line width=1.2pt, sfgray},
+    pathlbl/.style={font=\normalsize\bfseries},
   ]
 
   % --- Input nodes ---
   \node[input] (gyro_in) {Gyro $\omega$};
-  \node[input, below=3.5cm of gyro_in] (accel_in) {Accel $(a_x, a_y, a_z)$};
+  \node[input, below=3.0cm of gyro_in] (accel_in) {Accel};
 
   % --- Gyro path (top) ---
-  \node[block, right=1.8cm of gyro_in, draw=sfred, fill=sfred!8] (integrator) {$\displaystyle\int dt$};
-  \node[gain, right=1.8cm of integrator, draw=sfred, fill=sfred!8] (alpha) {$\alpha$};
+  \node[block=sfred, right=1.5cm of gyro_in] (integrator) {$\displaystyle\int dt$};
+  \node[gain=sfred, right=1.5cm of integrator] (alpha) {$\alpha$};
 
   % --- Accel path (bottom) ---
-  \node[block, right=1.8cm of accel_in, draw=sfgreen, fill=sfgreen!8] (atan) {$\mathrm{atan2}$};
-  \node[gain, right=1.8cm of atan, draw=sfgreen, fill=sfgreen!8] (one_alpha) {$1\!-\!\alpha$};
+  \node[block=sfgreen, right=1.5cm of accel_in] (atan) {atan2};
+  \node[gain=sfgreen, right=1.5cm of atan] (one_alpha) {$1\!-\!\alpha$};
 
   % --- Summation ---
-  \node[sum, right=1.8cm of $(alpha)!0.5!(one_alpha)$] (sumnode) {$+$};
+  \node[sum] at ($(alpha)!0.5!(one_alpha) + (2.5, 0)$) (sumnode) {$+$};
 
   % --- Output ---
-  \node[output, right=1.5cm of sumnode] (output) {$\hat{\theta}$};
+  \node[output, right=1.2cm of sumnode] (output) {$\hat{\theta}$};
 
   % --- Connections ---
   % Gyro path
   \draw[line, sfred] (gyro_in) -- (integrator);
   \draw[line, sfred] (integrator) -- (alpha);
-  \draw[line, sfred] (alpha) -- (alpha -| sumnode.west) -- (sumnode.west |- alpha) ;
-  \draw[line, sfred] (alpha.east) -- ++(0.6,0) |- (sumnode.150);
+  \draw[line, sfred] (alpha.east) -- ++(0.5, 0) |- (sumnode.150);
 
   % Accel path
   \draw[line, sfgreen] (accel_in) -- (atan);
   \draw[line, sfgreen] (atan) -- (one_alpha);
-  \draw[line, sfgreen] (one_alpha.east) -- ++(0.6,0) |- (sumnode.210);
+  \draw[line, sfgreen] (one_alpha.east) -- ++(0.5, 0) |- (sumnode.210);
 
   % Output
   \draw[line, sfblue, line width=1.5pt] (sumnode) -- (output);
 
-  % --- Feedback loop (previous estimate fed back to integrator) ---
-  \draw[line, sfgray, dashed] (sumnode.north) -- ++(0, 1.0)
-    -| node[label, above, pos=0.25] {$\hat{\theta}_{k-1}$} (integrator.north);
-
   % --- Path labels ---
-  \node[font=\scriptsize\bfseries, sfred, above=0.3cm of integrator]
-    {High-pass (gyro)};
-  \node[font=\scriptsize\bfseries, sfgreen, below=0.3cm of atan]
-    {Low-pass (accel)};
-
-  % --- Alpha value annotation ---
-  \node[font=\footnotesize, sfgray, align=center, below=0.5cm of sumnode]
-    {$\alpha = 0.98$\\[2pt]Gyro 98\% + Accel 2\%};
-
-  % --- Output label ---
-  \node[font=\footnotesize\bfseries, sfblue, above=0.15cm of output]
-    {Estimated angle};
+  \node[pathlbl, sfred, above=0.2cm of integrator] {High-pass};
+  \node[pathlbl, sfgreen, below=0.2cm of atan] {Low-pass};
 
 \end{tikzpicture}
 \end{document}

@@ -1,12 +1,12 @@
 \documentclass[border=10pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, decorations.pathmorphing}
+\usetikzlibrary{arrows.meta}
 
 \begin{document}
 
 \definecolor{truecolor}{RGB}{0, 120, 200}     % Blue - true value
 \definecolor{driftcolor}{RGB}{220, 50, 30}     % Red - gyro integrated
-\definecolor{gridcolor}{RGB}{200, 200, 200}
+\definecolor{gridcolor}{RGB}{210, 210, 210}
 \definecolor{labelcolor}{RGB}{80, 80, 80}
 \definecolor{annocolor}{RGB}{40, 160, 40}      % Green - annotations
 
@@ -14,55 +14,46 @@
     axis/.style={-{Stealth[length=3mm]}, line width=1pt, labelcolor},
     trueline/.style={truecolor, line width=2.5pt},
     driftline/.style={driftcolor, line width=2pt},
-    anno/.style={annocolor, line width=1pt, dashed},
-    dim/.style={{Stealth[length=2mm]}-{Stealth[length=2mm]}, annocolor, line width=0.8pt},
-    annolbl/.style={font=\small\bfseries, annocolor},
+    dim/.style={{Stealth[length=2.5mm]}-{Stealth[length=2.5mm]}, annocolor,
+                line width=1pt},
+    annolbl/.style={font=\normalsize\bfseries, annocolor},
   ]
 
   % Grid
-  \foreach \x in {0, 1, ..., 12} {
-    \draw[gridcolor] (\x, 0) -- (\x, 6);
+  \foreach \x in {0, 1, ..., 8} {
+    \draw[gridcolor] (\x, 0) -- (\x, 5);
   }
-  \foreach \y in {0, 1, ..., 6} {
-    \draw[gridcolor] (0, \y) -- (12, \y);
+  \foreach \y in {0, 1, ..., 5} {
+    \draw[gridcolor] (0, \y) -- (8, \y);
   }
 
   % Axes
-  \draw[axis] (-0.3, 0) -- (12.5, 0) node[right, font=\bfseries] {$t$ [s]};
-  \draw[axis] (0, -0.3) -- (0, 6.5) node[above, font=\bfseries] {$\theta$ [deg]};
+  \draw[axis] (-0.3, 0) -- (8.8, 0) node[right, font=\large\bfseries] {$t$};
+  \draw[axis] (0, -0.3) -- (0, 5.5) node[above, font=\large\bfseries] {$\theta$};
 
   % Time labels
-  \foreach \x/\t in {0/0, 2/5, 4/10, 6/15, 8/20, 10/25, 12/30} {
-    \node[font=\scriptsize, below, labelcolor] at (\x, -0.1) {\t};
+  \foreach \x/\t in {0/0, 2/10, 4/20, 6/30, 8/40} {
+    \node[font=\small, below, labelcolor] at (\x, -0.15) {\t s};
   }
 
-  % True value (horizontal line at y=3)
-  \draw[trueline] (0, 3) -- (12, 3);
-  \node[font=\small\bfseries, truecolor, above] at (2, 3.1) {True angle};
+  % True value (horizontal line at y=2)
+  \draw[trueline] (0, 2) -- (8, 2);
+  \node[font=\normalsize\bfseries, truecolor, above left] at (3, 2.15) {True angle};
 
-  % Gyro integrated value (drifting upward with noise)
+  % Gyro integrated value (drifting upward)
   \draw[driftline] plot[smooth, tension=0.5] coordinates {
-    (0, 3.0) (0.5, 3.05) (1, 3.15) (1.5, 3.2) (2, 3.35)
-    (2.5, 3.5) (3, 3.55) (3.5, 3.7) (4, 3.85) (4.5, 3.95)
-    (5, 4.1) (5.5, 4.2) (6, 4.35) (6.5, 4.5) (7, 4.6)
-    (7.5, 4.75) (8, 4.85) (8.5, 4.95) (9, 5.1) (9.5, 5.2)
-    (10, 5.3) (10.5, 5.4) (11, 5.5) (11.5, 5.55) (12, 5.65)
+    (0, 2.0) (0.5, 2.05) (1, 2.15) (1.5, 2.25) (2, 2.4)
+    (2.5, 2.55) (3, 2.7) (3.5, 2.85) (4, 3.05)
+    (4.5, 3.2) (5, 3.4) (5.5, 3.55) (6, 3.75)
+    (6.5, 3.9) (7, 4.1) (7.5, 4.25) (8, 4.45)
   };
-  \node[font=\small\bfseries, driftcolor, below right] at (8.5, 5.3) {Gyro $\int\omega\,dt$};
+  \node[font=\normalsize\bfseries, driftcolor, above left] at (7, 4.3)
+    {Gyro $\displaystyle\int\!\omega\,dt$};
 
-  % Drift annotation arrow at t=25s (x=10)
-  \draw[anno] (10, 3.0) -- (10, 5.3);
-  \draw[dim] (10.5, 3.0) -- (10.5, 5.3);
-  \node[annolbl, right] at (10.6, 4.15) {Drift};
-
-  % Small drift at t=10s (x=4)
-  \draw[anno] (4, 3.0) -- (4, 3.85);
-  \draw[dim] (4.5, 3.0) -- (4.5, 3.85);
-  \node[annolbl, right, font=\scriptsize\bfseries] at (4.6, 3.42) {Small};
-
-  % Bias label
-  \node[font=\footnotesize, driftcolor, align=center] at (6, 0.8)
-    {Gyro bias $\to$ angle error grows over time};
+  % Drift annotation at t=40s (x=8)
+  \draw[annocolor, line width=0.8pt, dashed] (8, 2.0) -- (8, 4.45);
+  \draw[dim] (8.4, 2.0) -- (8.4, 4.45);
+  \node[annolbl, right] at (8.5, 3.2) {Drift};
 
 \end{tikzpicture}
 \end{document}
