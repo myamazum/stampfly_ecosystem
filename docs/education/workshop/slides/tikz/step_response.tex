@@ -1,0 +1,83 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+
+\begin{document}
+
+\definecolor{refcolor}{RGB}{0, 120, 200}    % Blue - reference
+\definecolor{respcolor}{RGB}{220, 50, 30}   % Red - response
+\definecolor{gridcolor}{RGB}{200, 200, 200}
+\definecolor{labelcolor}{RGB}{80, 80, 80}
+\definecolor{annocolor}{RGB}{40, 160, 40}   % Green - annotations
+\begin{tikzpicture}[
+    axis/.style={-{Stealth[length=3mm]}, line width=1pt, labelcolor},
+    ref/.style={refcolor, line width=2pt},
+    resp/.style={respcolor, line width=2pt},
+    anno/.style={annocolor, line width=1pt, dashed},
+    dim/.style={{Stealth[length=2mm]}-{Stealth[length=2mm]}, annocolor, line width=0.8pt},
+    annolbl/.style={font=\small\bfseries, annocolor},
+  ]
+
+  % Grid
+  \foreach \x in {0, 1, ..., 12} {
+    \draw[gridcolor] (\x, 0) -- (\x, 6);
+  }
+  \foreach \y in {0, 1, ..., 6} {
+    \draw[gridcolor] (0, \y) -- (12, \y);
+  }
+
+  % Axes
+  \draw[axis] (-0.3, 0) -- (12.5, 0) node[right, font=\bfseries] {$t$ [s]};
+  \draw[axis] (0, -0.3) -- (0, 6.5) node[above, font=\bfseries] {$\omega$ [rad/s]};
+
+  % Time labels
+  \foreach \x/\t in {0/0, 2/0.5, 4/1.0, 6/1.5, 8/2.0, 10/2.5, 12/3.0} {
+    \node[font=\scriptsize, below, labelcolor] at (\x, -0.1) {\t};
+  }
+
+  % Reference (step input at t=0.5s = x=2)
+  \draw[ref] (0, 0) -- (2, 0) -- (2, 4) -- (12, 4);
+  \node[font=\small\bfseries, refcolor, above left] at (1, 0.3) {Target};
+
+  % Response curve (second-order underdamped)
+  \draw[resp] (0, 0) -- (2, 0)
+    .. controls (2.5, 0) and (3, 2) .. (3.5, 5.0)   % rise
+    .. controls (3.8, 5.6) and (4.2, 5.2) .. (4.5, 4.8)   % overshoot peak
+    .. controls (5.0, 4.0) and (5.2, 3.6) .. (5.5, 3.7)   % undershoot
+    .. controls (6.0, 3.9) and (6.5, 4.2) .. (7.0, 4.15)  % settle
+    .. controls (7.5, 4.05) and (8.0, 3.95) .. (8.5, 4.0)
+    -- (12, 4.0);
+  \node[font=\small\bfseries, respcolor, below right] at (9, 4.2) {Response};
+
+  % --- Annotations ---
+
+  % Overshoot
+  \draw[anno] (4.5, 4) -- (4.5, 5.0);
+  \draw[dim] (4.7, 4) -- (4.7, 5.0);
+  \node[annolbl, right] at (4.8, 4.5) {Overshoot};
+
+  % Rise time
+  \draw[anno] (2, -0.8) -- (2, -0.3);
+  \draw[anno] (3.2, -0.8) -- (3.2, -0.3);
+  \draw[dim] (2, -0.6) -- (3.2, -0.6);
+  \node[annolbl, below] at (2.6, -0.85) {Rise Time};
+
+  % Settling time
+  \draw[anno] (2, -1.8) -- (2, -1.5);
+  \draw[anno] (8.0, -1.8) -- (8.0, -1.5);
+  \draw[dim] (2, -1.65) -- (8.0, -1.65);
+  \node[annolbl, below] at (5, -1.85) {Settling Time};
+
+  % Steady-state value line
+  \draw[refcolor, line width=0.5pt, dashed] (0, 4) -- (12, 4);
+
+  % Settling band (5%)
+  \fill[annocolor, opacity=0.08] (0, 3.8) rectangle (12, 4.2);
+  \node[font=\scriptsize, annocolor, right] at (10, 3.6) {$\pm 5\%$ band};
+
+  % Title
+  \node[font=\Large\bfseries, labelcolor, anchor=south] at (6, 6.8)
+    {Step Response};
+
+\end{tikzpicture}
+\end{document}

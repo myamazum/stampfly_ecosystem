@@ -1,0 +1,63 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+
+\begin{document}
+
+\definecolor{axisX}{RGB}{220, 50, 30}   % Red - X forward
+\definecolor{axisY}{RGB}{40, 160, 40}   % Green - Y right
+\definecolor{axisZ}{RGB}{0, 120, 200}   % Blue - Z down
+\definecolor{bodycolor}{RGB}{80, 80, 80}
+\definecolor{gyrocolor}{RGB}{120, 80, 150}
+\begin{tikzpicture}[
+    axis/.style={-{Stealth[length=4mm]}, line width=2pt},
+    gyro/.style={-{Stealth[length=3mm]}, line width=1.5pt, gyrocolor},
+  ]
+
+  % Body rectangle (top view)
+  \fill[bodycolor!15, rounded corners=3pt] (-1.2, -1.2) rectangle (1.2, 1.2);
+  \draw[bodycolor, line width=1.5pt, rounded corners=3pt] (-1.2, -1.2) rectangle (1.2, 1.2);
+  \node[font=\footnotesize, text=bodycolor] at (0, 0) {IMU};
+
+  % X axis (forward = up on the page)
+  \draw[axis, axisX] (0, 1.5) -- (0, 4.0);
+  \node[font=\large\bfseries, axisX, above] at (0, 4.0) {X (Forward)};
+
+  % Y axis (right)
+  \draw[axis, axisY] (1.5, 0) -- (4.0, 0);
+  \node[font=\large\bfseries, axisY, right] at (4.0, 0) {Y (Right)};
+
+  % Z axis (down - draw diagonally to show 3D perspective)
+  \draw[axis, axisZ] (-0.8, -0.8) -- (-2.5, -2.5);
+  \node[font=\large\bfseries, axisZ, below left] at (-2.5, -2.5) {Z (Down)};
+
+  % Gyro rotation arrows
+  % Roll (rotation around X)
+  \draw[gyro] ([shift={(80:1.8)}]0, 2.8)
+    arc[start angle=80, end angle=-80, radius=0.6cm];
+  \node[font=\small, gyrocolor, right] at (0.8, 2.8) {Roll};
+
+  % Pitch (rotation around Y)
+  \draw[gyro] ([shift={(170:1.8)}]2.8, 0)
+    arc[start angle=170, end angle=10, radius=0.6cm];
+  \node[font=\small, gyrocolor, above] at (2.8, 0.8) {Pitch};
+
+  % Yaw (rotation around Z)
+  \draw[gyro] ([shift={(200:1.5)}]-1.6, -1.6)
+    arc[start angle=200, end angle=340, radius=0.6cm];
+  \node[font=\small, gyrocolor, left] at (-2.5, -1.2) {Yaw};
+
+  % NED label
+  \node[font=\Large\bfseries, bodycolor, anchor=south west] at (-4.5, 4.0)
+    {NED Coordinate System};
+  \node[font=\small, bodycolor, anchor=south west] at (-4.5, 3.4)
+    {North-East-Down};
+
+  % Legend
+  \node[anchor=west, font=\small] at (-4.5, -3.5) {%
+    \textcolor{axisX}{\rule{8pt}{8pt}} X (gyro\_x = Roll rate) \quad
+    \textcolor{axisY}{\rule{8pt}{8pt}} Y (gyro\_y = Pitch rate) \quad
+    \textcolor{axisZ}{\rule{8pt}{8pt}} Z (gyro\_z = Yaw rate)};
+
+\end{tikzpicture}
+\end{document}

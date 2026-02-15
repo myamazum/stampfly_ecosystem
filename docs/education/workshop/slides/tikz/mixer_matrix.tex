@@ -1,0 +1,91 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usetikzlibrary{arrows.meta, positioning}
+
+\begin{document}
+
+\definecolor{thrustcolor}{RGB}{0, 120, 200}   % Blue - Thrust
+\definecolor{rollcolor}{RGB}{220, 50, 30}     % Red - Roll
+\definecolor{pitchcolor}{RGB}{40, 160, 40}    % Green - Pitch
+\definecolor{yawcolor}{RGB}{120, 80, 150}     % Purple - Yaw
+\definecolor{motorcolor}{RGB}{80, 80, 80}     % Gray - Motors
+\definecolor{pluscolor}{RGB}{40, 160, 40}      % Green - positive
+\definecolor{minuscolor}{RGB}{220, 50, 30}     % Red - negative
+\begin{tikzpicture}[
+    cmd/.style={
+      rectangle, draw=#1, line width=1.5pt,
+      fill=#1!10, rounded corners=3pt,
+      minimum width=20mm, minimum height=12mm,
+      font=\bfseries, text=#1
+    },
+    mot/.style={
+      rectangle, draw=motorcolor, line width=1.5pt,
+      fill=motorcolor!8, rounded corners=3pt,
+      minimum width=20mm, minimum height=12mm,
+      font=\bfseries, text=motorcolor
+    },
+    plus/.style={-{Stealth[length=2.5mm]}, line width=1.2pt, pluscolor},
+    minus/.style={-{Stealth[length=2.5mm]}, line width=1.2pt, minuscolor, dashed},
+  ]
+
+  % Command inputs (left side)
+  \node[cmd=thrustcolor] (T) at (0, 3)  {T};
+  \node[cmd=rollcolor]   (R) at (0, 1)  {Roll};
+  \node[cmd=pitchcolor]  (P) at (0, -1) {Pitch};
+  \node[cmd=yawcolor]    (Y) at (0, -3) {Yaw};
+
+  % Motor outputs (right side)
+  \node[mot] (M1) at (8, 3)  {M1 (FR)};
+  \node[mot] (M2) at (8, 1)  {M2 (RR)};
+  \node[mot] (M3) at (8, -1) {M3 (RL)};
+  \node[mot] (M4) at (8, -3) {M4 (FL)};
+
+  % --- Thrust: all positive ---
+  \draw[plus] (T.east) -- (M1.west);
+  \draw[plus] (T.east) -- (M2.west);
+  \draw[plus] (T.east) -- (M3.west);
+  \draw[plus] (T.east) -- (M4.west);
+
+  % --- Roll: +M1,+M2, -M3,-M4 ---
+  \draw[plus]  (R.east) -- (M1.west);
+  \draw[plus]  (R.east) -- (M2.west);
+  \draw[minus] (R.east) -- (M3.west);
+  \draw[minus] (R.east) -- (M4.west);
+
+  % --- Pitch: -M1,+M2,+M3,-M4 ---
+  \draw[minus] (P.east) -- (M1.west);
+  \draw[plus]  (P.east) -- (M2.west);
+  \draw[plus]  (P.east) -- (M3.west);
+  \draw[minus] (P.east) -- (M4.west);
+
+  % --- Yaw: -M1,+M2,-M3,+M4 ---
+  \draw[minus] (Y.east) -- (M1.west);
+  \draw[plus]  (Y.east) -- (M2.west);
+  \draw[minus] (Y.east) -- (M3.west);
+  \draw[plus]  (Y.east) -- (M4.west);
+
+  % Matrix representation (below)
+  \node[font=\large, motorcolor, anchor=north] at (4, -5) {%
+    $\begin{bmatrix} M_1 \\ M_2 \\ M_3 \\ M_4 \end{bmatrix}
+    = \frac{1}{4}
+    \begin{bmatrix}
+      1 & +\frac{1}{L} & -\frac{1}{L} & -\frac{1}{k_q} \\[3pt]
+      1 & +\frac{1}{L} & +\frac{1}{L} & +\frac{1}{k_q} \\[3pt]
+      1 & -\frac{1}{L} & +\frac{1}{L} & -\frac{1}{k_q} \\[3pt]
+      1 & -\frac{1}{L} & -\frac{1}{L} & +\frac{1}{k_q}
+    \end{bmatrix}
+    \begin{bmatrix} T \\ \tau_\phi \\ \tau_\theta \\ \tau_\psi \end{bmatrix}$
+  };
+
+  % Legend
+  \node[anchor=west, font=\small] at (0, -8.5) {%
+    \textcolor{pluscolor}{\rule{12pt}{2pt}} $+$ (positive) \quad
+    \textcolor{minuscolor}{- - -} $-$ (negative)};
+
+  % Title
+  \node[font=\Large\bfseries, motorcolor] at (4, 5)
+    {Motor Mixer Matrix};
+
+\end{tikzpicture}
+\end{document}

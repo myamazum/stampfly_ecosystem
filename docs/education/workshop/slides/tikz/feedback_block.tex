@@ -1,0 +1,62 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+
+\begin{document}
+
+\definecolor{blockcolor}{RGB}{0, 120, 200}
+\definecolor{arrowcolor}{RGB}{80, 80, 80}
+\definecolor{fbcolor}{RGB}{220, 50, 30}
+\definecolor{sumcolor}{RGB}{40, 160, 40}
+\begin{tikzpicture}[
+    block/.style={
+      rectangle, draw=blockcolor, line width=1.5pt,
+      fill=blockcolor!8, rounded corners=3pt,
+      minimum width=26mm, minimum height=14mm,
+      font=\bfseries, text=blockcolor, align=center
+    },
+    sum/.style={
+      circle, draw=sumcolor, line width=1.5pt,
+      fill=sumcolor!8, minimum size=10mm,
+      font=\large\bfseries, text=sumcolor
+    },
+    arrow/.style={-{Stealth[length=3mm]}, line width=1.2pt, arrowcolor},
+    lbl/.style={font=\small, above, text=arrowcolor},
+  ]
+
+  % Blocks
+  \node[block] (target) at (0, 0) {Target\\Rate};
+  \node[sum]   (sum)    at (3, 0) {$\Sigma$};
+  \node[block] (kp)     at (6, 0) {P Control\\$K_p \times e$};
+  \node[block] (mixer)  at (9.5, 0) {Motor\\Mixer};
+  \node[block] (drone)  at (13, 0) {StampFly\\Drone};
+
+  % Forward path
+  \draw[arrow] (target) -- node[lbl] {$r$} (sum);
+  \draw[arrow] (sum) -- node[lbl] {$e$} (kp);
+  \draw[arrow] (kp) -- node[lbl] {$u$} (mixer);
+  \draw[arrow] (mixer) -- (drone);
+
+  % Output
+  \draw[arrow] (drone.east) -- ++(1.5, 0) node[lbl, right] {response};
+
+  % Feedback path
+  \node[block, fill=fbcolor!8, draw=fbcolor, text=fbcolor]
+    (gyro) at (8, -3) {Gyro\\Sensor};
+  \draw[arrow, fbcolor] (13, 0) -- (13, -3) -- (gyro);
+  \draw[arrow, fbcolor] (gyro) -- (3, -3) -- (sum);
+
+  % Sum signs
+  \node[font=\scriptsize, sumcolor, anchor=south east] at ($(sum.north)+(150:0.4)$) {$+$};
+  \node[font=\scriptsize, fbcolor, anchor=north east] at ($(sum.south)+(210:0.4)$) {$-$};
+
+  % Labels
+  \node[font=\small, arrowcolor, above] at ($(drone.east)+(0.75, 0.5)$) {angular rate};
+  \node[font=\small, fbcolor, below] at (8, -3.8) {feedback};
+
+  % Title
+  \node[font=\Large\bfseries, above=15mm of mixer]
+    {Closed-Loop Control};
+
+\end{tikzpicture}
+\end{document}

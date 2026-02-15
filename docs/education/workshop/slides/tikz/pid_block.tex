@@ -1,0 +1,80 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+
+\begin{document}
+
+\definecolor{pcolor}{RGB}{0, 120, 200}    % Blue - P
+\definecolor{icolor}{RGB}{40, 160, 40}    % Green - I
+\definecolor{dcolor}{RGB}{220, 50, 30}    % Red - D
+\definecolor{arrowcolor}{RGB}{80, 80, 80}
+\definecolor{sumcolor}{RGB}{120, 80, 150} % Purple - sum
+\begin{tikzpicture}[
+    block/.style={
+      rectangle, draw=#1, line width=1.5pt,
+      fill=#1!8, rounded corners=3pt,
+      minimum width=35mm, minimum height=13mm,
+      font=\bfseries, text=#1, align=center
+    },
+    sum/.style={
+      circle, draw=sumcolor, line width=1.5pt,
+      fill=sumcolor!8, minimum size=10mm,
+      font=\large\bfseries, text=sumcolor
+    },
+    arrow/.style={-{Stealth[length=3mm]}, line width=1.2pt, arrowcolor},
+  ]
+
+  % Input
+  \node[font=\bfseries, arrowcolor] (input) at (-1, 0) {error $e$};
+
+  % Branch point
+  \coordinate (branch) at (1.5, 0);
+
+  % P block (top)
+  \node[block=pcolor] (P) at (5.5, 2) {P: $K_p \cdot e$};
+
+  % I block (center)
+  \node[block=icolor] (I) at (5.5, 0) {I: $K_i \displaystyle\int e\,dt$};
+
+  % D block (bottom)
+  \node[block=dcolor] (D) at (5.5, -2) {D: $K_d \dfrac{de}{dt}$};
+
+  % Sum
+  \node[sum] (sum) at (10, 0) {$\Sigma$};
+
+  % Output
+  \node[font=\bfseries, arrowcolor] (output) at (12.5, 0) {output $u$};
+
+  % Input arrow to branch
+  \draw[arrow] (input) -- (branch);
+
+  % Branch to P/I/D
+  \draw[arrow, pcolor] (branch) |- (P);
+  \draw[arrow, icolor] (branch) -- (I);
+  \draw[arrow, dcolor] (branch) |- (D);
+
+  % P/I/D to sum
+  \draw[arrow, pcolor] (P) -| (sum);
+  \draw[arrow, icolor] (I) -- (sum);
+  \draw[arrow, dcolor] (D) -| (sum);
+
+  % Sum to output
+  \draw[arrow] (sum) -- (output);
+
+  % Plus signs at sum
+  \node[font=\scriptsize, pcolor] at ($(sum)+(120:0.75)$) {$+$};
+  \node[font=\scriptsize, icolor] at ($(sum)+(180:0.75)$) {$+$};
+  \node[font=\scriptsize, dcolor] at ($(sum)+(240:0.75)$) {$+$};
+
+  % Title
+  \node[font=\Large\bfseries, arrowcolor, above=8mm of P]
+    {PID Controller};
+
+  % Labels
+  \node[font=\small, pcolor, right] at (8.5, 2) {Proportional};
+  \node[font=\small, icolor, right] at (8.5, 0.5) {Integral};
+  \node[font=\small, dcolor, right] at (8.5, -2) {Derivative};
+
+\end{tikzpicture}
+\end{document}
