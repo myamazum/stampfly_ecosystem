@@ -54,9 +54,11 @@
   % --- Annotations ---
 
   % Overshoot (peak: τ=π/ωd=0.507s → x=4.03, y=5.49)
-  \draw[anno] (4.0, 4) -- (4.0, 5.5);
-  \draw[dim] (4.2, 4) -- (4.2, 5.5);
-  \node[annolbl, right] at (4.3, 4.75) {Overshoot};
+  \draw[anno] (4.0, 4.0) -- (4.0, 5.5);   % vertical at peak
+  \draw[anno] (4.0, 5.5) -- (5.7, 5.5);   % top extension line
+  \draw[anno] (5.2, 4.0) -- (5.7, 4.0);   % bottom extension line
+  \draw[dim] (5.5, 4.0) -- (5.5, 5.5);    % dimension arrow
+  \node[annolbl, right] at (5.6, 4.75) {Overshoot};
 
   % Rise time
   \draw[anno] (2, -0.8) -- (2, -0.3);
