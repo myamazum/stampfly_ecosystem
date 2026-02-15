@@ -98,9 +98,13 @@
 \usepackage{graphicx}
 \graphicspath{{../images/}}
 
+% --- Standalone (allows \input of standalone TikZ files) ---
+\usepackage[subpreambles=true]{standalone}
+
 % --- TikZ (for inline diagrams in slides) ---
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric,
+                 fit, decorations.pathmorphing, automata, calc}
 
 % --- Useful macros ---
 \newcommand{\api}[1]{\texttt{\color{sfblue}#1}}

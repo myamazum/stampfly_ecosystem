@@ -14,7 +14,7 @@
 
 TIKZ_DIR   := tikz
 IMAGES_DIR := images
-TIKZ_DPI   := 600
+TIKZ_DPI   := 300
 
 TIKZ_SOURCES := $(wildcard $(TIKZ_DIR)/*.tex)
 TIKZ_PDFS    := $(TIKZ_SOURCES:.tex=.pdf)
@@ -37,7 +37,7 @@ BEAMER_DIR     := beamer
 BEAMER_SOURCES := $(wildcard $(BEAMER_DIR)/lesson_*.tex)
 BEAMER_PDFS    := $(BEAMER_SOURCES:.tex=.pdf)
 
-beamer: tikz $(BEAMER_PDFS)
+beamer: $(BEAMER_PDFS)
 
 $(BEAMER_DIR)/lesson_%.pdf: $(BEAMER_DIR)/lesson_%.tex $(BEAMER_DIR)/stampfly_slides.sty $(TIKZ_SOURCES)
 	cd $(BEAMER_DIR) && lualatex -interaction=nonstopmode $(notdir $<) && lualatex -interaction=nonstopmode $(notdir $<)
