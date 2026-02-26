@@ -210,6 +210,68 @@ ASCII アートを活用する：
 | [StampFly技術仕様](https://github.com/...) | ハードウェア仕様書 |
 ```
 
+## Slide Review Checklist
+
+スライド（Beamer / TikZ）を作成・変更した後は、以下のチェックリストに従ってレビューし、問題があれば同一セッション内で修正すること。**作成だけして fix を次回に回さない。**
+
+### レビュー手順
+
+1. **Beamer の `.tex` を1ページずつ読み、チェックリストを適用する**
+2. **TikZ の `.tex` を1ファイルずつ読み、チェックリストを適用する**
+3. **PPTX ビルダー (`generate_slides.py`) と Beamer の内容を突き合わせる**
+4. 問題を発見したら修正し、修正ごとに fix コミットする
+
+### チェック項目
+
+#### L: レイアウト（Beamer スライド）
+
+| ID | チェック内容 | 過去の発生例 |
+|----|------------|-------------|
+| L1 | テキストがスライド下端・フッターにはみ出していないか（vbox overflow） | L0 P4/P10, L7 caption |
+| L2 | `block` / `alertblock` 内のテキストが長すぎて折り返しが不自然でないか | L2 goal text |
+| L3 | テーブルのカラム幅が適切か（`p{Nmm}` で不要な折り返しが発生していないか） | L0 P2 テーマ column |
+| L4 | コードリスティングがスライド1枚に収まるか（行数・フォントサイズ） | L7 code listing 20→14行 |
+| L5 | `\resizebox` や `columns` で図とテキストが重ならないか | L9 P4 top-bottom→side-by-side |
+| L6 | `\vspace` で要素間の余白が適切か（詰まりすぎ・空きすぎ） | L0 P10 exampleblock |
+
+#### T: TikZ 図
+
+| ID | チェック内容 | 過去の発生例 |
+|----|------------|-------------|
+| T1 | **タイトル重複:** TikZ 図内にタイトルを持たないこと（Beamer の frame title が担当） | feedback\_block, mixer\_matrix, imu\_axes, pid\_block |
+| T2 | **ラベル重なり:** ラベル同士、ラベルと線・ノード・矢印が重なっていないか | gyro\_drift "True angle" vs curve, pid\_block labels vs sum node |
+| T3 | **矢印の接続:** 矢印の始点・終点が必ずノードまたは座標に接続しているか（宙に浮いていないか） | — |
+| T4 | **矢印の交差:** 矢印が不自然に交差していないか（交差が必要な場合は `line to` でオフセット） | — |
+| T5 | **信号フローの正しさ:** ブロック図のフィードバック分岐点・加算点が制御工学の慣例に従っているか | feedback\_block tap point |
+| T6 | **アノテーション位置:** 矢印・ラベルが指す先が実際のデータ点と一致しているか | step\_response overshoot arrow |
+| T7 | **図のサイズ:** Beamer に `\resizebox` で埋め込んだときスライド領域に収まるか | gyro\_drift 12x6→8x5 |
+| T8 | **数式・物理量の正確性:** 伝達関数・単位・パラメータが技術的に正しいか | step\_response 2nd-order TF |
+| T9 | **色定義:** `\definecolor` は `\begin{document}` の後に記述（standalone パッケージの互換性） | 全 TikZ ファイル |
+
+#### C: コンテンツ整合性（Beamer ↔ PPTX）
+
+| ID | チェック内容 | 過去の発生例 |
+|----|------------|-------------|
+| C1 | Beamer にあるスライドが PPTX ビルダーにも存在するか（逆も同様） | L5 safety/checkpoint, L6 tuning, L7 experiment |
+| C2 | コードスニペットの内容が Beamer と PPTX で一致しているか | L6 motor\_mixer 引数不一致 |
+| C3 | チェックポイント項目が Beamer と PPTX で一致しているか | L5 checkpoint items |
+
+#### S: スライド構造
+
+| ID | チェック内容 |
+|----|------------|
+| S1 | 各レッスンが標準構造に従っているか: タイトル → ゴール → 図/概念 → API → 実習コード → チェックポイント |
+| S2 | 「次のレッスン」ブロックが正しいレッスン番号・タイトルを参照しているか |
+| S3 | `\lesson{N}{日本語タイトル}{英語タイトル}` のフォーマットが正しいか |
+
+### 修正方針
+
+1. **レイアウト溢れ:** テキスト短縮 → フォントサイズ縮小（`\footnotesize`, `\scriptsize`）→ `columns` レイアウト変更の順で対応
+2. **TikZ タイトル重複:** TikZ 側のタイトルを削除（Beamer frame title に委ねる）
+3. **ラベル重なり:** `above`/`below`/`left`/`right` の位置変更、または `xshift`/`yshift` で微調整
+4. **ブロック図の信号フロー:** フィードバック分岐は出力信号線上に junction dot を置く
+5. **Beamer/PPTX 不一致:** Beamer を正（SSOT）として PPTX を合わせる
+
 ## Project Overview
 
 StampFly Ecosystem is an educational/research platform for drone control engineering. It covers the complete workflow: **design → implementation → experimentation → analysis → education**.
