@@ -26,6 +26,7 @@ from PIL import Image
 import numpy as np
 import cv2
 import os
+import time
 
 # Get the path to assets directory
 # アセットディレクトリへのパスを取得
@@ -97,6 +98,10 @@ class render():
         arrow(pos=vec(0, 0, 0), axis=vec(0, 0.2, 0), shaftwidth=0.005, color=color.green, round=True)
         arrow(pos=vec(0, 0, 0), axis=vec(0, 0, 0.2), shaftwidth=0.005, color=color.blue, round=True)
 
+        # Performance: measure world generation time
+        # 性能計測: ワールド生成時間
+        t0 = time.perf_counter()
+
         #床面を表示
         self.floor_object()
 
@@ -104,14 +109,30 @@ class render():
         if world_type == 'ringworld':
             self._create_ringworld_objects()
 
+        t_world = time.perf_counter() - t0
+
         self.scene.bind('keydown', self.key_pressed)
+
+        # Performance: measure STL loading time
+        # 性能計測: STL読み込み時間
+        t0 = time.perf_counter()
 
         #StampFly表示
         self.stampfly_object()
 
+        t_stl = time.perf_counter() - t0
+
         self.timer_text = wtext(text="Elapsed Time: 0.0 s")
         self.scene.append_to_caption('\n')
         self.collision_text = wtext(text="")
+
+        # Performance summary
+        # 性能サマリー
+        print(f"\n=== Renderer Init Performance ===")
+        print(f"  World generation: {t_world:.2f}s")
+        print(f"  STL loading:     {t_stl:.2f}s")
+        print(f"  Total init:      {t_world + t_stl:.2f}s")
+        print(f"=================================\n")
 
     def _create_ringworld_objects(self):
         """リングワールド用のリングオブジェクトを配置"""
@@ -168,6 +189,7 @@ class render():
         white_color = vector(0.95, 0.95, 0.95)
         green_color = vector(0.1, 0.6, 0.2)
 
+        tile_count = 0
         for i in range(-tile_range, tile_range):
             for j in range(-tile_range, tile_range):
                 x = (i + 0.5) * tile_size
@@ -177,11 +199,14 @@ class render():
                 else:
                     tile_color = green_color
                 box(pos=vector(x, y, 0), size=vector(tile_size, tile_size, 0.001), color=tile_color)
+                tile_count += 1
+        print(f"  Floor tiles created: {tile_count}")
 
     def _create_voxel_world(self):
         # マインクラフト風ボクセルワールド
         # Minecraft-style voxel world
         cube_size = self.cube_size
+        self._voxel_count = 0  # Performance counter / 性能カウンタ
 
         # シードを設定してランダム地形生成
         # Set seed for random terrain generation
@@ -269,6 +294,7 @@ class render():
                         cube_color = stone_color  # さらに下は石
 
                     box(pos=vector(x, y, z), size=vector(cube_size, cube_size, cube_size), color=cube_color)
+                    self._voxel_count += 1
 
         # 木を配置（同じrngを使用）
         # Place trees (using same rng)
@@ -296,6 +322,7 @@ class render():
             for th in range(trunk_height):
                 tz = -(ground_h + th + 1 + 0.5) * cube_size
                 box(pos=vector(tx, ty, tz), size=vector(cube_size, cube_size, cube_size), color=wood_color)
+                self._voxel_count += 1
 
             # 葉（幹の上に球状に配置）
             leaf_base = ground_h + trunk_height + 1
@@ -310,6 +337,9 @@ class render():
                             leaf_pz = -(leaf_base + lz + 0.5) * cube_size
                             box(pos=vector(leaf_px, leaf_py, leaf_pz),
                                 size=vector(cube_size, cube_size, cube_size), color=leaf_color)
+                            self._voxel_count += 1
+
+        print(f"  Voxel objects created: {self._voxel_count}")
 
     def ring_object(self,pos,angle=0):
         x=cos(radians(angle))
