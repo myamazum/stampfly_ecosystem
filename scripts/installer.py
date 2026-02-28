@@ -148,7 +148,9 @@ def _run_in_idf_env(idf_path: Path, pip_args: list[str]) -> int:
 
 
 class ESPIDFDetector:
-    """Detect ESP-IDF installations"""
+    """Detect ESP-IDF installations.
+    All platforms use ~/esp/esp-idf as the standard location.
+    全プラットフォームで ~/esp/esp-idf を標準パスとする"""
 
     COMMON_PATHS = [
         Path.home() / "esp" / "esp-idf",
@@ -159,13 +161,6 @@ class ESPIDFDetector:
         Path.home() / ".espressif" / "esp-idf",
         Path("/opt/esp-idf"),
     ]
-
-    # Windows paths
-    if sys.platform == "win32":
-        COMMON_PATHS.extend([
-            Path("C:/Espressif/frameworks/esp-idf"),
-            Path("C:/esp-idf"),
-        ])
 
     @classmethod
     def find_all(cls) -> List[Tuple[Path, str]]:
@@ -206,9 +201,10 @@ class ESPIDFDetector:
 
     @classmethod
     def _is_valid_idf(cls, path: Path) -> bool:
-        """Check if path is a valid ESP-IDF installation"""
-        export_script = path / ("export.bat" if sys.platform == "win32" else "export.sh")
-        return export_script.exists()
+        """Check if path is a valid ESP-IDF installation.
+        ESP-IDF repos ship both export.sh and export.bat; accept either.
+        ESP-IDFリポジトリはexport.shとexport.batの両方を含む。どちらかがあれば有効"""
+        return (path / "export.sh").exists() or (path / "export.bat").exists()
 
     @classmethod
     def _get_version(cls, path: Path) -> str:
@@ -287,10 +283,9 @@ class ESPIDFInstaller:
         不完全なクローンを検出（.gitはあるがexportスクリプトがない）"""
         if not path.exists() or not (path / ".git").exists():
             return False
-        # Check for platform-appropriate export script
-        # プラットフォームに応じたexportスクリプトを確認
-        export_script = "export.bat" if sys.platform == "win32" else "export.sh"
-        return not (path / export_script).exists()
+        # A complete clone has both export.sh and export.bat; accept either
+        # 完全なクローンはexport.shとexport.batの両方を持つ。どちらかあればOK
+        return not ESPIDFDetector._is_valid_idf(path)
 
     @classmethod
     def install(cls, target_dir: Optional[Path] = None, version: str = DEFAULT_VERSION) -> Optional[Path]:
@@ -371,15 +366,18 @@ class ESPIDFInstaller:
         """Run ESP-IDF install script (idempotent).
         ESP-IDFのinstall.shを実行（冪等）"""
         info("Installing ESP-IDF tools (this may take a while)...")
-        if sys.platform == "win32":
-            install_script = target_dir / "install.bat"
-            cmd = [str(install_script), "esp32s3"]
-        else:
-            install_script = target_dir / "install.sh"
-            cmd = ["bash", str(install_script), "esp32s3"]
-
         try:
-            subprocess.run(cmd, check=True)
+            if sys.platform == "win32":
+                install_script = target_dir / "install.bat"
+                # Use shell=True + call for .bat execution from any shell
+                # shell=True + call で任意のシェルから .bat を確実に実行
+                cmd = f'call "{install_script}" esp32s3'
+                subprocess.run(cmd, shell=True, check=True)
+            else:
+                install_script = target_dir / "install.sh"
+                subprocess.run(
+                    ["bash", str(install_script), "esp32s3"], check=True,
+                )
         except subprocess.CalledProcessError as e:
             error(f"Failed to install ESP-IDF tools: {e}")
             return None
