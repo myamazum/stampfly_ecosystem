@@ -29,12 +29,12 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     """
     # Define query commands: (name, help, cli_cmd, format_func)
     queries = [
-        ("battery", "Query battery level (%)", "battery?", _fmt_battery),
+        ("battery", "Query battery level (%%)", "battery?", _fmt_battery),
         ("height", "Query ESKF estimated height (cm)", "height?", _fmt_height),
         ("tof", "Query ToF bottom distance (cm)", "tof?", _fmt_tof),
         ("baro", "Query barometric altitude (cm)", "baro?", _fmt_baro),
         ("attitude", "Query attitude angles (deg)", "attitude?", _fmt_attitude),
-        ("acceleration", "Query acceleration (cm/s²)", "acceleration?", _fmt_acceleration),
+        ("acceleration", "Query acceleration (cm/s2)", "acceleration?", _fmt_acceleration),
         ("speed", "Query configured speed (cm/s)", "speed?", _fmt_speed),
     ]
 
