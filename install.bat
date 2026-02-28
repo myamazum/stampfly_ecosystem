@@ -12,7 +12,7 @@ echo  StampFly Ecosystem Installer
 echo ============================================================
 echo.
 
-REM Check for git (required for ESP-IDF clone)
+REM Check for git
 echo [INFO] Checking git...
 where git >nul 2>&1
 if errorlevel 1 (
@@ -29,10 +29,12 @@ if errorlevel 1 (
 echo [OK] git found
 echo.
 
-REM Discover Python in common install locations and prepend to PATH
-REM 一般的なインストール場所からPythonを探してPATHに追加
+REM Discover python.exe in common install locations
 for %%d in (
-    "%USERPROFILE%\.pyenv\pyenv-win\shims"
+    "%USERPROFILE%\.pyenv\pyenv-win\versions\3.13.7"
+    "%USERPROFILE%\.pyenv\pyenv-win\versions\3.12.0"
+    "%USERPROFILE%\.pyenv\pyenv-win\versions\3.11.0"
+    "%USERPROFILE%\.pyenv\pyenv-win\versions\3.10.11"
     "%LOCALAPPDATA%\Programs\Python\Python313"
     "%LOCALAPPDATA%\Programs\Python\Python312"
     "%LOCALAPPDATA%\Programs\Python\Python311"
@@ -90,4 +92,4 @@ echo [OK] Found Python %PYTHON_VERSION% (%PYTHON_CMD%)
 echo.
 
 REM Run Python installer
-%PYTHON_CMD% "%SCRIPT_DIR%scripts\installer.py" %*
+%PYTHON_CMD% -u "%SCRIPT_DIR%scripts\installer.py" %*
