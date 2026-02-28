@@ -18,11 +18,18 @@ Parameters (Tello SDK compatible):
 import argparse
 import asyncio
 import os
-import select
 import sys
-import termios
 import time
-import tty
+
+# Terminal raw mode modules (Unix only)
+# ターミナル生入力モジュール（Unix専用）
+try:
+    import select
+    import termios
+    import tty
+    _HAS_TERMIOS = True
+except ImportError:
+    _HAS_TERMIOS = False
 
 from ..utils import console
 from ..utils.vehicle_connection import VehicleConnection, DEFAULT_HOST
@@ -149,6 +156,13 @@ KEY_HELP = """
 
 def _run_interactive(args: argparse.Namespace) -> int:
     """Run interactive keyboard RC control mode."""
+    # termios is required for raw keyboard input (Unix only)
+    # termiosはキーボード生入力に必要（Unix専用）
+    if not _HAS_TERMIOS:
+        console.error("Interactive RC mode is not supported on Windows")
+        console.error("Use one-shot mode: sf rc <a> <b> <c> <d>")
+        return 1
+
     # Check if stdin is a terminal
     # 標準入力がターミナルかチェック
     if not sys.stdin.isatty():
