@@ -200,6 +200,11 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
     RENDER_FPS = 60
     RENDER_DT = 1.0 / RENDER_FPS  # ~16.67ms
 
+    # Number of control cycles per render frame to maintain real-time
+    # リアルタイム維持のための1描画フレームあたりの制御サイクル数
+    # 400Hz control / 60 FPS ≈ 6.67 → round to keep physics close to 2000Hz
+    CONTROLS_PER_FRAME = CONTROL_HZ // RENDER_FPS  # 6
+
     print("=" * 60)
     print("High-Frequency Simulation (Experimental)")
     print("高周波シミュレーション（実験版）")
@@ -208,6 +213,8 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
     print(f"Control:       {CONTROL_HZ} Hz (dt = {CONTROL_DT*1000:.2f} ms)")
     print(f"Visualization: {RENDER_FPS} FPS")
     print(f"Physics steps per control: {PHYSICS_PER_CONTROL}")
+    print(f"Controls per frame:  {CONTROLS_PER_FRAME}")
+    print(f"Effective physics:   {RENDER_FPS * CONTROLS_PER_FRAME * PHYSICS_PER_CONTROL} Hz")
     print("=" * 60)
 
     # ===========================================
@@ -390,88 +397,73 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
                     yaw_ref = 0.3 * yaw_raw * np.pi
 
             # ===========================================
-            # Physics Loop (catch up to real time)
+            # Control update at 400Hz
+            # 制御更新 400Hz
             # ===========================================
-            while sim_time <= wall_now:
-                t0 = time.perf_counter()
+            if sim_time >= next_control_time:
+                rate_p = stampfly.body.pqr[0][0]
+                rate_q = stampfly.body.pqr[1][0]
+                rate_r = stampfly.body.pqr[2][0]
+                phi = stampfly.body.euler[0][0]
+                theta = stampfly.body.euler[1][0]
 
-                # Control update at 400Hz
-                if sim_time >= next_control_time:
-                    rate_p = stampfly.body.pqr[0][0]
-                    rate_q = stampfly.body.pqr[1][0]
-                    rate_r = stampfly.body.pqr[2][0]
-                    phi = stampfly.body.euler[0][0]
-                    theta = stampfly.body.euler[1][0]
+                if use_rate_mode:
+                    roll_rate_ref = roll_ref
+                    pitch_rate_ref = pitch_ref
+                    yaw_rate_ref = yaw_ref
+                else:
+                    roll_rate_ref = roll_pid.update(roll_ref, phi, CONTROL_DT)
+                    pitch_rate_ref = pitch_pid.update(pitch_ref, theta, CONTROL_DT)
+                    yaw_rate_ref = yaw_ref
 
-                    if use_rate_mode:
-                        roll_rate_ref = roll_ref
-                        pitch_rate_ref = pitch_ref
-                        yaw_rate_ref = yaw_ref
-                    else:
-                        roll_rate_ref = roll_pid.update(roll_ref, phi, CONTROL_DT)
-                        pitch_rate_ref = pitch_pid.update(pitch_ref, theta, CONTROL_DT)
-                        yaw_rate_ref = yaw_ref
+                roll_torque = roll_rate_pid.update(roll_rate_ref, rate_p, CONTROL_DT)
+                pitch_torque = pitch_rate_pid.update(pitch_rate_ref, rate_q, CONTROL_DT)
+                yaw_torque = yaw_rate_pid.update(yaw_rate_ref, rate_r, CONTROL_DT)
 
-                    roll_torque = roll_rate_pid.update(roll_rate_ref, rate_p, CONTROL_DT)
-                    pitch_torque = pitch_rate_pid.update(pitch_rate_ref, rate_q, CONTROL_DT)
-                    yaw_torque = yaw_rate_pid.update(yaw_rate_ref, rate_r, CONTROL_DT)
+                # Control allocation
+                total_thrust = hover_thrust + delta_thrust
+                total_thrust = max(0.0, min(total_thrust, 4 * 0.15))
+                motor_thrusts = allocator.mix(total_thrust, roll_torque, pitch_torque, yaw_torque)
+                motor_voltages = allocator.thrusts_to_voltages(motor_thrusts)
+                voltage = [motor_voltages[0], motor_voltages[1], motor_voltages[2], motor_voltages[3]]
 
-                    # Control allocation
-                    total_thrust = hover_thrust + delta_thrust
-                    total_thrust = max(0.0, min(total_thrust, 4 * 0.15))
-                    motor_thrusts = allocator.mix(total_thrust, roll_torque, pitch_torque, yaw_torque)
-                    motor_voltages = allocator.thrusts_to_voltages(motor_thrusts)
-                    voltage = [motor_voltages[0], motor_voltages[1], motor_voltages[2], motor_voltages[3]]
+                # Collision detection at 400Hz
+                # 衝突判定 400Hz
+                pos = stampfly.body.position
+                if Render.check_collision(pos[0][0], pos[1][0], pos[2][0]):
+                    print(f"COLLISION at t={sim_time:.2f}s")
+                    Render.show_collision(pos[0][0], pos[1][0], pos[2][0])
+                    raise KeyboardInterrupt
 
-                    # Collision detection at 400Hz (moved from 2000Hz physics loop)
-                    # 衝突判定を400Hz化（2000Hzから5倍削減）
-                    pos = stampfly.body.position
-                    if Render.check_collision(pos[0][0], pos[1][0], pos[2][0]):
-                        print(f"COLLISION at t={sim_time:.2f}s")
-                        Render.show_collision(pos[0][0], pos[1][0], pos[2][0])
-                        raise KeyboardInterrupt  # Exit cleanly
-
-                    control_steps += 1
-                    next_control_time = control_steps * CONTROL_DT
-                    perf_control_count += 1
-                    perf_control_time += time.perf_counter() - t0
-                    t0 = time.perf_counter()
-
-                # Physics step
-                stampfly.step(voltage, PHYSICS_DT)
-                physics_steps += 1
-                sim_time = physics_steps * PHYSICS_DT
-                perf_physics_count += 1
-                perf_physics_time += time.perf_counter() - t0
-
-                # Data logging (reduced frequency)
-                if physics_steps % LOG_INTERVAL == 0:
-                    T_log.append(sim_time)
-                    PQR_log.append(stampfly.body.pqr.copy())
-                    EULER_log.append(stampfly.body.euler.copy())
-                    POS_log.append(stampfly.body.position.copy())
+                control_steps += 1
+                next_control_time = control_steps * CONTROL_DT
 
             # ===========================================
-            # Rendering at target FPS (without rate() blocking)
+            # Physics step (2000Hz)
+            # 物理ステップ (2000Hz)
             # ===========================================
-            if wall_now >= next_render_time:
-                t0 = time.perf_counter()
-                # Update VPython objects and flush to browser via rate()
-                # VPythonオブジェクトを更新し、rate()でブラウザにフラッシュ
-                Render.copter.pos = vector(stampfly.body.position[0][0], stampfly.body.position[1][0], stampfly.body.position[2][0])
-                axis_x = vector(stampfly.body.DCM[0,0], stampfly.body.DCM[1,0], stampfly.body.DCM[2,0])
-                axis_z = vector(stampfly.body.DCM[0,2], stampfly.body.DCM[1,2], stampfly.body.DCM[2,2])
-                Render.copter.axis = axis_x
-                Render.copter.up = axis_z
-                Render.follow_camera_setting(stampfly, t=sim_time)
-                Render.timer_text.text = f"Elapsed Time: {sim_time:.1f} s"
-                # rate() flushes WebSocket commands to browser for display
-                # rate()がWebSocketコマンドをブラウザに送信して描画を更新する
-                rate(RENDER_FPS)
-                render_steps += 1
-                next_render_time = render_steps * RENDER_DT
-                perf_render_count += 1
-                perf_render_time += time.perf_counter() - t0
+            stampfly.step(voltage, PHYSICS_DT)
+            physics_steps += 1
+            sim_time = physics_steps * PHYSICS_DT
+
+            # Data logging (reduced frequency)
+            if physics_steps % LOG_INTERVAL == 0:
+                T_log.append(sim_time)
+                PQR_log.append(stampfly.body.pqr.copy())
+                EULER_log.append(stampfly.body.euler.copy())
+                POS_log.append(stampfly.body.position.copy())
+
+            # ===========================================
+            # Rendering — rate(fps) is the master clock
+            # 描画 — rate(fps)がマスタークロック
+            # rendering() calls rate(fps) only when anim_time is reached.
+            # Between rate() calls, this loop runs at full CPU speed.
+            # rendering()はanim_time到達時のみrate(fps)を呼ぶ。
+            # rate()呼び出し間はCPU全速力でループが回る。
+            # ===========================================
+            keyname = Render.rendering(sim_time, stampfly)
+            if keyname == 'q':
+                raise KeyboardInterrupt
 
             # ===========================================
             # Performance Report (every second)
@@ -480,12 +472,10 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
             if current_second > last_print_time:
                 last_print_time = current_second
 
-                # Calculate real-time ratio
+                wall_now = time.perf_counter() - wall_start
                 rt_ratio = sim_time / wall_now if wall_now > 0 else 1.0
 
-                # Get state for display
                 euler = stampfly.body.euler
-                pqr = stampfly.body.pqr
                 pos = stampfly.body.position
 
                 mode_str = "ACRO" if use_rate_mode else "STAB"
@@ -493,34 +483,15 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
                       f"pos=({pos[0][0]:+.1f},{pos[1][0]:+.1f},{pos[2][0]:.1f}) | "
                       f"RPY=({np.degrees(euler[0][0]):+.0f},{np.degrees(euler[1][0]):+.0f},{np.degrees(euler[2][0]):+.0f})")
 
-                # Detailed performance every 5 seconds
-                if current_second % 5 == 0 and current_second > 0:
-                    elapsed = wall_now - perf_last_report
-                    if elapsed > 0:
-                        actual_physics_hz = perf_physics_count / elapsed
-                        actual_control_hz = perf_control_count / elapsed
-                        actual_render_fps = perf_render_count / elapsed
-                        print(f"  Performance: Physics={actual_physics_hz:.0f}Hz "
-                              f"Control={actual_control_hz:.0f}Hz "
-                              f"Render={actual_render_fps:.0f}FPS")
-
-                    perf_last_report = wall_now
-                    perf_physics_count = 0
-                    perf_control_count = 0
-                    perf_render_count = 0
-
-            # Small sleep to prevent CPU spinning when ahead of real-time
-            sleep_time = sim_time - wall_now
-            if sleep_time > 0.001:
-                time.sleep(sleep_time * 0.5)  # Sleep for half the available time
-
     except KeyboardInterrupt:
         pass
 
+    wall_total = time.perf_counter() - wall_start
     print("\nSimulation ended.")
     print(f"Total physics steps: {physics_steps}")
     print(f"Total control steps: {control_steps}")
-    print(f"Total render frames: {render_steps}")
+    print(f"Sim time: {sim_time:.2f}s  Wall time: {wall_total:.2f}s  RT: {sim_time/wall_total:.2f}x")
+    print(f"Effective physics: {physics_steps/wall_total:.0f} Hz")
 
     # ===========================================
     # Plot Results
@@ -572,8 +543,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='High-Frequency Flight Simulator (2000Hz Physics)')
     parser.add_argument('--world', '-w', type=str, default='voxel',
-                        choices=['ringworld', 'voxel'],
-                        help='World type (default: voxel)')
+                        choices=['ringworld', 'voxel', 'minimal'],
+                        help='World type (default: voxel, minimal for debugging)')
     parser.add_argument('--seed', '-s', type=int, default=None,
                         help='Terrain seed (random if not specified)')
     parser.add_argument('--mode', '-m', type=str, default='rate',

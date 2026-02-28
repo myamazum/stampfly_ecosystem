@@ -81,11 +81,17 @@ class render():
         self.collision_detected = False
 
         # VPythonのシーンを設定
+        # VPython scene setup (starts web server + opens browser)
+        print("  Starting VPython canvas (launching browser)...", flush=True)
+        t_canvas = time.perf_counter()
         height = 550
         width = 1000
         title = f'StampFly Simulation - {world_type.upper()}'
         self.scene = canvas(title=title, width=width, height=height, background=vector(2, 34, 43)/255)
         self.scene.ambient = vec(0.37, 0.37, 0.37)  # 環境光を明るくする
+        t_canvas = time.perf_counter() - t_canvas
+        print(f"  Canvas ready: {t_canvas:.2f}s", flush=True)
+
         self.fps = fps
         self.anim_time = 0.0
         self.frame_num = 0
@@ -129,9 +135,10 @@ class render():
         # Performance summary
         # 性能サマリー
         print(f"\n=== Renderer Init Performance ===")
+        print(f"  Canvas (browser): {t_canvas:.2f}s")
         print(f"  World generation: {t_world:.2f}s")
         print(f"  STL loading:     {t_stl:.2f}s")
-        print(f"  Total init:      {t_world + t_stl:.2f}s")
+        print(f"  Total init:      {t_canvas + t_world + t_stl:.2f}s")
         print(f"=================================\n")
 
     def _create_ringworld_objects(self):
@@ -178,8 +185,16 @@ class render():
 
         if world_type == 'voxel':
             self._create_voxel_world()
+        elif world_type == 'minimal':
+            self._create_minimal_floor()
         else:
             self._create_ringworld_floor()
+
+    def _create_minimal_floor(self):
+        # 最小ワールド: ボックス1個のみ（デバッグ用）
+        # Minimal world: single box only (for debugging)
+        box(pos=vector(0, 0, 0), size=vector(2, 2, 0.01), color=vector(0.5, 0.5, 0.5))
+        print("  Minimal floor: 1 object")
 
     def _create_ringworld_floor(self):
         # 0.5m四方の白と緑の市松模様タイル（リングワールド用）
@@ -513,10 +528,16 @@ class render():
         #STLファイルのYとZのデータを入れ替える.更にZは符号反転
         # STLファイルを読み込む（ファイルパスを指定）
         stl_mesh = mesh.Mesh.from_file(STAMPFLY_STL_PATH)
+        total_triangles = len(stl_mesh.vectors)
+        print(f"  Loading STL: {total_triangles} triangles...")
 
         obj=[]
         # STLメッシュデータの頂点をVPython用に変換して表示
-        for i in range(len(stl_mesh.vectors)):
+        for i in range(total_triangles):
+            # Progress every 1000 triangles
+            # 1000三角形ごとに進捗表示
+            if i % 1000 == 0:
+                print(f"    {i}/{total_triangles} ({100*i//total_triangles}%)", flush=True)
             #print(i)
             # 各三角形の頂点を取得
             p0=vector(*stl_mesh.vectors[i][0])/1000

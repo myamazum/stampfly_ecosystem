@@ -81,8 +81,8 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     run_parser.add_argument(
         "-w", "--world",
         default="voxel",
-        choices=["ringworld", "voxel"],
-        help="World type (default: voxel)",
+        choices=["ringworld", "voxel", "minimal"],
+        help="World type (default: voxel, minimal for debugging)",
     )
     run_parser.add_argument(
         "--seed",
