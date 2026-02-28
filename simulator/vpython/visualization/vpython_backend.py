@@ -935,7 +935,7 @@ class render():
             report.append(f"  Median:   {statistics.median(ps):.1f}")
             report.append(f"  Min:      {min(ps)}")
             report.append(f"  Max:      {max(ps)}")
-            report.append(f"  Target (2000Hz/60FPS): 33.3 steps/frame")
+            report.append(f"  Target (2000Hz/{self.fps}FPS): {2000/self.fps:.1f} steps/frame")
             report.append("")
 
         return "\n".join(report)

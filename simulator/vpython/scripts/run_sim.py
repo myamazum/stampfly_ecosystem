@@ -197,13 +197,13 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
     CONTROL_DT = 1.0 / CONTROL_HZ  # 0.0025s = 2.5ms
     PHYSICS_PER_CONTROL = PHYSICS_HZ // CONTROL_HZ  # 5 physics steps per control
 
-    RENDER_FPS = 60
-    RENDER_DT = 1.0 / RENDER_FPS  # ~16.67ms
+    RENDER_FPS = 30
+    RENDER_DT = 1.0 / RENDER_FPS  # ~33.33ms
 
     # Number of control cycles per render frame to maintain real-time
     # リアルタイム維持のための1描画フレームあたりの制御サイクル数
-    # 400Hz control / 60 FPS ≈ 6.67 → round to keep physics close to 2000Hz
-    CONTROLS_PER_FRAME = CONTROL_HZ // RENDER_FPS  # 6
+    # 400Hz control / 30 FPS ≈ 13.3
+    CONTROLS_PER_FRAME = CONTROL_HZ // RENDER_FPS  # 13
 
     print("=" * 60)
     print("High-Frequency Simulation (Experimental)")
@@ -347,12 +347,18 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
     perf_control_count = 0
     perf_render_count = 0
 
-    # Frame timing diagnostics
-    # フレームタイミング診断
-    physics_step_times = []  # Per-step physics computation time / 1ステップの物理演算時間
-    control_step_times = []  # Per-step control computation time / 1ステップの制御演算時間
+    # Frame timing diagnostics (sampled to reduce overhead)
+    # フレームタイミング診断（オーバーヘッド削減のためサンプリング）
+    SAMPLE_INTERVAL = 100  # Sample every 100th step / 100ステップごとにサンプリング
+    physics_step_times = []  # Sampled physics step times / サンプリングされた物理演算時間
+    control_step_times = []  # Sampled control step times / サンプリングされた制御演算時間
     steps_since_last_frame = 0  # Physics steps counter between frames / フレーム間物理ステップカウンタ
     last_frame_num = 0  # Track renderer frame number / レンダラフレーム番号追跡
+
+    # Instantaneous RT tracking (per-second)
+    # 瞬時RT追跡（1秒ごと）
+    rt_prev_sim_time = 0.0
+    rt_prev_wall_time = 0.0
 
     print("\n" + "=" * 60)
     print(f"Roll Rate PID: Kp={cfg.roll_kp:.2e} Nm/(rad/s)")
@@ -408,7 +414,9 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
             # 制御更新 400Hz
             # ===========================================
             if sim_time >= next_control_time:
-                t_ctrl_start = time.perf_counter()
+                _sample_ctrl = (control_steps % (SAMPLE_INTERVAL // 5) == 0)
+                if _sample_ctrl:
+                    t_ctrl_start = time.perf_counter()
                 rate_p = stampfly.body.pqr[0][0]
                 rate_q = stampfly.body.pqr[1][0]
                 rate_r = stampfly.body.pqr[2][0]
@@ -445,20 +453,24 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
 
                 control_steps += 1
                 next_control_time = control_steps * CONTROL_DT
-                t_ctrl_end = time.perf_counter()
-                control_step_times.append(t_ctrl_end - t_ctrl_start)
+                if _sample_ctrl:
+                    t_ctrl_end = time.perf_counter()
+                    control_step_times.append(t_ctrl_end - t_ctrl_start)
 
             # ===========================================
             # Physics step (2000Hz)
             # 物理ステップ (2000Hz)
             # ===========================================
-            t_phys_start = time.perf_counter()
-            stampfly.step(voltage, PHYSICS_DT)
-            t_phys_end = time.perf_counter()
+            if physics_steps % SAMPLE_INTERVAL == 0:
+                t_phys_start = time.perf_counter()
+                stampfly.step(voltage, PHYSICS_DT)
+                t_phys_end = time.perf_counter()
+                physics_step_times.append(t_phys_end - t_phys_start)
+            else:
+                stampfly.step(voltage, PHYSICS_DT)
             physics_steps += 1
             sim_time = physics_steps * PHYSICS_DT
             steps_since_last_frame += 1
-            physics_step_times.append(t_phys_end - t_phys_start)
 
             # Data logging (reduced frequency)
             if physics_steps % LOG_INTERVAL == 0:
@@ -493,13 +505,21 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
                 last_print_time = current_second
 
                 wall_now = time.perf_counter() - wall_start
-                rt_ratio = sim_time / wall_now if wall_now > 0 else 1.0
+                rt_cumulative = sim_time / wall_now if wall_now > 0 else 1.0
+
+                # Instantaneous RT (per-second measurement)
+                # 瞬時RT（1秒ごとの計測）
+                dt_sim = sim_time - rt_prev_sim_time
+                dt_wall = wall_now - rt_prev_wall_time
+                rt_instant = dt_sim / dt_wall if dt_wall > 0 else 1.0
+                rt_prev_sim_time = sim_time
+                rt_prev_wall_time = wall_now
 
                 euler = stampfly.body.euler
                 pos = stampfly.body.position
 
                 mode_str = "ACRO" if use_rate_mode else "STAB"
-                print(f"[{mode_str}] t={sim_time:.1f}s RT={rt_ratio:.2f}x | "
+                print(f"[{mode_str}] t={sim_time:.1f}s RT={rt_instant:.2f}x(avg={rt_cumulative:.2f}x) | "
                       f"pos=({pos[0][0]:+.1f},{pos[1][0]:+.1f},{pos[2][0]:.1f}) | "
                       f"RPY=({np.degrees(euler[0][0]):+.0f},{np.degrees(euler[1][0]):+.0f},{np.degrees(euler[2][0]):+.0f})")
 
@@ -548,78 +568,68 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
         print(f"  Max:      {max(cst)*1e6:.1f} us")
         print()
 
-    # Feasibility analysis
-    # 実現可能性分析
+    # Feasibility analysis (FPS-independent)
+    # 実現可能性分析（FPS非依存）
     print("=" * 70)
-    print("60FPS FEASIBILITY ANALYSIS / 60FPS実現可能性分析")
+    print("REAL-TIME FEASIBILITY ANALYSIS / リアルタイム実現可能性分析")
     print("=" * 70)
-    if len(physics_step_times) > 100:
-        pst = physics_step_times[100:]
+    if len(physics_step_times) > 10:
+        pst = physics_step_times[10:]  # Skip warm-up / ウォームアップをスキップ
         avg_physics_us = statistics.mean(pst) * 1e6
         avg_physics_ms = statistics.mean(pst) * 1000
 
-        # Time budget per frame at 60FPS
-        frame_budget_ms = 1000.0 / 60.0  # 16.67 ms
-
-        # How many physics steps fit in one frame budget
-        steps_per_budget = frame_budget_ms / avg_physics_ms
-        physics_hz_at_60fps = steps_per_budget * 60
-
-        # Required steps for 2000Hz physics at 60FPS
-        required_steps = 2000 / 60  # 33.3
-
-        # Control overhead per frame (400Hz/60FPS ≈ 6.67 control steps per frame)
-        controls_per_frame = 400 / 60
-        if len(control_step_times) > 20:
-            avg_ctrl_ms = statistics.mean(control_step_times[20:]) * 1000
-            ctrl_overhead_ms = controls_per_frame * avg_ctrl_ms
+        # Per-second computation budget (1000ms available)
+        # 1秒あたりの演算バジェット（1000ms利用可能）
+        physics_per_sec_ms = PHYSICS_HZ * avg_physics_ms
+        if len(control_step_times) > 10:
+            avg_ctrl_ms = statistics.mean(control_step_times[10:]) * 1000
         else:
             avg_ctrl_ms = 0
-            ctrl_overhead_ms = 0
+        control_per_sec_ms = CONTROL_HZ * avg_ctrl_ms
 
-        # Render overhead from renderer timing data
         td = Render._timing_data if hasattr(Render, '_timing_data') else {}
         if td.get('render_overheads') and len(td['render_overheads']) > 5:
-            avg_render_overhead_ms = statistics.mean(td['render_overheads'][5:]) * 1000
+            avg_render_ms = statistics.mean(td['render_overheads'][5:]) * 1000
         else:
-            avg_render_overhead_ms = 0
+            avg_render_ms = 0
+        render_per_sec_ms = RENDER_FPS * avg_render_ms
 
-        # Total computation per frame
-        physics_compute_ms = required_steps * avg_physics_ms
-        total_compute_ms = physics_compute_ms + ctrl_overhead_ms + avg_render_overhead_ms
+        total_per_sec_ms = physics_per_sec_ms + control_per_sec_ms + render_per_sec_ms
+        theoretical_rt = 1000.0 / total_per_sec_ms
 
-        print(f"\n  Frame budget at 60FPS: {frame_budget_ms:.2f} ms")
-        print(f"\n  Per-frame computation breakdown:")
-        print(f"    Physics  ({required_steps:.1f} steps x {avg_physics_us:.1f} us): {physics_compute_ms:.3f} ms")
-        print(f"    Control  ({controls_per_frame:.1f} steps x {avg_ctrl_ms*1000:.1f} us): {ctrl_overhead_ms:.3f} ms")
-        print(f"    Render overhead:                      {avg_render_overhead_ms:.3f} ms")
+        print(f"\n  Per-second computation breakdown (for 1s of simulation):")
+        print(f"  1秒のシミュレーションに必要な実時間:")
+        print(f"    Physics  ({PHYSICS_HZ} Hz x {avg_physics_us:.1f} us): {physics_per_sec_ms:.1f} ms ({physics_per_sec_ms/10:.1f}%)")
+        print(f"    Control  ({CONTROL_HZ} Hz x {avg_ctrl_ms*1000:.1f} us):  {control_per_sec_ms:.1f} ms ({control_per_sec_ms/10:.1f}%)")
+        print(f"    Render   ({RENDER_FPS} FPS x {avg_render_ms:.3f} ms):   {render_per_sec_ms:.1f} ms ({render_per_sec_ms/10:.1f}%)")
         print(f"    ─────────────────────────────────────")
-        print(f"    Total computation:                    {total_compute_ms:.3f} ms")
-        print(f"    Remaining for rate() wait:             {frame_budget_ms - total_compute_ms:.3f} ms")
+        print(f"    Total:                              {total_per_sec_ms:.1f} ms")
+        print(f"    Available (real-time):               1000.0 ms")
+        print()
+        print(f"  Theoretical RT: {theoretical_rt:.2f}x")
+        print(f"  Measured RT:    {sim_time/wall_total:.2f}x")
         print()
 
-        if total_compute_ms < frame_budget_ms:
-            utilization = total_compute_ms / frame_budget_ms * 100
-            print(f"  RESULT: 60FPS is FEASIBLE / 60FPS は実現可能")
-            print(f"  CPU utilization: {utilization:.1f}% of frame budget")
-            print(f"  rate() will wait {frame_budget_ms - total_compute_ms:.2f} ms per frame")
+        if total_per_sec_ms <= 1000.0:
+            print(f"  RESULT: REAL-TIME ACHIEVABLE / リアルタイム達成可能")
+            print(f"  CPU utilization: {total_per_sec_ms/10:.1f}%")
         else:
-            max_fps = 1000.0 / total_compute_ms
-            print(f"  RESULT: 60FPS is NOT FEASIBLE / 60FPS は実現不可能")
-            print(f"  Computation exceeds frame budget by {total_compute_ms - frame_budget_ms:.2f} ms")
-            print(f"  Maximum achievable FPS: {max_fps:.1f}")
-            print(f"  Recommended target FPS: {int(max_fps * 0.8)}")
-            # Suggest reduced physics rate
-            avail_for_physics = frame_budget_ms - ctrl_overhead_ms - avg_render_overhead_ms
-            if avail_for_physics > 0:
-                max_steps = avail_for_physics / avg_physics_ms
-                max_phys_hz = max_steps * 60
-                print(f"  Alternative: reduce physics to {int(max_phys_hz)} Hz at 60FPS")
+            max_physics_hz = 1.0 / (avg_physics_ms / 1000.0)
+            print(f"  RESULT: REAL-TIME NOT ACHIEVABLE / リアルタイム達成不可能")
+            print(f"  Bottleneck: Physics engine ({physics_per_sec_ms/total_per_sec_ms*100:.0f}% of total)")
+            print(f"  Max physics throughput: {max_physics_hz:.0f} Hz (target: {PHYSICS_HZ} Hz)")
+            print()
 
-        print()
-        print(f"  Max physics steps per frame: {steps_per_budget:.1f}")
-        print(f"  Required for 2000Hz at 60FPS: {required_steps:.1f}")
-        print(f"  Max achievable physics Hz at 60FPS: {physics_hz_at_60fps:.0f}")
+            # Recommend physics rate for RT=1.0
+            # RT=1.0達成のための物理レート推奨
+            avail_for_physics_ms = 1000.0 - control_per_sec_ms - render_per_sec_ms
+            if avail_for_physics_ms > 0 and avg_physics_ms > 0:
+                recommended_physics_hz = int(avail_for_physics_ms / avg_physics_ms)
+                recommended_dt = 1.0 / recommended_physics_hz
+                print(f"  Recommendation for RT=1.0:")
+                print(f"    Physics: {recommended_physics_hz} Hz (dt = {recommended_dt*1000:.2f} ms)")
+                print(f"    Control: {CONTROL_HZ} Hz")
+                print(f"    Render:  {RENDER_FPS} FPS")
 
     print()
     print("=" * 70)
