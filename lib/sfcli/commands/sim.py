@@ -79,6 +79,24 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Simulator backend (default: vpython)",
     )
     run_parser.add_argument(
+        "-w", "--world",
+        default="voxel",
+        choices=["ringworld", "voxel"],
+        help="World type (default: voxel)",
+    )
+    run_parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for world generation",
+    )
+    run_parser.add_argument(
+        "--mode",
+        default="rate",
+        choices=["rate", "angle"],
+        help="Control mode: rate=ACRO, angle=STABILIZE (default: rate)",
+    )
+    run_parser.add_argument(
         "--no-joystick",
         action="store_true",
         help="Disable joystick input",
@@ -123,9 +141,11 @@ def run_help(args: argparse.Namespace) -> int:
     console.print("  headless  Run headless simulation")
     console.print()
     console.print("Examples:")
-    console.print("  sf sim run              # Run VPython simulator")
-    console.print("  sf sim run genesis      # Run Genesis simulator")
-    console.print("  sf sim headless -d 30   # 30s headless simulation")
+    console.print("  sf sim run                      # Run VPython simulator (voxel)")
+    console.print("  sf sim run -w ringworld         # Run with ring world (lighter)")
+    console.print("  sf sim run --mode angle         # STABILIZE mode")
+    console.print("  sf sim run genesis              # Run Genesis simulator")
+    console.print("  sf sim headless -d 30           # 30s headless simulation")
     console.print()
     console.print("Run 'sf sim <subcommand> --help' for details.")
     return 0
@@ -190,8 +210,15 @@ def run_sim(args: argparse.Namespace) -> int:
     console.print()
 
     # Build command
+    # コマンドを構築
     cmd = [python_cmd, str(script_path)]
 
+    if hasattr(args, 'world') and args.world:
+        cmd.extend(["--world", args.world])
+    if hasattr(args, 'seed') and args.seed is not None:
+        cmd.extend(["--seed", str(args.seed)])
+    if hasattr(args, 'mode') and args.mode:
+        cmd.extend(["--mode", args.mode])
     if hasattr(args, 'no_joystick') and args.no_joystick:
         cmd.append("--no-joystick")
 
