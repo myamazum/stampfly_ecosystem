@@ -17,55 +17,6 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-# WSL2 detection
-# WSL2環境を検出
-is_wsl() {
-    [ -f /proc/version ] && grep -qi microsoft /proc/version
-}
-
-# Check system prerequisites (Debian/Ubuntu)
-# システム前提条件チェック（Debian/Ubuntu）
-check_prerequisites() {
-    # ESP-IDF required packages for Debian/Ubuntu
-    local required_packages="git cmake ninja-build python3-venv wget flex bison gperf ccache libffi-dev libssl-dev dfu-util libusb-1.0-0"
-
-    if [ -f /etc/debian_version ]; then
-        local missing=""
-        for pkg in $required_packages; do
-            if ! dpkg -s "$pkg" > /dev/null 2>&1; then
-                missing="$missing $pkg"
-            fi
-        done
-
-        if [ -n "$missing" ]; then
-            error "Missing required packages:$missing"
-            echo
-            echo "  Install with:"
-            echo -e "    ${BOLD}sudo apt update && sudo apt install -y$missing${NC}"
-            echo
-            exit 1
-        fi
-        success "All prerequisite packages installed"
-    else
-        # Non-Debian: check key commands only
-        # 非Debian系: 主要コマンドのみ確認
-        local missing_cmds=""
-        for cmd_name in git cmake ninja python3 wget flex bison gperf ccache; do
-            if ! command -v "$cmd_name" &> /dev/null; then
-                missing_cmds="$missing_cmds $cmd_name"
-            fi
-        done
-
-        if [ -n "$missing_cmds" ]; then
-            error "Missing required commands:$missing_cmds"
-            echo "  Please install these using your system package manager."
-            echo
-            exit 1
-        fi
-        success "All prerequisite commands found"
-    fi
-}
-
 info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -88,6 +39,119 @@ header() {
     echo -e "${BOLD} $1${NC}"
     echo -e "${CYAN}============================================================${NC}"
     echo
+}
+
+# WSL2 detection
+# WSL2環境を検出
+is_wsl() {
+    [ -f /proc/version ] && grep -qi microsoft /proc/version
+}
+
+# Check system prerequisites for Linux
+# Linux用システム前提条件チェック
+check_prerequisites_linux() {
+    # ESP-IDF required packages for Debian/Ubuntu
+    # (per https://docs.espressif.com/projects/esp-idf/en/v5.5.2/esp32s3/get-started/linux-macos-setup.html)
+    local required_packages="git cmake ninja-build python3 python3-pip python3-venv wget flex bison gperf ccache libffi-dev libssl-dev dfu-util libusb-1.0-0"
+
+    if [ -f /etc/debian_version ]; then
+        local missing=""
+        for pkg in $required_packages; do
+            if ! dpkg -s "$pkg" > /dev/null 2>&1; then
+                missing="$missing $pkg"
+            fi
+        done
+
+        if [ -n "$missing" ]; then
+            error "Missing required packages:$missing"
+            echo
+            echo "  Install with:"
+            echo -e "    ${BOLD}sudo apt update && sudo apt install -y$missing${NC}"
+            echo
+            exit 1
+        fi
+        success "All prerequisite packages installed"
+    else
+        # Non-Debian (Fedora, Arch, etc.): check key commands only
+        # 非Debian系: 主要コマンドのみ確認
+        local missing_cmds=""
+        for cmd_name in git cmake ninja python3 wget flex bison gperf ccache; do
+            if ! command -v "$cmd_name" &> /dev/null; then
+                missing_cmds="$missing_cmds $cmd_name"
+            fi
+        done
+
+        if [ -n "$missing_cmds" ]; then
+            error "Missing required commands:$missing_cmds"
+            echo "  Please install these using your system package manager."
+            echo
+            exit 1
+        fi
+        success "All prerequisite commands found"
+    fi
+}
+
+# Check system prerequisites for macOS
+# macOS用システム前提条件チェック
+check_prerequisites_macos() {
+    local has_issues=false
+
+    # Check XCode Command Line Tools
+    # XCode CLTの確認
+    if ! xcode-select -p > /dev/null 2>&1; then
+        error "XCode Command Line Tools not installed"
+        echo
+        echo "  Install with:"
+        echo -e "    ${BOLD}xcode-select --install${NC}"
+        echo
+        has_issues=true
+    else
+        success "XCode Command Line Tools installed"
+    fi
+
+    # Check Homebrew
+    # Homebrewの確認
+    if ! command -v brew &> /dev/null; then
+        error "Homebrew not found"
+        echo
+        echo "  Install from:"
+        echo -e "    ${BOLD}https://brew.sh${NC}"
+        echo
+        if [ "$has_issues" = true ]; then
+            exit 1
+        fi
+        has_issues=true
+    fi
+
+    # Check required tools (cmake, ninja, dfu-util, ccache)
+    # 必須ツールの確認
+    local required_cmds="cmake ninja dfu-util ccache"
+    local missing_cmds=""
+    for cmd_name in $required_cmds; do
+        if ! command -v "$cmd_name" &> /dev/null; then
+            missing_cmds="$missing_cmds $cmd_name"
+        fi
+    done
+
+    if [ -n "$missing_cmds" ]; then
+        error "Missing required tools:$missing_cmds"
+        echo
+        if command -v brew &> /dev/null; then
+            echo "  Install with:"
+            echo -e "    ${BOLD}brew install$missing_cmds${NC}"
+        else
+            echo "  Install Homebrew first, then run:"
+            echo -e "    ${BOLD}brew install$missing_cmds${NC}"
+        fi
+        echo
+        has_issues=true
+    else
+        success "All required tools installed (cmake, ninja, dfu-util, ccache)"
+    fi
+
+    if [ "$has_issues" = true ]; then
+        exit 1
+    fi
 }
 
 # Check Python version
@@ -169,13 +233,20 @@ if is_wsl; then
     echo
 fi
 
-# Check system prerequisites on Linux
-# Linux環境のシステム前提条件チェック
-if [ "$(uname -s)" = "Linux" ]; then
-    info "Checking system prerequisites..."
-    check_prerequisites
-    echo
-fi
+# Check system prerequisites
+# システム前提条件チェック
+case "$(uname -s)" in
+    Linux)
+        info "Checking system prerequisites..."
+        check_prerequisites_linux
+        echo
+        ;;
+    Darwin)
+        info "Checking system prerequisites..."
+        check_prerequisites_macos
+        echo
+        ;;
+esac
 
 info "Checking Python..."
 

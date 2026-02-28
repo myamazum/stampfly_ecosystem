@@ -12,6 +12,23 @@ echo  StampFly Ecosystem Installer
 echo ============================================================
 echo.
 
+REM Check for git (required for ESP-IDF clone)
+echo [INFO] Checking git...
+where git >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] git is not installed.
+    echo.
+    echo   Install Git from:
+    echo     https://git-scm.com/download/win
+    echo.
+    echo   Or using winget:
+    echo     winget install Git.Git
+    echo.
+    exit /b 1
+)
+echo [OK] git found
+echo.
+
 REM Check for Python
 echo [INFO] Checking Python...
 
