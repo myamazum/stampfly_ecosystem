@@ -39,7 +39,7 @@ opencv-python>=4.8.0     # cv2
 vpython>=7.6.0
 pygame>=2.5.0
 numpy-stl>=3.0.0
-hidapi>=0.14.0           # Joystick HID support (bundles native hidapi library)
+hidapi>=0.14.0           # Joystick HID support (also works with 'hid' package)
 
 # ============================================================
 # Development
