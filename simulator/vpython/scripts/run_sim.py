@@ -457,7 +457,7 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
                 t0 = time.perf_counter()
                 # Direct VPython update without rate() blocking
                 # rate()を使わず直接VPythonオブジェクトを更新
-                Render.copter.pos = vector(*stampfly.body.position)
+                Render.copter.pos = vector(stampfly.body.position[0][0], stampfly.body.position[1][0], stampfly.body.position[2][0])
                 axis_x = vector(stampfly.body.DCM[0,0], stampfly.body.DCM[1,0], stampfly.body.DCM[2,0])
                 axis_z = vector(stampfly.body.DCM[0,2], stampfly.body.DCM[1,2], stampfly.body.DCM[2,2])
                 Render.copter.axis = axis_x

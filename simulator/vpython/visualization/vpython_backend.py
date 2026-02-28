@@ -775,7 +775,7 @@ class render():
         #3D描画        
         if(sim_time >= self.anim_time):
             rate(self.fps)
-            self.copter.pos = vector(*drone.body.position )
+            self.copter.pos = vector(drone.body.position[0][0], drone.body.position[1][0], drone.body.position[2][0])
             axis_x = vector(drone.body.DCM[0,0], drone.body.DCM[1,0], drone.body.DCM[2,0])
             axis_z = vector(drone.body.DCM[0,2], drone.body.DCM[1,2], drone.body.DCM[2,2])
             self.copter.axis = axis_x
