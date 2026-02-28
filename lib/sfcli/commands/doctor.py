@@ -6,6 +6,7 @@ Checks the development environment for common issues.
 """
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 from ..utils import console, paths, platform
@@ -112,7 +113,54 @@ def run(args: argparse.Namespace) -> int:
         for port in ports:
             console.success(f"  {port}")
     else:
-        console.print("  No serial ports found (connect device to see ports)")
+        if platform.is_wsl():
+            console.warning("  No serial ports found")
+            console.print("    WSL2 requires usbipd-win to access USB devices.")
+            console.print("    See WSL2 section below for details.")
+        else:
+            console.print("  No serial ports found (connect device to see ports)")
+
+    # Check WSL2 environment
+    # WSL2環境チェック
+    if platform.is_wsl():
+        console.print()
+        console.info("Checking WSL2...")
+        console.success("  WSL2 environment detected")
+
+        # Check usbipd-win availability
+        # usbipd-win の存在確認
+        try:
+            result = subprocess.run(
+                ["usbipd.exe", "--version"],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                usbipd_ver = result.stdout.strip()
+                console.success(f"  usbipd-win: {usbipd_ver}")
+            else:
+                warnings.append("usbipd-win not working properly")
+                console.warning("  usbipd-win: NOT WORKING")
+                console.print("    Install: winget install usbipd")
+                console.print("    See: https://learn.microsoft.com/en-us/windows/wsl/connect-usb")
+        except FileNotFoundError:
+            warnings.append("usbipd-win not found (required for USB device access in WSL2)")
+            console.warning("  usbipd-win: NOT FOUND")
+            console.print("    Install on Windows side: winget install usbipd")
+            console.print("    Then: sudo apt install linux-tools-generic hwdata")
+            console.print("    See: https://learn.microsoft.com/en-us/windows/wsl/connect-usb")
+        except Exception:
+            console.warning("  usbipd-win: could not check")
+
+        # Check for Windows PATH pollution
+        # Windows PATHの汚染チェック
+        import os
+        path_dirs = os.environ.get("PATH", "").split(":")
+        mnt_paths = [p for p in path_dirs if p.startswith("/mnt/")]
+        if mnt_paths:
+            console.warning(f"  Windows PATH entries: {len(mnt_paths)} found")
+            console.print("    These may cause issues with ESP-IDF tools.")
+            console.print("    The installer filters these automatically during sfcli install.")
 
     # Check StampFly configuration
     console.print()

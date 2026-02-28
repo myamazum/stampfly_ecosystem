@@ -13,6 +13,8 @@ Options:
     --skip-deps        Skip dependency installation
     --minimal          Install minimal dependencies (skip simulator)
     --uninstall        Remove sfcli from ESP-IDF environment
+    --clean            Clean install (remove config and sfcli, then reinstall)
+    --force            Force reinstall all steps (skip probe checks)
 """
 
 import os
@@ -26,6 +28,18 @@ from typing import Optional, List, Tuple
 if sys.version_info < (3, 10):
     print(f"Error: Python 3.10+ required, found {sys.version_info.major}.{sys.version_info.minor}")
     sys.exit(1)
+
+
+def is_wsl() -> bool:
+    """Check if running in WSL2
+    WSL2環境を検出"""
+    if sys.platform != "linux":
+        return False
+    try:
+        with open("/proc/version", "r") as f:
+            return "microsoft" in f.read().lower()
+    except Exception:
+        return False
 
 
 class Colors:
@@ -101,6 +115,34 @@ def prompt_choice(message: str, choices: List[str], default: int = 1) -> int:
         except (ValueError, EOFError, KeyboardInterrupt):
             pass
         print(f"Please enter a number between 1 and {len(choices)}")
+
+
+def _build_idf_env_command(idf_path: Path) -> str:
+    """Build shell prefix that sources ESP-IDF and filters WSL2 PATH.
+    ESP-IDF環境を読み込み、WSL2ではWindowsパスを除外するシェルプレフィックスを構築"""
+    export_script = idf_path / "export.sh"
+    # WSL2: strip /mnt/ paths to avoid Windows executables with CRLF
+    # WSL2: /mnt/ パスを除外してCRLFのWindows実行ファイルを回避
+    if is_wsl():
+        path_filter = 'export PATH=$(echo "$PATH" | tr ":" "\\n" | grep -v "^/mnt/" | tr "\\n" ":"); '
+    else:
+        path_filter = ""
+    return f'{path_filter}source "{export_script}" > /dev/null 2>&1'
+
+
+def _run_in_idf_env(idf_path: Path, pip_args: list[str]) -> int:
+    """Run pip in ESP-IDF Python environment.
+    ESP-IDFのPython環境でpipを実行"""
+    if sys.platform == "win32":
+        export_script = idf_path / "export.bat"
+        escaped = " ".join(pip_args)
+        cmd = f'cmd /c "{export_script}" && python -m pip {escaped}'
+        return subprocess.run(cmd, shell=True).returncode
+    else:
+        escaped = " ".join(pip_args)
+        env_prefix = _build_idf_env_command(idf_path)
+        inner = f'{env_prefix} && python -m pip {escaped}'
+        return subprocess.run(["bash", "-c", inner]).returncode
 
 
 class ESPIDFDetector:
@@ -190,33 +232,46 @@ class ESPIDFDetector:
 
     @classmethod
     def get_python_env(cls, idf_path: Path) -> Optional[Path]:
-        """Get the Python environment for an ESP-IDF installation"""
-        # Source export.sh and get the Python path
+        """Get the Python environment for an ESP-IDF installation.
+        ESP-IDFインストールのPython環境を取得"""
         if sys.platform == "win32":
             export_script = idf_path / "export.bat"
             cmd = f'cmd /c "{export_script}" && where python'
+            try:
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode == 0:
+                    python_path = result.stdout.strip().split('\n')[0]
+                    return Path(python_path)
+            except Exception:
+                pass
         else:
-            export_script = idf_path / "export.sh"
-            cmd = f'bash -c \'source "{export_script}" > /dev/null 2>&1 && which python\''
-
-        try:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode == 0:
-                python_path = result.stdout.strip().split('\n')[0]
-                return Path(python_path)
-        except Exception:
-            pass
+            # Use _build_idf_env_command to handle WSL2 PATH filtering
+            # WSL2 PATH除外を含むコマンドを使用
+            env_prefix = _build_idf_env_command(idf_path)
+            inner = f'{env_prefix} && which python'
+            try:
+                result = subprocess.run(
+                    ["bash", "-c", inner],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode == 0:
+                    python_path = result.stdout.strip().split('\n')[0]
+                    return Path(python_path)
+            except Exception:
+                pass
 
         return None
 
 
 class ESPIDFInstaller:
-    """Install ESP-IDF"""
+    """Install ESP-IDF with recovery support.
+    リカバリ対応のESP-IDFインストーラー"""
 
     # Use specific stable release tag, not branch name
     # v5.5.2 is the latest stable release as of January 2026
@@ -225,8 +280,15 @@ class ESPIDFInstaller:
     REPO_URL = "https://github.com/espressif/esp-idf.git"
 
     @classmethod
+    def _is_partial_clone(cls, path: Path) -> bool:
+        """Detect incomplete clone (has .git but no export.sh).
+        不完全なクローンを検出（.gitはあるがexport.shがない）"""
+        return path.exists() and (path / ".git").exists() and not (path / "export.sh").exists()
+
+    @classmethod
     def install(cls, target_dir: Optional[Path] = None, version: str = DEFAULT_VERSION) -> Optional[Path]:
-        """Install ESP-IDF"""
+        """Install ESP-IDF with 3-stage clone separation.
+        3段階分離でESP-IDFをインストール"""
         if target_dir is None:
             target_dir = Path.home() / "esp" / "esp-idf"
 
@@ -236,15 +298,31 @@ class ESPIDFInstaller:
         info(f"Installing ESP-IDF {version} to {target_dir}...")
         print()
 
-        # Clone repository
-        info("Cloning ESP-IDF repository...")
+        # Stage 1: Check existing directory state
+        # ステージ1: 既存ディレクトリの状態確認
+        if target_dir.exists():
+            if cls._is_partial_clone(target_dir):
+                warn(f"Incomplete clone detected at {target_dir}, cleaning up...")
+                shutil.rmtree(target_dir)
+            elif ESPIDFDetector._is_valid_idf(target_dir):
+                info("ESP-IDF repository already cloned, skipping to install step...")
+                return cls._run_install_script(target_dir, version)
+            else:
+                # Directory exists but not a git repo or ESP-IDF
+                # ディレクトリは存在するがgitリポジトリでもESP-IDFでもない
+                error(f"Directory exists but is not ESP-IDF: {target_dir}")
+                error("Remove it manually or specify a different path.")
+                return None
+
+        # Stage 2: Clone main repository (without submodules)
+        # ステージ2: メインリポジトリのクローン（サブモジュールなし）
+        info("Cloning ESP-IDF repository (main repo)...")
         try:
             subprocess.run(
                 [
                     "git", "clone",
                     "--branch", version,
                     "--depth", "1",
-                    "--recursive",
                     cls.REPO_URL,
                     str(target_dir),
                 ],
@@ -252,9 +330,39 @@ class ESPIDFInstaller:
             )
         except subprocess.CalledProcessError as e:
             error(f"Failed to clone ESP-IDF: {e}")
+            # Clean up failed clone
+            # 失敗したクローンをクリーンアップ
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
             return None
 
-        # Run install script
+        # Stage 3: Initialize submodules (retryable)
+        # ステージ3: サブモジュール初期化（リトライ可能）
+        info("Initializing submodules (this may take a while)...")
+        try:
+            subprocess.run(
+                [
+                    "git", "submodule", "update",
+                    "--init", "--depth", "1", "--recursive",
+                ],
+                cwd=target_dir,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            error(f"Failed to initialize submodules: {e}")
+            warn("Main repository is preserved. Re-run installer to retry submodule init.")
+            # Don't delete - main repo is intact, user can retry
+            # 削除しない - メインリポジトリはそのまま、再実行でリトライ可能
+            return None
+
+        # Stage 4: Run install script (idempotent)
+        # ステージ4: install.sh 実行（冪等）
+        return cls._run_install_script(target_dir, version)
+
+    @classmethod
+    def _run_install_script(cls, target_dir: Path, version: str) -> Optional[Path]:
+        """Run ESP-IDF install script (idempotent).
+        ESP-IDFのinstall.shを実行（冪等）"""
         info("Installing ESP-IDF tools (this may take a while)...")
         if sys.platform == "win32":
             install_script = target_dir / "install.bat"
@@ -281,7 +389,39 @@ class Installer:
         self.config_dir = self.root / ".sf"
         self.config_file = self.config_dir / "config.toml"
 
-    def run(self, idf_path: Optional[Path] = None, skip_deps: bool = False, minimal: bool = False) -> int:
+    def _is_sfcli_installed(self, idf_path: Path) -> bool:
+        """Check if sfcli is installed in ESP-IDF Python environment.
+        sfcliがESP-IDF Python環境にインストール済みか確認"""
+        if sys.platform == "win32":
+            export_script = idf_path / "export.bat"
+            cmd = f'cmd /c "{export_script}" && python -c "import sfcli"'
+            try:
+                result = subprocess.run(
+                    cmd, shell=True, capture_output=True, text=True,
+                )
+                return result.returncode == 0
+            except Exception:
+                return False
+        else:
+            env_prefix = _build_idf_env_command(idf_path)
+            inner = f'{env_prefix} && python -c "import sfcli"'
+            try:
+                result = subprocess.run(
+                    ["bash", "-c", inner],
+                    capture_output=True,
+                    text=True,
+                )
+                return result.returncode == 0
+            except Exception:
+                return False
+
+    def run(
+        self,
+        idf_path: Optional[Path] = None,
+        skip_deps: bool = False,
+        minimal: bool = False,
+        force: bool = False,
+    ) -> int:
         """Run installation"""
 
         # Step 1: Find or install ESP-IDF
@@ -369,6 +509,10 @@ class Installer:
             error("Please ensure ESP-IDF is properly installed:")
             error(f"  cd {idf_path}")
             error("  ./install.sh")
+            if is_wsl():
+                error("")
+                error("WSL2 detected: Windows Python (pyenv-win) may be interfering.")
+                error("Check that /mnt/c/... paths are not providing python.")
             return 1
 
         success(f"ESP-IDF Python: {idf_python}")
@@ -378,59 +522,49 @@ class Installer:
         header("Step 3/3: StampFly CLI")
 
         if not skip_deps:
-            if minimal:
-                info("Installing minimal dependencies (simulator excluded)...")
+            # Probe: check if already installed (skip if not --force)
+            # プローブ: インストール済みか確認（--forceでなければスキップ）
+            if not force and self._is_sfcli_installed(idf_path):
+                success("sfcli is already installed, skipping (use --force to reinstall)")
             else:
-                info("Installing dependencies (including simulator)...")
+                if force:
+                    info("Force reinstalling...")
 
-            # Get pip from ESP-IDF environment
-            if sys.platform == "win32":
-                export_script = idf_path / "export.bat"
-                pip_cmd = f'cmd /c "{export_script}" && python -m pip'
-            else:
-                export_script = idf_path / "export.sh"
-                pip_cmd = f'bash -c \'source "{export_script}" > /dev/null 2>&1 && python -m pip'
+                if minimal:
+                    info("Installing sfcli with core dependencies...")
+                    pip_args = ["install"]
+                    if force:
+                        pip_args.append("--force-reinstall")
+                    pip_args.extend(["-e", f'"{self.root}"'])
+                    rc = _run_in_idf_env(idf_path, pip_args)
+                    if rc != 0:
+                        error("Failed to install sfcli")
+                        return 1
 
-            if minimal:
-                # Install only core dependencies from pyproject.toml
-                info("Installing sfcli with core dependencies...")
-                if sys.platform == "win32":
-                    cmd = f'{pip_cmd} install -e "{self.root}"'
+                    info("Simulator dependencies skipped. Install later with: sf setup sim")
                 else:
-                    cmd = f'{pip_cmd} install -e "{self.root}"\''
+                    # Install full dependencies including simulator
+                    # シミュレータを含むすべての依存関係をインストール
+                    requirements = self.root / "requirements.txt"
+                    if requirements.exists():
+                        info("Installing all dependencies...")
+                        pip_args = ["install", "-r", f'"{requirements}"']
+                        rc = _run_in_idf_env(idf_path, pip_args)
+                        if rc != 0:
+                            warn("Some dependencies may have failed to install")
+                            warn("You can install simulator dependencies later with: sf setup sim")
 
-                result = subprocess.run(cmd, shell=True)
-                if result.returncode != 0:
-                    error("Failed to install sfcli")
-                    return 1
-
-                info("Simulator dependencies skipped. Install later with: sf setup sim")
-            else:
-                # Install full dependencies including simulator
-                requirements = self.root / "requirements.txt"
-                if requirements.exists():
-                    info("Installing all dependencies...")
-                    if sys.platform == "win32":
-                        cmd = f'{pip_cmd} install -r "{requirements}"'
-                    else:
-                        cmd = f'{pip_cmd} install -r "{requirements}"\''
-
-                    result = subprocess.run(cmd, shell=True)
-                    if result.returncode != 0:
-                        warn("Some dependencies may have failed to install")
-                        warn("You can install simulator dependencies later with: sf setup sim")
-
-                # Install sfcli in editable mode
-                info("Installing sfcli...")
-                if sys.platform == "win32":
-                    cmd = f'{pip_cmd} install -e "{self.root}"'
-                else:
-                    cmd = f'{pip_cmd} install -e "{self.root}"\''
-
-                result = subprocess.run(cmd, shell=True)
-                if result.returncode != 0:
-                    error("Failed to install sfcli")
-                    return 1
+                    # Install sfcli in editable mode
+                    # sfcliを開発モードでインストール
+                    info("Installing sfcli...")
+                    pip_args = ["install"]
+                    if force:
+                        pip_args.append("--force-reinstall")
+                    pip_args.extend(["-e", f'"{self.root}"'])
+                    rc = _run_in_idf_env(idf_path, pip_args)
+                    if rc != 0:
+                        error("Failed to install sfcli")
+                        return 1
 
         success("StampFly CLI installed!")
         print()
@@ -455,7 +589,49 @@ class Installer:
         print("  sf build vehicle   # Build firmware")
         print()
 
+        # WSL2-specific guidance
+        # WSL2固有の案内
+        if is_wsl():
+            print("WSL2 Notes:")
+            print("  - USB device access requires usbipd-win on Windows side")
+            print("    Install: winget install usbipd")
+            print("    See: https://learn.microsoft.com/en-us/windows/wsl/connect-usb")
+            print("  - Run 'sf doctor' to check WSL2-specific configuration")
+            print()
+
         return 0
+
+    def clean(self, idf_path: Optional[Path] = None) -> int:
+        """Clean install: remove config and sfcli, then reinstall.
+        クリーンインストール: 設定とsfcliを削除後、再インストール"""
+        header("Cleaning StampFly installation...")
+
+        # Find ESP-IDF path from config or argument
+        # 設定またはコマンドライン引数からESP-IDFパスを取得
+        resolved_idf_path = idf_path
+        if not resolved_idf_path and self.config_file.exists():
+            for line in self.config_file.read_text().split('\n'):
+                if line.startswith('path = "'):
+                    resolved_idf_path = Path(line.split('"')[1])
+                    break
+
+        # Uninstall sfcli from ESP-IDF Python environment
+        # ESP-IDFのPython環境からsfcliをアンインストール
+        if resolved_idf_path and ESPIDFDetector._is_valid_idf(resolved_idf_path):
+            info("Uninstalling sfcli...")
+            _run_in_idf_env(resolved_idf_path, ["uninstall", "-y", "stampfly-ecosystem"])
+
+        # Remove config file
+        # 設定ファイルを削除
+        if self.config_file.exists():
+            self.config_file.unlink()
+            info("Removed configuration file")
+
+        success("Clean complete. Re-running installer...")
+        print()
+
+        # Re-run installation
+        return self.run(idf_path=idf_path, force=True)
 
     def _save_config(self, idf_path: Path) -> None:
         """Save configuration file"""
@@ -501,14 +677,7 @@ default_target = "vehicle"
 
         # Uninstall sfcli
         info("Uninstalling sfcli...")
-        if sys.platform == "win32":
-            export_script = idf_path / "export.bat"
-            cmd = f'cmd /c "{export_script}" && python -m pip uninstall -y stampfly-ecosystem'
-        else:
-            export_script = idf_path / "export.sh"
-            cmd = f'bash -c \'source "{export_script}" > /dev/null 2>&1 && python -m pip uninstall -y stampfly-ecosystem\''
-
-        subprocess.run(cmd, shell=True)
+        _run_in_idf_env(idf_path, ["uninstall", "-y", "stampfly-ecosystem"])
 
         # Remove config
         if self.config_file.exists():
@@ -552,6 +721,16 @@ def main() -> int:
         action="store_true",
         help="Uninstall sfcli",
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Clean install (remove config and sfcli, then reinstall)",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reinstall all steps (skip probe checks)",
+    )
 
     args = parser.parse_args()
 
@@ -563,11 +742,14 @@ def main() -> int:
 
     if args.uninstall:
         return installer.uninstall()
+    elif args.clean:
+        return installer.clean(idf_path=args.idf_path)
     else:
         return installer.run(
             idf_path=args.idf_path,
             skip_deps=args.skip_deps,
             minimal=args.minimal,
+            force=args.force,
         )
 
 

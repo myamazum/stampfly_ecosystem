@@ -17,6 +17,55 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
+# WSL2 detection
+# WSL2環境を検出
+is_wsl() {
+    [ -f /proc/version ] && grep -qi microsoft /proc/version
+}
+
+# Check system prerequisites (Debian/Ubuntu)
+# システム前提条件チェック（Debian/Ubuntu）
+check_prerequisites() {
+    # ESP-IDF required packages for Debian/Ubuntu
+    local required_packages="git cmake ninja-build python3-venv wget flex bison gperf ccache libffi-dev libssl-dev dfu-util libusb-1.0-0"
+
+    if [ -f /etc/debian_version ]; then
+        local missing=""
+        for pkg in $required_packages; do
+            if ! dpkg -s "$pkg" > /dev/null 2>&1; then
+                missing="$missing $pkg"
+            fi
+        done
+
+        if [ -n "$missing" ]; then
+            error "Missing required packages:$missing"
+            echo
+            echo "  Install with:"
+            echo -e "    ${BOLD}sudo apt update && sudo apt install -y$missing${NC}"
+            echo
+            exit 1
+        fi
+        success "All prerequisite packages installed"
+    else
+        # Non-Debian: check key commands only
+        # 非Debian系: 主要コマンドのみ確認
+        local missing_cmds=""
+        for cmd_name in git cmake ninja python3 wget flex bison gperf ccache; do
+            if ! command -v "$cmd_name" &> /dev/null; then
+                missing_cmds="$missing_cmds $cmd_name"
+            fi
+        done
+
+        if [ -n "$missing_cmds" ]; then
+            error "Missing required commands:$missing_cmds"
+            echo "  Please install these using your system package manager."
+            echo
+            exit 1
+        fi
+        success "All prerequisite commands found"
+    fi
+}
+
 info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -109,6 +158,24 @@ install_python_guidance() {
 
 # Main
 header "StampFly Ecosystem Installer"
+
+# WSL2 information
+# WSL2環境の情報表示
+if is_wsl; then
+    info "WSL2 environment detected"
+    echo
+    echo "  Note: USB device access requires usbipd-win on Windows side."
+    echo "  See: https://learn.microsoft.com/en-us/windows/wsl/connect-usb"
+    echo
+fi
+
+# Check system prerequisites on Linux
+# Linux環境のシステム前提条件チェック
+if [ "$(uname -s)" = "Linux" ]; then
+    info "Checking system prerequisites..."
+    check_prerequisites
+    echo
+fi
 
 info "Checking Python..."
 
