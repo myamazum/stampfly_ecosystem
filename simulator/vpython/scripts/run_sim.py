@@ -423,6 +423,14 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
                     motor_voltages = allocator.thrusts_to_voltages(motor_thrusts)
                     voltage = [motor_voltages[0], motor_voltages[1], motor_voltages[2], motor_voltages[3]]
 
+                    # Collision detection at 400Hz (moved from 2000Hz physics loop)
+                    # 衝突判定を400Hz化（2000Hzから5倍削減）
+                    pos = stampfly.body.position
+                    if Render.check_collision(pos[0][0], pos[1][0], pos[2][0]):
+                        print(f"COLLISION at t={sim_time:.2f}s")
+                        Render.show_collision(pos[0][0], pos[1][0], pos[2][0])
+                        raise KeyboardInterrupt  # Exit cleanly
+
                     control_steps += 1
                     next_control_time = control_steps * CONTROL_DT
                     perf_control_count += 1
@@ -442,13 +450,6 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
                     PQR_log.append(stampfly.body.pqr.copy())
                     EULER_log.append(stampfly.body.euler.copy())
                     POS_log.append(stampfly.body.position.copy())
-
-                # Collision detection
-                pos = stampfly.body.position
-                if Render.check_collision(pos[0][0], pos[1][0], pos[2][0]):
-                    print(f"COLLISION at t={sim_time:.2f}s")
-                    Render.show_collision(pos[0][0], pos[1][0], pos[2][0])
-                    raise KeyboardInterrupt  # Exit cleanly
 
             # ===========================================
             # Rendering at target FPS (without rate() blocking)

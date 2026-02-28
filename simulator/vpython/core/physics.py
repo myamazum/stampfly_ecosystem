@@ -24,6 +24,17 @@
 
 import numpy as np
 
+
+def _cross3(a, b):
+    """Manual cross product for 3x1 column vectors (avoids np.cross overhead).
+    3x1列ベクトル用の手動外積計算（np.crossのオーバーヘッドを回避）"""
+    return np.array([
+        [a[1][0]*b[2][0] - a[2][0]*b[1][0]],
+        [a[2][0]*b[0][0] - a[0][0]*b[2][0]],
+        [a[0][0]*b[1][0] - a[1][0]*b[0][0]]
+    ])
+
+
 #DCM(Direct Cosine Matrix) is transform from body frame to inertial frame.
 
 class rigidbody():
@@ -31,6 +42,9 @@ class rigidbody():
         #DCM(Direct Cosine Matrix) from body frame to inertial frame:
         self.mass = mass
         self.inertia = inersia#np.array()#np.eye(3)
+        # Pre-compute inverse inertia matrix (constant, avoids 8000 inv/s)
+        # 慣性逆行列を事前計算（定数なので毎ステップの計算を回避）
+        self.inertia_inv = np.linalg.inv(np.array(inersia))
         self.euler = np.array(euler)
         self.quat = self.euler2quat(euler)
         self.DCM = self.quat_dcm(self.quat)
@@ -93,7 +107,7 @@ class rigidbody():
         #m ([duvw/dt] + omaga x uvw) = force
         #[duvw/dt] = force/m - (omaga x uvw)
         force = np.array(force)
-        uvw_dot = force/self.mass - np.cross(pqr, uvw, axis=0)
+        uvw_dot = force/self.mass - _cross3(pqr, uvw)
         return uvw_dot
 
     def pqr_dot(self, pqr, torque):
@@ -106,7 +120,7 @@ class rigidbody():
         #dpqr/dt = I^-1 @ (torque - pqr x (I @ pqr))
         #pqr_dot = I^-1 @ (torque - pqr x (I @ pqr))
         torque = np.array(torque)
-        pqr_dot = np.linalg.inv(self.inertia) @ (torque - np.cross(pqr, self.inertia @ pqr, axis=0))
+        pqr_dot = self.inertia_inv @ (torque - _cross3(pqr, self.inertia @ pqr))
         return pqr_dot
     
     def position_dot(self, uvw, quat):

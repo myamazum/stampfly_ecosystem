@@ -44,6 +44,16 @@ class motor_prop():
             self.rotation_dir = cw
             self.location = np.array([[0.023], [-0.023], [0.005]])
         
+        # Pre-allocate force/moment buffers (avoids 16000 alloc/s)
+        # force/momentバッファを事前割り当て（毎ステップのalloc回避）
+        self._force_buf = np.array([[0.0], [0.0], [0.0]])
+        self._moment_buf = np.array([[0.0], [0.0], [0.0]])
+        # Cache location components for manual cross product
+        # 手動外積用にlocation成分をキャッシュ
+        self._loc_x = self.location[0][0]
+        self._loc_y = self.location[1][0]
+        self._loc_z = self.location[2][0]
+
         #StampFlyのパラメータ
         #回転数と電圧の関係から求めたパラメータ
         self.Am = 5.39e-8
@@ -95,18 +105,36 @@ class motor_prop():
         return self.Cq * self.omega**2
 
     def get_force(self):
-        return np.array([[0.0], [0.0], [-self.get_thrust()]])
+        # Write into pre-allocated buffer (avoids np.array allocation)
+        # 事前割り当てバッファに書き込み（np.array生成を回避）
+        thrust = self.get_thrust()
+        self._force_buf[0][0] = 0.0
+        self._force_buf[1][0] = 0.0
+        self._force_buf[2][0] = -thrust
+        return self._force_buf
 
     def get_moment(self):
-        moment = np.array([[0.0], [0.0], [-self.rotation_dir * self.get_torque()]])
-        moment += np.cross(self.location, np.array([[0.0], [0.0], [-self.get_thrust()]]) , axis=0)
-        return moment
+        # Manual cross product: location × [0, 0, -thrust] (avoids np.cross + np.array)
+        # 手動外積: location × [0, 0, -thrust]（np.cross + np.array生成を回避）
+        thrust = self.get_thrust()
+        neg_thrust = -thrust
+        # cross(loc, [0,0,-T]) = [loc_y*(-T) - loc_z*0, loc_z*0 - loc_x*(-T), loc_x*0 - loc_y*0]
+        #                       = [-loc_y*T, loc_x*T, 0]
+        self._moment_buf[0][0] = self._loc_y * neg_thrust
+        self._moment_buf[1][0] = -self._loc_x * neg_thrust
+        self._moment_buf[2][0] = -self.rotation_dir * self.get_torque()
+        return self._moment_buf
 
     def get_force_moment(self):
-        force = np.array([[0.0], [0.0], [-self.get_thrust()]])
-        moment = np.array([[0.0], [0.0], [-self.rotation_dir * self.get_torque()]])
-        moment += np.cross(self.location, np.array([[0.0], [0.0], [-self.get_thrust()]]) , axis=0)
-        return force, moment
+        thrust = self.get_thrust()
+        neg_thrust = -thrust
+        self._force_buf[0][0] = 0.0
+        self._force_buf[1][0] = 0.0
+        self._force_buf[2][0] = neg_thrust
+        self._moment_buf[0][0] = self._loc_y * neg_thrust
+        self._moment_buf[1][0] = -self._loc_x * neg_thrust
+        self._moment_buf[2][0] = -self.rotation_dir * self.get_torque()
+        return self._force_buf, self._moment_buf
 
     def set_anguler_velocity(self, omega):
         self.omega = omega

@@ -42,6 +42,9 @@ class multicopter():
         self.distuerbance_moment = [4.4e-6, 4.4e-6, 4.e-6]
         self.distuerbance_force = [1e-6, 1e-6, 1e-6]
         self.battery = bt.battery()
+        # Pre-compute gravity vector (constant, avoids 2000 alloc/s)
+        # 重力ベクトルを事前計算（定数なので毎ステップの生成を回避）
+        self._gravity = np.array([[0.0], [0.0], [mass * 9.81]])
 
     def set_disturbance(self, moment, force):
         self.distuerbance_moment = moment
@@ -66,9 +69,7 @@ class multicopter():
         rate_p = self.body.pqr[0][0]
         rate_q = self.body.pqr[1][0]
         rate_r = self.body.pqr[2][0]
-        weight = self.body.mass * 9.81
-        gravity = np.array([[0.0], [0.0], [weight]])
-        gravity_body= self.body.DCM.T @ gravity
+        gravity_body = self.body.DCM.T @ self._gravity
         
         #Moment
         moment = self.mp1.get_moment() + self.mp2.get_moment() + self.mp3.get_moment() + self.mp4.get_moment()
