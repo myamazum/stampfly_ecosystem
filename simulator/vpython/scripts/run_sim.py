@@ -190,11 +190,11 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
     # ===========================================
     # Timing Configuration
     # ===========================================
-    PHYSICS_HZ = 2000
-    PHYSICS_DT = 1.0 / PHYSICS_HZ  # 0.0005s = 0.5ms
+    PHYSICS_HZ = 1000
+    PHYSICS_DT = 1.0 / PHYSICS_HZ  # 0.001s = 1.0ms
 
-    CONTROL_HZ = 400
-    CONTROL_DT = 1.0 / CONTROL_HZ  # 0.0025s = 2.5ms
+    CONTROL_HZ = 200
+    CONTROL_DT = 1.0 / CONTROL_HZ  # 0.005s = 5.0ms
     PHYSICS_PER_CONTROL = PHYSICS_HZ // CONTROL_HZ  # 5 physics steps per control
 
     RENDER_FPS = 30
@@ -229,8 +229,9 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
         inersia=[[9.16e-6, 0.0, 0.0], [0.0, 13.3e-6, 0.0], [0.0, 0.0, 20.4e-6]]
     )
 
-    # Initialize renderer (60 FPS target)
+    # Initialize renderer
     Render = render(RENDER_FPS, world_type=world_type, seed=seed)
+    Render.physics_hz = PHYSICS_HZ  # For timing report / タイミングレポート用
 
     # Get safe spawn position
     spawn_x, spawn_y, spawn_z = Render.get_safe_spawn_position(x=0.0, y=0.0, clearance=1.0)
@@ -376,10 +377,9 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
 
     try:
         while sim_time < 6000.0:
-            wall_now = time.perf_counter() - wall_start
-
             # ===========================================
-            # Read Joystick (every loop iteration)
+            # Read Joystick (at control rate: 200Hz)
+            # ジョイスティック読み取り（制御レート: 200Hz）
             # ===========================================
             joydata = joystick.read()
             if joydata is not None:
@@ -410,67 +410,63 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
                     yaw_ref = 0.3 * yaw_raw * np.pi
 
             # ===========================================
-            # Control update at 400Hz
-            # 制御更新 400Hz
+            # Control update (200Hz)
+            # 制御更新 (200Hz)
             # ===========================================
-            if sim_time >= next_control_time:
-                _sample_ctrl = (control_steps % (SAMPLE_INTERVAL // 5) == 0)
-                if _sample_ctrl:
-                    t_ctrl_start = time.perf_counter()
-                rate_p = stampfly.body.pqr[0][0]
-                rate_q = stampfly.body.pqr[1][0]
-                rate_r = stampfly.body.pqr[2][0]
-                phi = stampfly.body.euler[0][0]
-                theta = stampfly.body.euler[1][0]
+            _sample_ctrl = (control_steps % (SAMPLE_INTERVAL // 5) == 0)
+            if _sample_ctrl:
+                t_ctrl_start = time.perf_counter()
+            rate_p = stampfly.body.pqr[0][0]
+            rate_q = stampfly.body.pqr[1][0]
+            rate_r = stampfly.body.pqr[2][0]
+            phi = stampfly.body.euler[0][0]
+            theta = stampfly.body.euler[1][0]
 
-                if use_rate_mode:
-                    roll_rate_ref = roll_ref
-                    pitch_rate_ref = pitch_ref
-                    yaw_rate_ref = yaw_ref
-                else:
-                    roll_rate_ref = roll_pid.update(roll_ref, phi, CONTROL_DT)
-                    pitch_rate_ref = pitch_pid.update(pitch_ref, theta, CONTROL_DT)
-                    yaw_rate_ref = yaw_ref
-
-                roll_torque = roll_rate_pid.update(roll_rate_ref, rate_p, CONTROL_DT)
-                pitch_torque = pitch_rate_pid.update(pitch_rate_ref, rate_q, CONTROL_DT)
-                yaw_torque = yaw_rate_pid.update(yaw_rate_ref, rate_r, CONTROL_DT)
-
-                # Control allocation
-                total_thrust = hover_thrust + delta_thrust
-                total_thrust = max(0.0, min(total_thrust, 4 * 0.15))
-                motor_thrusts = allocator.mix(total_thrust, roll_torque, pitch_torque, yaw_torque)
-                motor_voltages = allocator.thrusts_to_voltages(motor_thrusts)
-                voltage = [motor_voltages[0], motor_voltages[1], motor_voltages[2], motor_voltages[3]]
-
-                # Collision detection at 400Hz
-                # 衝突判定 400Hz
-                pos = stampfly.body.position
-                if Render.check_collision(pos[0][0], pos[1][0], pos[2][0]):
-                    print(f"COLLISION at t={sim_time:.2f}s")
-                    Render.show_collision(pos[0][0], pos[1][0], pos[2][0])
-                    raise KeyboardInterrupt
-
-                control_steps += 1
-                next_control_time = control_steps * CONTROL_DT
-                if _sample_ctrl:
-                    t_ctrl_end = time.perf_counter()
-                    control_step_times.append(t_ctrl_end - t_ctrl_start)
-
-            # ===========================================
-            # Physics step (2000Hz)
-            # 物理ステップ (2000Hz)
-            # ===========================================
-            if physics_steps % SAMPLE_INTERVAL == 0:
-                t_phys_start = time.perf_counter()
-                stampfly.step(voltage, PHYSICS_DT)
-                t_phys_end = time.perf_counter()
-                physics_step_times.append(t_phys_end - t_phys_start)
+            if use_rate_mode:
+                roll_rate_ref = roll_ref
+                pitch_rate_ref = pitch_ref
+                yaw_rate_ref = yaw_ref
             else:
+                roll_rate_ref = roll_pid.update(roll_ref, phi, CONTROL_DT)
+                pitch_rate_ref = pitch_pid.update(pitch_ref, theta, CONTROL_DT)
+                yaw_rate_ref = yaw_ref
+
+            roll_torque = roll_rate_pid.update(roll_rate_ref, rate_p, CONTROL_DT)
+            pitch_torque = pitch_rate_pid.update(pitch_rate_ref, rate_q, CONTROL_DT)
+            yaw_torque = yaw_rate_pid.update(yaw_rate_ref, rate_r, CONTROL_DT)
+
+            # Control allocation
+            total_thrust = hover_thrust + delta_thrust
+            total_thrust = max(0.0, min(total_thrust, 4 * 0.15))
+            motor_thrusts = allocator.mix(total_thrust, roll_torque, pitch_torque, yaw_torque)
+            motor_voltages = allocator.thrusts_to_voltages(motor_thrusts)
+            voltage = [motor_voltages[0], motor_voltages[1], motor_voltages[2], motor_voltages[3]]
+
+            control_steps += 1
+            if _sample_ctrl:
+                t_ctrl_end = time.perf_counter()
+                control_step_times.append(t_ctrl_end - t_ctrl_start)
+
+            # ===========================================
+            # Physics inner loop (PHYSICS_PER_CONTROL steps)
+            # 物理内部ループ（制御1回あたりPHYSICS_PER_CONTROL回）
+            # Measure the batch time every SAMPLE_INTERVAL steps
+            # SAMPLE_INTERVAL ステップごとにバッチ時間を計測
+            # ===========================================
+            _sample_phys = (control_steps % 20 == 0)  # Sample every 20th control cycle
+            if _sample_phys:
+                t_phys_start = time.perf_counter()
+
+            for _ in range(PHYSICS_PER_CONTROL):
                 stampfly.step(voltage, PHYSICS_DT)
-            physics_steps += 1
+                physics_steps += 1
+
+            if _sample_phys:
+                t_phys_end = time.perf_counter()
+                physics_step_times.append((t_phys_end - t_phys_start) / PHYSICS_PER_CONTROL)
+
             sim_time = physics_steps * PHYSICS_DT
-            steps_since_last_frame += 1
+            steps_since_last_frame += PHYSICS_PER_CONTROL
 
             # Data logging (reduced frequency)
             if physics_steps % LOG_INTERVAL == 0:
@@ -479,15 +475,22 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
                 EULER_log.append(stampfly.body.euler.copy())
                 POS_log.append(stampfly.body.position.copy())
 
+            # Collision detection (at control rate)
+            # 衝突判定（制御レート）
+            pos = stampfly.body.position
+            if Render.check_collision(pos[0][0], pos[1][0], pos[2][0]):
+                print(f"COLLISION at t={sim_time:.2f}s")
+                Render.show_collision(pos[0][0], pos[1][0], pos[2][0])
+                raise KeyboardInterrupt
+
             # ===========================================
             # Rendering — rate(fps) is the master clock
             # 描画 — rate(fps)がマスタークロック
-            # rendering() calls rate(fps) only when anim_time is reached.
-            # Between rate() calls, this loop runs at full CPU speed.
-            # rendering()はanim_time到達時のみrate(fps)を呼ぶ。
-            # rate()呼び出し間はCPU全速力でループが回る。
+            # Skip function call when not time to render (saves ~37ms/sec)
+            # レンダリング時刻でなければ関数呼び出しをスキップ
             # ===========================================
-            keyname = Render.rendering(sim_time, stampfly)
+            if sim_time >= Render.anim_time:
+                keyname = Render.rendering(sim_time, stampfly)
             # Track physics steps between frames
             # フレーム間の物理ステップ数を追跡
             if Render.frame_num > last_frame_num:
@@ -693,5 +696,5 @@ if __name__ == "__main__":
                         help='Control mode: rate=ACRO, angle=STABILIZE (default: rate)')
     args = parser.parse_args()
 
-    print(f"Starting 2000Hz simulation: world={args.world}, mode={args.mode}")
+    print(f"Starting simulation: world={args.world}, mode={args.mode}")
     flight_sim_2000hz(world_type=args.world, seed=args.seed, control_mode=args.mode)
