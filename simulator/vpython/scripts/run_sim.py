@@ -26,12 +26,15 @@ High-Frequency Physical Units Mode Flight Simulation (Experimental)
 
 Timing configuration:
 タイミング設定:
-- Physics: 2000Hz (h = 0.5ms)
-- Control: 400Hz (5 physics steps per control)
-- Visualization: 60Hz
+- Physics: 1000Hz (h = 1.0ms)
+- Control: 200Hz (5 physics steps per control)
+- Visualization: 30Hz
 
-Real-time synchronization using wall-clock time.
-実時間同期のためウォールクロック時間を使用。
+Loop structure: outer render loop + inner control loop
+ループ構造: 外側レンダリングループ + 内側制御ループ
+
+Real-time synchronization via VPython rate().
+VPython rate()によるリアルタイム同期。
 """
 
 import sys
@@ -123,20 +126,29 @@ class ControlAllocator:
             [0.25,  0.25 * inv_d,  0.25 * inv_d, -0.25 * inv_kappa],  # M4 (FL)
         ])
 
+        # Pre-allocate buffers (avoids 200 alloc/s)
+        # バッファ事前割り当て（200回/秒のalloc回避）
+        self._control_buf = np.zeros(4)
+        self._thrust_buf = np.zeros(4)
+
     def mix(self, total_thrust: float, roll_torque: float,
             pitch_torque: float, yaw_torque: float) -> np.ndarray:
         """
         Convert control inputs to motor thrusts
         制御入力をモータ推力に変換
         """
-        control = np.array([total_thrust, roll_torque, pitch_torque, yaw_torque])
-        thrusts = self.B_inv @ control
-        thrusts = np.clip(thrusts, 0.0, self.max_thrust)
-        return thrusts
+        self._control_buf[0] = total_thrust
+        self._control_buf[1] = roll_torque
+        self._control_buf[2] = pitch_torque
+        self._control_buf[3] = yaw_torque
+        np.dot(self.B_inv, self._control_buf, out=self._thrust_buf)
+        np.clip(self._thrust_buf, 0.0, self.max_thrust, out=self._thrust_buf)
+        return self._thrust_buf
 
-    def thrusts_to_voltages(self, thrusts: np.ndarray) -> np.ndarray:
-        """Convert motor thrusts to voltages"""
-        return np.array([thrust_to_voltage(t) for t in thrusts])
+    def thrusts_to_voltages(self, thrusts: np.ndarray) -> list:
+        """Convert motor thrusts to voltages (returns list for direct use)"""
+        return [thrust_to_voltage(thrusts[0]), thrust_to_voltage(thrusts[1]),
+                thrust_to_voltage(thrusts[2]), thrust_to_voltage(thrusts[3])]
 
 
 # =============================================================================
@@ -315,9 +327,6 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
     control_steps = 0
     render_steps = 0
 
-    next_control_time = 0.0
-    next_render_time = 0.0
-
     # Control state
     roll_ref = 0.0
     pitch_ref = 0.0
@@ -333,28 +342,21 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
     voltage = [0.0, 0.0, 0.0, 0.0]
 
     # Data logging (reduced frequency to save memory)
-    LOG_INTERVAL = 10  # Log every 10 physics steps (200Hz logging)
+    LOG_INTERVAL = 50  # Log every 50 physics steps (20Hz logging)
     T_log = []
     PQR_log = []
     EULER_log = []
     POS_log = []
 
-    # Performance monitoring
-    perf_physics_time = 0.0
-    perf_control_time = 0.0
-    perf_render_time = 0.0
-    perf_last_report = 0.0
-    perf_physics_count = 0
-    perf_control_count = 0
-    perf_render_count = 0
+    # Performance monitoring (legacy - kept for compatibility)
+    # パフォーマンス監視（レガシー - 互換性のため保持）
 
     # Frame timing diagnostics (sampled to reduce overhead)
     # フレームタイミング診断（オーバーヘッド削減のためサンプリング）
-    SAMPLE_INTERVAL = 100  # Sample every 100th step / 100ステップごとにサンプリング
     physics_step_times = []  # Sampled physics step times / サンプリングされた物理演算時間
     control_step_times = []  # Sampled control step times / サンプリングされた制御演算時間
-    steps_since_last_frame = 0  # Physics steps counter between frames / フレーム間物理ステップカウンタ
     last_frame_num = 0  # Track renderer frame number / レンダラフレーム番号追跡
+    steps_at_last_frame = 0  # Physics steps at last frame / 前回フレーム時の物理ステップ数
 
     # Instantaneous RT tracking (per-second)
     # 瞬時RT追跡（1秒ごと）
@@ -371,132 +373,163 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
 
     # ===========================================
     # Main Simulation Loop (Real-time synchronized)
+    # メインシミュレーションループ（リアルタイム同期）
+    #
+    # Structure: Outer render loop + inner control loop
+    # 構造: 外側レンダリングループ + 内側制御ループ
+    #
+    # The inner loop runs control cycles until the next render time,
+    # then the outer loop handles rendering via rate().
+    # This reduces render-check overhead from 200/sec to 30/sec.
     # ===========================================
     wall_start = time.perf_counter()
     last_print_time = -1
+    keyname = ''
+
+    # Cache frequently used references (avoid repeated attribute lookups)
+    # 頻繁にアクセスする参照をキャッシュ（属性ルックアップの繰り返しを回避）
+    body = stampfly.body
+    _step = stampfly.step
+    _joy_read = joystick.read
+    _check_collision = Render.check_collision
+    _rendering = Render.rendering
+    _anim_time_ref = Render  # Access anim_time via Render.anim_time
+
+    # Full loop timing diagnostics (measure total iteration overhead)
+    # フルループタイミング診断（イテレーション全体のオーバーヘッドを計測）
+    full_loop_times = []
 
     try:
         while sim_time < 6000.0:
-            # ===========================================
-            # Read Joystick (at control rate: 200Hz)
-            # ジョイスティック読み取り（制御レート: 200Hz）
-            # ===========================================
-            joydata = joystick.read()
-            if joydata is not None:
-                thrust_raw = (joydata[0] - 127) / 127.0 - thrust_offset
-                roll_raw = (joydata[1] - 127) / 127.0 - roll_offset
-                pitch_raw = (joydata[2] - 127) / 127.0 - pitch_offset
-                yaw_raw = (joydata[3] - 127) / 127.0 - yaw_offset
+            # =============================================
+            # Inner control loop: run until next render time
+            # 内側制御ループ: 次のレンダリング時刻まで実行
+            # =============================================
+            next_render_sim_time = _anim_time_ref.anim_time
 
-                # Mode button
-                buttons = joydata[4] if len(joydata) > 4 else 0
-                mode_button = bool(buttons & 0x04)
+            while sim_time < next_render_sim_time:
+                # Measure full control cycle (sampled)
+                # 制御サイクル全体を計測（サンプリング）
+                _sample_full = (control_steps % 40 == 0)
+                if _sample_full:
+                    t_full_start = time.perf_counter()
 
-                if mode_button and not prev_mode_button:
-                    use_rate_mode = not use_rate_mode
-                    mode_name = 'ACRO (Rate)' if use_rate_mode else 'STABILIZE (Angle)'
-                    print(f"Mode changed: {mode_name}")
-                prev_mode_button = mode_button
+                # --- Joystick read (200Hz) ---
+                joydata = _joy_read()
+                if joydata is not None:
+                    thrust_raw = (joydata[0] - 127) / 127.0 - thrust_offset
+                    roll_raw = (joydata[1] - 127) / 127.0 - roll_offset
+                    pitch_raw = (joydata[2] - 127) / 127.0 - pitch_offset
+                    yaw_raw = (joydata[3] - 127) / 127.0 - yaw_offset
 
-                delta_thrust = 0.5 * thrust_raw * hover_thrust
+                    # Mode button
+                    buttons = joydata[4] if len(joydata) > 4 else 0
+                    mode_button = bool(buttons & 0x04)
+
+                    if mode_button and not prev_mode_button:
+                        use_rate_mode = not use_rate_mode
+                        mode_name = 'ACRO (Rate)' if use_rate_mode else 'STABILIZE (Angle)'
+                        print(f"Mode changed: {mode_name}")
+                    prev_mode_button = mode_button
+
+                    delta_thrust = 0.5 * thrust_raw * hover_thrust
+
+                    if use_rate_mode:
+                        roll_ref = cfg.roll_rate_max * roll_raw
+                        pitch_ref = cfg.pitch_rate_max * pitch_raw
+                        yaw_ref = cfg.yaw_rate_max * yaw_raw
+                    else:
+                        roll_ref = 0.25 * roll_raw * np.pi
+                        pitch_ref = 0.25 * pitch_raw * np.pi
+                        yaw_ref = 0.3 * yaw_raw * np.pi
+
+                # --- Control update (200Hz) ---
+                _sample_ctrl = (control_steps % 20 == 0)
+                if _sample_ctrl:
+                    t_ctrl_start = time.perf_counter()
+
+                # Cache body state (reduce attribute lookups)
+                # ボディ状態をキャッシュ（属性ルックアップ削減）
+                _pqr = body.pqr
+                rate_p = _pqr[0][0]
+                rate_q = _pqr[1][0]
+                rate_r = _pqr[2][0]
 
                 if use_rate_mode:
-                    roll_ref = cfg.roll_rate_max * roll_raw
-                    pitch_ref = cfg.pitch_rate_max * pitch_raw
-                    yaw_ref = cfg.yaw_rate_max * yaw_raw
+                    roll_rate_ref = roll_ref
+                    pitch_rate_ref = pitch_ref
+                    yaw_rate_ref = yaw_ref
                 else:
-                    roll_ref = 0.25 * roll_raw * np.pi
-                    pitch_ref = 0.25 * pitch_raw * np.pi
-                    yaw_ref = 0.3 * yaw_raw * np.pi
+                    _euler = body.euler
+                    phi = _euler[0][0]
+                    theta = _euler[1][0]
+                    roll_rate_ref = roll_pid.update(roll_ref, phi, CONTROL_DT)
+                    pitch_rate_ref = pitch_pid.update(pitch_ref, theta, CONTROL_DT)
+                    yaw_rate_ref = yaw_ref
 
-            # ===========================================
-            # Control update (200Hz)
-            # 制御更新 (200Hz)
-            # ===========================================
-            _sample_ctrl = (control_steps % (SAMPLE_INTERVAL // 5) == 0)
-            if _sample_ctrl:
-                t_ctrl_start = time.perf_counter()
-            rate_p = stampfly.body.pqr[0][0]
-            rate_q = stampfly.body.pqr[1][0]
-            rate_r = stampfly.body.pqr[2][0]
-            phi = stampfly.body.euler[0][0]
-            theta = stampfly.body.euler[1][0]
+                roll_torque = roll_rate_pid.update(roll_rate_ref, rate_p, CONTROL_DT)
+                pitch_torque = pitch_rate_pid.update(pitch_rate_ref, rate_q, CONTROL_DT)
+                yaw_torque = yaw_rate_pid.update(yaw_rate_ref, rate_r, CONTROL_DT)
 
-            if use_rate_mode:
-                roll_rate_ref = roll_ref
-                pitch_rate_ref = pitch_ref
-                yaw_rate_ref = yaw_ref
-            else:
-                roll_rate_ref = roll_pid.update(roll_ref, phi, CONTROL_DT)
-                pitch_rate_ref = pitch_pid.update(pitch_ref, theta, CONTROL_DT)
-                yaw_rate_ref = yaw_ref
+                # Control allocation (uses pre-allocated buffers)
+                # 制御配分（事前割り当てバッファ使用）
+                total_thrust = hover_thrust + delta_thrust
+                if total_thrust < 0.0:
+                    total_thrust = 0.0
+                elif total_thrust > 0.6:
+                    total_thrust = 0.6
+                motor_thrusts = allocator.mix(total_thrust, roll_torque, pitch_torque, yaw_torque)
+                voltage = allocator.thrusts_to_voltages(motor_thrusts)
 
-            roll_torque = roll_rate_pid.update(roll_rate_ref, rate_p, CONTROL_DT)
-            pitch_torque = pitch_rate_pid.update(pitch_rate_ref, rate_q, CONTROL_DT)
-            yaw_torque = yaw_rate_pid.update(yaw_rate_ref, rate_r, CONTROL_DT)
+                control_steps += 1
+                if _sample_ctrl:
+                    control_step_times.append(time.perf_counter() - t_ctrl_start)
 
-            # Control allocation
-            total_thrust = hover_thrust + delta_thrust
-            total_thrust = max(0.0, min(total_thrust, 4 * 0.15))
-            motor_thrusts = allocator.mix(total_thrust, roll_torque, pitch_torque, yaw_torque)
-            motor_voltages = allocator.thrusts_to_voltages(motor_thrusts)
-            voltage = [motor_voltages[0], motor_voltages[1], motor_voltages[2], motor_voltages[3]]
+                # --- Physics inner loop (5 steps per control) ---
+                _sample_phys = (control_steps % 20 == 0)
+                if _sample_phys:
+                    t_phys_start = time.perf_counter()
 
-            control_steps += 1
-            if _sample_ctrl:
-                t_ctrl_end = time.perf_counter()
-                control_step_times.append(t_ctrl_end - t_ctrl_start)
+                for _ in range(PHYSICS_PER_CONTROL):
+                    _step(voltage, PHYSICS_DT)
+                physics_steps += PHYSICS_PER_CONTROL
 
-            # ===========================================
-            # Physics inner loop (PHYSICS_PER_CONTROL steps)
-            # 物理内部ループ（制御1回あたりPHYSICS_PER_CONTROL回）
-            # Measure the batch time every SAMPLE_INTERVAL steps
-            # SAMPLE_INTERVAL ステップごとにバッチ時間を計測
-            # ===========================================
-            _sample_phys = (control_steps % 20 == 0)  # Sample every 20th control cycle
-            if _sample_phys:
-                t_phys_start = time.perf_counter()
+                if _sample_phys:
+                    physics_step_times.append((time.perf_counter() - t_phys_start) / PHYSICS_PER_CONTROL)
 
-            for _ in range(PHYSICS_PER_CONTROL):
-                stampfly.step(voltage, PHYSICS_DT)
-                physics_steps += 1
+                sim_time = physics_steps * PHYSICS_DT
 
-            if _sample_phys:
-                t_phys_end = time.perf_counter()
-                physics_step_times.append((t_phys_end - t_phys_start) / PHYSICS_PER_CONTROL)
+                # --- Data logging (reduced frequency: 20Hz) ---
+                if physics_steps % LOG_INTERVAL == 0:
+                    T_log.append(sim_time)
+                    PQR_log.append(body.pqr.copy())
+                    EULER_log.append(body.euler.copy())
+                    POS_log.append(body.position.copy())
 
-            sim_time = physics_steps * PHYSICS_DT
-            steps_since_last_frame += PHYSICS_PER_CONTROL
+                # --- Collision detection ---
+                _pos = body.position
+                if _check_collision(_pos[0][0], _pos[1][0], _pos[2][0]):
+                    print(f"COLLISION at t={sim_time:.2f}s")
+                    Render.show_collision(_pos[0][0], _pos[1][0], _pos[2][0])
+                    raise KeyboardInterrupt
 
-            # Data logging (reduced frequency)
-            if physics_steps % LOG_INTERVAL == 0:
-                T_log.append(sim_time)
-                PQR_log.append(stampfly.body.pqr.copy())
-                EULER_log.append(stampfly.body.euler.copy())
-                POS_log.append(stampfly.body.position.copy())
+                # Full control cycle measurement
+                if _sample_full:
+                    full_loop_times.append(time.perf_counter() - t_full_start)
 
-            # Collision detection (at control rate)
-            # 衝突判定（制御レート）
-            pos = stampfly.body.position
-            if Render.check_collision(pos[0][0], pos[1][0], pos[2][0]):
-                print(f"COLLISION at t={sim_time:.2f}s")
-                Render.show_collision(pos[0][0], pos[1][0], pos[2][0])
-                raise KeyboardInterrupt
-
-            # ===========================================
+            # =============================================
             # Rendering — rate(fps) is the master clock
             # 描画 — rate(fps)がマスタークロック
-            # Skip function call when not time to render (saves ~37ms/sec)
-            # レンダリング時刻でなければ関数呼び出しをスキップ
-            # ===========================================
-            if sim_time >= Render.anim_time:
-                keyname = Render.rendering(sim_time, stampfly)
+            # =============================================
+            keyname = _rendering(sim_time, stampfly)
+
             # Track physics steps between frames
             # フレーム間の物理ステップ数を追跡
             if Render.frame_num > last_frame_num:
-                Render.record_physics_steps(steps_since_last_frame)
-                steps_since_last_frame = 0
+                Render.record_physics_steps(physics_steps - steps_at_last_frame)
+                steps_at_last_frame = physics_steps
                 last_frame_num = Render.frame_num
+
             if keyname == 'q':
                 raise KeyboardInterrupt
 
@@ -518,13 +551,13 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
                 rt_prev_sim_time = sim_time
                 rt_prev_wall_time = wall_now
 
-                euler = stampfly.body.euler
-                pos = stampfly.body.position
+                _euler = body.euler
+                _pos = body.position
 
                 mode_str = "ACRO" if use_rate_mode else "STAB"
                 print(f"[{mode_str}] t={sim_time:.1f}s RT={rt_instant:.2f}x(avg={rt_cumulative:.2f}x) | "
-                      f"pos=({pos[0][0]:+.1f},{pos[1][0]:+.1f},{pos[2][0]:.1f}) | "
-                      f"RPY=({np.degrees(euler[0][0]):+.0f},{np.degrees(euler[1][0]):+.0f},{np.degrees(euler[2][0]):+.0f})")
+                      f"pos=({_pos[0][0]:+.1f},{_pos[1][0]:+.1f},{_pos[2][0]:.1f}) | "
+                      f"RPY=({np.degrees(_euler[0][0]):+.0f},{np.degrees(_euler[1][0]):+.0f},{np.degrees(_euler[2][0]):+.0f})")
 
     except KeyboardInterrupt:
         pass
@@ -571,6 +604,26 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
         print(f"  Max:      {max(cst)*1e6:.1f} us")
         print()
 
+    # Full control cycle timing report (including all overhead)
+    # 制御サイクル全体タイミングレポート（全オーバーヘッド含む）
+    if len(full_loop_times) > 20:
+        flt = full_loop_times[20:]  # Skip warm-up / ウォームアップをスキップ
+        print("--- Full control cycle time / 制御サイクル全体時間 ---")
+        print(f"  Average:  {statistics.mean(flt)*1e6:.1f} us ({statistics.mean(flt)*1000:.3f} ms)")
+        print(f"  Median:   {statistics.median(flt)*1e6:.1f} us")
+        print(f"  Min:      {min(flt)*1e6:.1f} us")
+        print(f"  Max:      {max(flt)*1e6:.1f} us")
+        print(f"  Per second ({CONTROL_HZ} Hz): {statistics.mean(flt)*CONTROL_HZ*1000:.1f} ms")
+        # Overhead = full_cycle - physics - control
+        if len(physics_step_times) > 10 and len(control_step_times) > 10:
+            avg_phys = statistics.mean(physics_step_times[10:])
+            avg_ctrl = statistics.mean(control_step_times[10:])
+            avg_full = statistics.mean(flt)
+            overhead = avg_full - (avg_phys * PHYSICS_PER_CONTROL) - avg_ctrl
+            print(f"  Overhead per cycle: {overhead*1e6:.1f} us (joystick+collision+logging+loop)")
+            print(f"  Overhead per sec:   {overhead*CONTROL_HZ*1000:.1f} ms")
+        print()
+
     # Feasibility analysis (FPS-independent)
     # 実現可能性分析（FPS非依存）
     print("=" * 70)
@@ -597,14 +650,25 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
             avg_render_ms = 0
         render_per_sec_ms = RENDER_FPS * avg_render_ms
 
-        total_per_sec_ms = physics_per_sec_ms + control_per_sec_ms + render_per_sec_ms
-        theoretical_rt = 1000.0 / total_per_sec_ms
+        # Loop overhead from full-cycle measurement
+        # フルサイクル計測からのループオーバーヘッド
+        if len(full_loop_times) > 20:
+            avg_full_ms = statistics.mean(full_loop_times[20:]) * 1000
+            full_per_sec_ms = CONTROL_HZ * avg_full_ms
+            overhead_per_sec_ms = full_per_sec_ms - physics_per_sec_ms - control_per_sec_ms
+        else:
+            overhead_per_sec_ms = 0
+            full_per_sec_ms = 0
+
+        total_per_sec_ms = physics_per_sec_ms + control_per_sec_ms + render_per_sec_ms + overhead_per_sec_ms
+        theoretical_rt = 1000.0 / total_per_sec_ms if total_per_sec_ms > 0 else float('inf')
 
         print(f"\n  Per-second computation breakdown (for 1s of simulation):")
         print(f"  1秒のシミュレーションに必要な実時間:")
         print(f"    Physics  ({PHYSICS_HZ} Hz x {avg_physics_us:.1f} us): {physics_per_sec_ms:.1f} ms ({physics_per_sec_ms/10:.1f}%)")
         print(f"    Control  ({CONTROL_HZ} Hz x {avg_ctrl_ms*1000:.1f} us):  {control_per_sec_ms:.1f} ms ({control_per_sec_ms/10:.1f}%)")
         print(f"    Render   ({RENDER_FPS} FPS x {avg_render_ms:.3f} ms):   {render_per_sec_ms:.1f} ms ({render_per_sec_ms/10:.1f}%)")
+        print(f"    Overhead (joystick+collision+loop):  {overhead_per_sec_ms:.1f} ms ({overhead_per_sec_ms/10:.1f}%)")
         print(f"    ─────────────────────────────────────")
         print(f"    Total:                              {total_per_sec_ms:.1f} ms")
         print(f"    Available (real-time):               1000.0 ms")
