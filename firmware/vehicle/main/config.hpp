@@ -114,9 +114,9 @@ namespace eskf {
 // センサー有効/無効スイッチ
 // デフォルト: 全センサーON。デバッグ時に個別無効化可能
 // -----------------------------------------------------------------------------
-inline constexpr bool USE_OPTICAL_FLOW = true;     // オプティカルフロー（水平速度推定）
-inline constexpr bool USE_BAROMETER = true;        // 気圧センサー（高度推定）
-inline constexpr bool USE_TOF = true;              // ToFセンサー（高度推定）
+inline constexpr bool USE_OPTICAL_FLOW = false;    // オプティカルフロー ※姿勢ジャンプ原因切分け中
+inline constexpr bool USE_BAROMETER = false;       // 気圧センサー ※姿勢ジャンプ原因切分け中
+inline constexpr bool USE_TOF = false;             // ToFセンサー ※姿勢ジャンプ原因切分け中
 inline constexpr bool USE_MAGNETOMETER = false;    // 地磁気観測更新（ヨー補正）※テスト用に無効化
 inline constexpr bool ENABLE_YAW_ESTIMATION = true; // ヨー推定（ジャイロ積分）※falseで0固定
 
@@ -195,14 +195,13 @@ inline constexpr float FLOW_OFFSET_X = 0.0f;
 inline constexpr float FLOW_OFFSET_Y = 0.0f;
 
 // -----------------------------------------------------------------------------
-// 姿勢補正モード
-// 0: 加速度絶対値フィルタのみ
-// 1: 適応的R (水平加速度でRをスケーリング)
-// 2: 角速度フィルタ (高回転時にRを増加)
-// 3: 高回転時バイアス保護
+// 姿勢補正: 適応的Rスケーリング
+// R = R_base × (1 + K_ADAPTIVE × |accel_norm - g|²)
+// 動的加速度が大きいほど加速度計の補正を弱める（ゼロにはしない）
+// K=0: 常に同じ重みで補正、K=10: 1m/s²偏差で補正が約1/11に低減
 // -----------------------------------------------------------------------------
 inline constexpr int ATT_UPDATE_MODE = 0;
-inline constexpr float K_ADAPTIVE = 0.0f;
+inline constexpr float K_ADAPTIVE = 10.0f;
 inline constexpr float GYRO_ATT_THRESHOLD = 0.5f;      // [rad/s]
 
 // -----------------------------------------------------------------------------

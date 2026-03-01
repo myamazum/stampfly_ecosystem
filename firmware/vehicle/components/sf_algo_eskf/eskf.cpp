@@ -1501,13 +1501,10 @@ void ESKF::updateAccelAttitude(const Vector3& accel)
     float ay = accel.y - state_.accel_bias.y;
     float az = accel.z - state_.accel_bias.z;
 
-    // 加速度ノルムをチェック（運動中は更新スキップ）
+    // 加速度ノルムと重力偏差（適応的Rスケーリングに使用）
+    // Acceleration norm and gravity deviation (for adaptive R scaling)
     float accel_norm = std::sqrt(ax*ax + ay*ay + az*az);
     float gravity_diff = std::abs(accel_norm - config_.gravity);
-
-    if (gravity_diff > config_.accel_motion_threshold) {
-        return;
-    }
 
     // ========================================================================
     // 3軸加速度観測によるカルマン更新
@@ -1554,9 +1551,11 @@ void ESKF::updateAccelAttitude(const Vector3& accel)
     float H26 = g*R21,     H27 = -g*R20,   H28 = 0.0f;
     // バイアス部分 (列12,13,14): H[0][12]=1, H[1][13]=1, H[2][14]=1
 
-    // Adaptive R（水平加速度でスケーリング）
-    float horiz_accel_sq = ax*ax + ay*ay;
-    float R_scale = 1.0f + config_.k_adaptive * horiz_accel_sq;
+    // Adaptive R（重力偏差でスケーリング）
+    // 動的加速度が大きいほどRを増大させ、補正ゲインを連続的に低減
+    // Continuously reduce correction gain as acceleration deviates from gravity
+    float gravity_diff_sq = gravity_diff * gravity_diff;
+    float R_scale = 1.0f + config_.k_adaptive * gravity_diff_sq;
     float base_noise_sq = config_.accel_att_noise * config_.accel_att_noise;
     float R_val = base_noise_sq * R_scale;
 
