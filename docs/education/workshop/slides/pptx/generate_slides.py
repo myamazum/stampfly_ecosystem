@@ -599,11 +599,11 @@ def build_lesson_02() -> Presentation:
     add_title_slide(prs, "Lesson 2: コントローラ入力", "Controller Input")
 
     add_content_slide(prs, "今日のゴール / Today's Goal", [
-        "コントローラのスティック値を読み取り、モータを操作する",
+        "スティック値を変数に読み取り、演算でモータを個別制御する",
         "",
         "• ESP-NOW 無線通信の仕組みを理解",
-        "• スティック値の正規化（ADC → 浮動小数点）",
-        "• オープンループ制御の限界を体感",
+        "• 変数と四則演算でスティック → モータ Duty を計算",
+        "• オープンループ手動操縦の限界を体感",
     ])
 
     add_content_slide(
@@ -623,6 +623,7 @@ def build_lesson_02() -> Presentation:
         ["rc_pitch()", "ピッチ", "-1.0 -- +1.0"],
         ["rc_yaw()", "ヨー", "-1.0 -- +1.0"],
         ["is_armed()", "ARM状態", "true / false"],
+        ["motor_set_duty(id, v)", "モータ個別制御", "id=1-4, v=0.0-1.0"],
     ])
 
     add_content_slide(prs, "ペアリング手順 / Pairing", [
@@ -632,6 +633,16 @@ def build_lesson_02() -> Presentation:
         "",
         "⚠ 教室では一組ずつペアリングする（ブロードキャスト通信のため近くの機体と干渉する可能性）",
         "⚠ うまくいかない場合: 両方を再起動して Step 1 からやり直す",
+    ])
+
+    # Motor layout + mixing sign table
+    add_table_slide(prs, "モータ配置とミキシング / Motor Layout & Mixing", [
+        "Motor", "T", "Roll", "Pitch", "Yaw",
+    ], [
+        ["M1 FR", "+", "+", "-", "-"],
+        ["M2 RR", "+", "+", "+", "+"],
+        ["M3 RL", "+", "-", "+", "-"],
+        ["M4 FL", "+", "-", "-", "+"],
     ])
 
     add_content_slide(
@@ -644,35 +655,31 @@ def build_lesson_02() -> Presentation:
         image_path=IMAGES_DIR / "open_loop.png",
     )
 
-    add_code_slide(prs, "実習: スロットル → モータ", """
+    add_code_slide(prs, "実習: 手動ミキシング", """
 #include "workshop_api.hpp"
-
 static uint32_t tick = 0;
-
-void setup() {
-    ws::print("Lesson 2: Controller Input");
-}
-
+void setup() { ws::print("L2: Open-Loop Control"); }
 void loop_400Hz(float dt) {
     tick++;
-    float throttle = ws::rc_throttle();
-
-    // Direct throttle-to-motor (open loop)
-    ws::motor_set_all(throttle);
-
-    // Print every 200ms
-    if (tick % 80 == 0) {
+    float t = ws::rc_throttle();
+    float r = ws::rc_roll()  * 0.3f;
+    float p = ws::rc_pitch() * 0.3f;
+    float y = ws::rc_yaw()   * 0.3f;
+    ws::motor_set_duty(1, t + r - p - y); // FR
+    ws::motor_set_duty(2, t + r + p + y); // RR
+    ws::motor_set_duty(3, t - r + p - y); // RL
+    ws::motor_set_duty(4, t - r - p + y); // FL
+    if (tick % 80 == 0)
         ws::print("T=%.2f R=%.2f P=%.2f Y=%.2f",
-            throttle, ws::rc_roll(),
-            ws::rc_pitch(), ws::rc_yaw());
-    }
+            t, r, p, y);
 }
 """)
 
     add_checkpoint_slide(prs, [
         "コントローラとペアリングできた",
-        "ARM 後、スロットルでモータが回る",
-        "シリアルモニタに T/R/P/Y 値が表示される",
+        "スロットルで全モータが均等に回る",
+        "ピッチスティックで前後モータの回転差が出る",
+        "ゲイン(0.3f)を変えて挙動の違いを確認した",
     ], "Lesson 3: LED 制御")
 
     return prs
