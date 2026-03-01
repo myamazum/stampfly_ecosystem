@@ -515,10 +515,60 @@ void loop_400Hz(float dt)
 }
 """)
 
+    # P15: Workflow
+    add_content_slide(prs, "作業の進め方 / Workflow", [
+        "【ファイル構造】",
+        "  firmware/workshop/",
+        "    ├── lessons/",
+        "    │   ├── lesson_00/student.cpp  ← テンプレート",
+        "    │   ├── lesson_01/student.cpp",
+        "    │   └── ...",
+        "    └── main/",
+        "        └── user_code.cpp  ← ここを編集！",
+        "",
+        "【手順】",
+        "  1. sf lesson switch N → テンプレートを user_code.cpp にコピー",
+        "  2. user_code.cpp を編集",
+        "  3. sf lesson build",
+        "  4. sf lesson flash",
+        "",
+        "⚠ student.cpp はテンプレート — 直接編集しない！ switch で何度でもリセット可能",
+    ])
+
+    # P16: Controller setup
+    add_content_slide(prs, "コントローラのセットアップ / Controller Setup", [
+        "【コントローラのビルドと書き込み】",
+        "  1. コントローラを USB 接続",
+        "  2. sf build controller",
+        "  3. sf flash controller",
+        "",
+        "【確認】",
+        "  LCD に起動画面が表示されれば OK",
+        "  Lesson 2 でペアリングして使用する",
+    ])
+
+    # P17: Simulator
+    add_content_slide(prs, "シミュレータで遊ぶ / Try the Simulator", [
+        "【コマンド】",
+        "  sf sim run                  ← デフォルト（VPython + ボクセルワールド）",
+        "  sf sim run -w ringworld     ← 軽量ワールド",
+        "",
+        "【操作方法】",
+        "  スロットル → 上昇",
+        "  ロール / ピッチ → 傾き",
+        "  ヨー → 回転",
+        "  ARM ボタン → リセット",
+        "  Q キー → 終了",
+        "",
+        "コントローラを USB 接続すればジョイスティックで操縦可能！",
+        "まだ制御なし（オープンループ）→ 難しいのが正常",
+    ])
+
     add_checkpoint_slide(prs, [
         "sf doctor がエラーなしで通る",
-        "ビルドが成功する",
-        "シリアルモニタに \"Hello StampFly!\" が表示される",
+        "ビルドが成功し \"Hello StampFly!\" が表示される",
+        "コントローラのビルド・書き込みが完了した",
+        "シミュレータが起動し操縦を試した",
     ], "Lesson 1: モータ制御")
 
     return prs

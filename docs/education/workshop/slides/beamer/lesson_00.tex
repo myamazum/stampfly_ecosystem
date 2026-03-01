@@ -268,12 +268,102 @@ void loop_400Hz(float dt)
 \end{frame}
 
 % ------------------------------------------------------------------
+\begin{frame}{作業の進め方 / Workflow}
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      \begin{block}{ファイル構造}
+        \footnotesize\ttfamily
+        firmware/workshop/\\
+        \hspace{1em}├── lessons/\\
+        \hspace{1em}│\hspace{1em}├── lesson\_00/student.cpp\\
+        \hspace{1em}│\hspace{1em}├── lesson\_01/student.cpp\\
+        \hspace{1em}│\hspace{1em}└── ...\\
+        \hspace{1em}└── main/\\
+        \hspace{2.5em}└── user\_code.cpp ← 編集！
+      \end{block}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{enumerate}\setlength{\itemsep}{4pt}
+        \item \code{sf lesson switch N}\\
+              {\footnotesize テンプレートを \code{user\_code.cpp} にコピー}
+        \item \code{user\_code.cpp} を編集
+        \item \code{sf lesson build}
+        \item \code{sf lesson flash}
+      \end{enumerate}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.5em}
+
+  \begin{alertblock}{注意}
+    \code{student.cpp} はテンプレートなので直接編集しない！\\
+    \code{switch} で何度でもリセットできる
+  \end{alertblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{コントローラのセットアップ / Controller Setup}
+  \begin{block}{コントローラのビルドと書き込み}
+    \begin{enumerate}
+      \item コントローラを USB 接続
+      \item \code{sf build controller}
+      \item \code{sf flash controller}
+    \end{enumerate}
+  \end{block}
+
+  \vspace{1em}
+
+  \begin{exampleblock}{確認}
+    LCD に起動画面が表示されれば OK\\
+    Lesson 2 でペアリングして使用する
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{シミュレータで遊ぶ / Try the Simulator}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{コマンド}
+        \code{sf sim run}\\
+        {\footnotesize デフォルト（VPython + ボクセルワールド）}\\[2pt]
+        \code{sf sim run -w ringworld}\\
+        {\footnotesize 軽量ワールド}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{table}
+        \centering\small
+        \begin{tabular}{ll}
+          \hline
+          \textbf{操作} & \textbf{説明} \\
+          \hline
+          スロットル       & 上昇 \\
+          ロール / ピッチ  & 傾き \\
+          ヨー             & 回転 \\
+          ARM ボタン       & リセット \\
+          Q キー           & 終了 \\
+          \hline
+        \end{tabular}
+      \end{table}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+
+  \begin{exampleblock}{ヒント}
+    コントローラを USB 接続すればジョイスティックで操縦可能！\\
+    まだ制御なし（オープンループ）→ 難しいのが正常
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
 \begin{frame}{チェックポイント / Checkpoint}
   \begin{alertblock}{確認事項}
     \begin{itemize}
       \item[$\square$] \code{sf doctor} がエラーなしで通る
-      \item[$\square$] ビルドが成功する
-      \item[$\square$] シリアルモニタに \texttt{"Hello StampFly!"} が表示される
+      \item[$\square$] ビルドが成功し \texttt{"Hello StampFly!"} が表示される
+      \item[$\square$] コントローラのビルド・書き込みが完了した
+      \item[$\square$] シミュレータが起動し操縦を試した
     \end{itemize}
   \end{alertblock}
 
