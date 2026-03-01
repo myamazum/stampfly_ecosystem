@@ -912,10 +912,8 @@ static void render_stick_test_screen(void)
     M5.Display.printf("Press BTN: Back ");
 }
 
-// Channel画面描画
-// Channel screen rendering
-// チャンネル設定画面の選択状態
-// Channel setting screen selection state
+// Device ID / Channel 画面描画
+// Device ID / Channel screen rendering
 static void render_channel_screen(void)
 {
     const int line_height = 17;
@@ -2157,10 +2155,8 @@ extern "C" void app_main(void)
         M5.Display.setTextColor(SF_GREEN, SF_BLACK);
         M5.Display.println("ESP-NOW: OK");
 
-        // ビーコンピア初期化
-        beacon_peer_init();
-
         // ペアリング処理 (ボタン押下時またはMAC未設定時)
+        // Pairing process (on button press or MAC not set)
         M5.update();
         bool force_pairing = M5.BtnA.isPressed();
         if (force_pairing) {
@@ -2175,7 +2171,9 @@ extern "C" void app_main(void)
             peer_info_save();
         }
 
-        // ドローンピア初期化
+        // ピア初期化（ペアリング後にチャンネル確定してから初期化）
+        // Initialize peers after pairing so channel is finalized
+        beacon_peer_init();
         drone_peer_init();
 
         // Stick Modeは既にNVSから読み込み済み
