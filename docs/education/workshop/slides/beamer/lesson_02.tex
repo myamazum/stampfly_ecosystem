@@ -48,12 +48,29 @@
       \hline
     \end{tabular}
   \end{table}
+\end{frame}
 
-  \vspace{0.5em}
+% ------------------------------------------------------------------
+\begin{frame}{ペアリング手順 / Pairing}
+  \begin{table}
+    \centering
+    \begin{tabular}{cp{120mm}}
+      \hline
+      \textbf{Step} & \textbf{操作} \\
+      \hline
+      1 & コントローラの \textbf{M5ボタンを押しながら電源ON} → LCD に ``Pairing mode...'' 表示 \\
+      2 & StampFly のボタンを \textbf{3秒長押し} → 青LED高速点滅 + ビープ音 \\
+      3 & ペアリング完了 → ビープ音が鳴り、次回から自動接続 \\
+      \hline
+    \end{tabular}
+  \end{table}
 
-  \begin{block}{ペアリング手順}
-    StampFly のボタンを \textbf{3秒長押し} → コントローラと自動ペアリング
-  \end{block}
+  \begin{alertblock}{注意}
+    \begin{itemize}
+      \item 教室では\textbf{一組ずつ}ペアリングする（ブロードキャスト通信のため近くの機体と干渉する可能性）
+      \item うまくいかない場合: 両方を再起動して Step 1 からやり直す
+    \end{itemize}
+  \end{alertblock}
 \end{frame}
 
 % ------------------------------------------------------------------

@@ -625,6 +625,15 @@ def build_lesson_02() -> Presentation:
         ["is_armed()", "ARM状態", "true / false"],
     ])
 
+    add_content_slide(prs, "ペアリング手順 / Pairing", [
+        "Step 1: コントローラの M5ボタンを押しながら電源ON → LCD に \"Pairing mode...\" 表示",
+        "Step 2: StampFly のボタンを 3秒長押し → 青LED高速点滅 + ビープ音",
+        "Step 3: ペアリング完了 → ビープ音が鳴り、次回から自動接続",
+        "",
+        "⚠ 教室では一組ずつペアリングする（ブロードキャスト通信のため近くの機体と干渉する可能性）",
+        "⚠ うまくいかない場合: 両方を再起動して Step 1 からやり直す",
+    ])
+
     add_content_slide(
         prs, "オープンループ制御 / Open-Loop Control",
         [
