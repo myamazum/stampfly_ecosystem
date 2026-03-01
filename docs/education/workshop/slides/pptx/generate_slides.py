@@ -816,71 +816,112 @@ void loop_400Hz(float dt) {
 def build_lesson_06() -> Presentation:
     prs = new_presentation()
 
+    # Slide 1: Title
     add_title_slide(prs, "Lesson 6: PID 制御", "PID Control")
 
+    # Slide 2: Goal (updated)
     add_content_slide(prs, "今日のゴール / Today's Goal", [
-        "I 項・D 項を追加し、定常偏差除去とオーバーシュート低減を実現する",
+        "工学形式 PID を実装し、不完全微分でノイズに強い制御を実現する",
         "",
-        "• P 制御の限界（定常偏差が残る）",
-        "• I 項: 偏差の積分で定常偏差を除去",
-        "• D 項: 偏差の微分でオーバーシュートを低減",
+        "• P 制御の限界（定常偏差、振動）",
+        "• 工学形式 Kp / Ti / Td とは",
+        "• 不完全微分: ノイズに強い微分項",
+        "• ログから調整する方法",
     ])
 
+    # Slide 3: PID Block Diagram
     add_content_slide(
         prs, "PID 制御器 / PID Controller",
         [
             "P（比例）: 現在の誤差に比例した出力",
-            "I（積分）: 誤差の蓄積を補正",
-            "D（微分）: 誤差の変化率で振動を抑制",
+            "I（積分）: Kp/Ti で偏差の蓄積を補正",
+            "D（不完全微分）: Td·s/(η·Td·s+1) で高周波をカット",
+            "",
+            "C(s) = Kp(1 + 1/(Ti·s) + Td·s/(η·Td·s+1))",
         ],
         image_path=IMAGES_DIR / "pid_block.png",
     )
 
-    add_table_slide(prs, "推奨ゲイン / Recommended Gains", [
-        "軸", "Kp", "Ki", "Kd",
+    # Slide 4: Why Incomplete Derivative? (new)
+    add_content_slide(prs, "なぜ不完全微分か / Why Incomplete Derivative?", [
+        "【問題】",
+        "• ジャイロセンサにはノイズがある",
+        "• 理想微分 de/dt はノイズを増幅",
+        "• 高周波振動 → モータに悪影響",
+        "",
+        "【解決策】",
+        "• 不完全微分フィルタ η で高周波をカット",
+        "• η = 0.1〜0.2（小→フィルタ弱い、大→フィルタ強い）",
+        "• 微分の効きとノイズ除去のトレードオフ",
+    ])
+
+    # Slide 5: Engineering Form Parameters (new)
+    add_table_slide(prs, "工学形式パラメータ / Engineering Form", [
+        "パラメータ", "意味", "効果",
     ], [
-        ["Roll", "0.5", "0.3", "0.005"],
-        ["Pitch", "0.5", "0.3", "0.005"],
-        ["Yaw", "2.0", "0.5", "0.01"],
+        ["Kp", "比例ゲイン", "大→応答速い、大きすぎ→振動"],
+        ["Ti", "積分時間 [s]", "小→積分強い、小さすぎ→ワインドアップ"],
+        ["Td", "微分時間 [s]", "大→微分強い、大きすぎ→ノイズ増幅"],
+        ["η", "フィルタ係数", "0.1〜0.2、大→ノイズに強い"],
     ])
 
-    add_content_slide(prs, "チューニングの順序 / Tuning Procedure", [
-        "1. Ki = Kd = 0 にして Kp を調整（振動しない最大値）",
-        "2. Ki を少しずつ追加（定常偏差が消えるまで）",
-        "3. Kd を少しずつ追加（振動が収まるまで）",
+    # Slide 6: Log-Based Tuning Guide (new)
+    add_table_slide(prs, "ログから調整する / Log-Based Tuning", [
+        "ログで見える症状", "原因", "調整",
+    ], [
+        ["振動が収まらない", "Kp 過大", "Kp↓"],
+        ["応答が遅い", "Kp 過小", "Kp↑"],
+        ["定常偏差が残る", "I項不足", "Ti↓（積分強化）"],
+        ["オーバーシュート大", "D項不足", "Td↑（微分強化）"],
+        ["高周波ノイズ", "η 過小", "η↑（0.1→0.2）"],
+        ["ゆっくり発散", "ワインドアップ", "Ti↑"],
     ])
 
-    add_code_slide(prs, "実習: ロール軸 PID", """
-#include "workshop_api.hpp"
-float Kp=0.5f, Ki=0.3f, Kd=0.005f;
+    # Slide 7: Recommended Gains (Ti/Td form)
+    add_table_slide(prs, "推奨ゲイン / Recommended Gains", [
+        "軸", "Kp", "Ti [s]", "Td [s]", "η",
+    ], [
+        ["Roll", "0.5", "1.67", "0.01", "0.125"],
+        ["Pitch", "0.5", "1.67", "0.01", "0.125"],
+        ["Yaw", "2.0", "4.0", "0.005", "0.125"],
+    ])
+
+    # Slide 8: Hands-on Step 1 -- Ideal PID
+    add_code_slide(prs, "実習 Step 1: 理想 PID", """
+float Kp=0.5f, Ti=1.67f, Td=0.01f;
 float integral=0, prev_err=0;
-void setup() { ws::print("Lesson 6: PID"); }
-void loop_400Hz(float dt) {
-    if (!ws::is_armed()) {
-        ws::motor_stop_all();
-        integral = 0; prev_err = 0;  // Reset
-        return;
-    }
-    float target = ws::rc_roll() * 1.0f;
-    float error  = target - ws::gyro_x();
-    float P = Kp * error;
-    integral += error * dt;
-    if (integral >  0.5f) integral =  0.5f;
-    if (integral < -0.5f) integral = -0.5f;
-    float I = Ki * integral;
-    float D = Kd * (error - prev_err) / dt;
-    prev_err = error;
-    float roll_out = P + I + D;
-    // Repeat for pitch and yaw axes
-    ws::motor_mixer(ws::rc_throttle(), roll_out,
-                    pitch_out, yaw_out);
-}
+// ... inside loop_400Hz(dt) ...
+float target = ws::rc_roll() * 1.0f;
+float error  = target - ws::gyro_x();
+float P = Kp * error;
+// I term (trapezoidal)
+if (Ti > 0)
+    integral += (dt/(2*Ti)) * (error + prev_err);
+float I = Kp * integral;
+// D term (ideal derivative)
+float D = Kp * Td * (error - prev_err) / dt;
+prev_err = error;
+float roll_out = P + I + D;
 """)
 
+    # Slide 9: Hands-on Step 2 -- Incomplete Derivative
+    add_code_slide(prs, "実習 Step 2: 不完全微分", """
+// Replace ideal D with incomplete derivative filter
+float eta = 0.125f;
+float d_filt = 0;  // persistent state
+// ... inside loop_400Hz(dt) ...
+float alpha = 2*eta*Td / dt;
+float a = (alpha - 1) / (alpha + 1);
+float b = 2*Td / ((alpha + 1) * dt);
+d_filt = a * d_filt + b * (error - prev_err);
+float D = Kp * d_filt;  // Filtered!
+""")
+
+    # Slide 10: Checkpoint (updated)
     add_checkpoint_slide(prs, [
+        "理想微分 vs 不完全微分で高周波振動の違いを確認",
         "定常偏差がなくなった（P のみと比較）",
-        "振動なく安定してホバリング",
-        "ゲインを変更して応答の変化を確認",
+        "ゲイン調整表を使って応答を改善できた",
     ], "Lesson 7: テレメトリ + ステップ応答")
 
     return prs

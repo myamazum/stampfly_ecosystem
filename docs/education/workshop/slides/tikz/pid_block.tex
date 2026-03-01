@@ -14,7 +14,7 @@
     block/.style={
       rectangle, draw=#1, line width=1.5pt,
       fill=#1!8, rounded corners=3pt,
-      minimum width=35mm, minimum height=13mm,
+      minimum width=38mm, minimum height=13mm,
       font=\bfseries, text=#1, align=center
     },
     sum/.style={
@@ -26,25 +26,26 @@
   ]
 
   % Input
-  \node[font=\bfseries, arrowcolor] (input) at (-1, 0) {error $e$};
+  \node[font=\bfseries, arrowcolor] (input) at (-1, 0) {$e(t)$};
 
   % Branch point
   \coordinate (branch) at (1.5, 0);
+  \fill[arrowcolor] (branch) circle (2.5pt);
 
   % P block (top)
   \node[block=pcolor] (P) at (5.5, 2) {P: $K_p \cdot e$};
 
   % I block (center)
-  \node[block=icolor] (I) at (5.5, 0) {I: $K_i \displaystyle\int e\,dt$};
+  \node[block=icolor] (I) at (5.5, 0) {I: $\dfrac{K_p}{T_i} \displaystyle\int e\,dt$};
 
-  % D block (bottom)
-  \node[block=dcolor] (D) at (5.5, -2) {D: $K_d \dfrac{de}{dt}$};
+  % D block (bottom) -- Incomplete derivative filter
+  \node[block=dcolor] (D) at (5.5, -2) {D: $\dfrac{T_d s}{\eta T_d s + 1}$};
 
   % Sum
   \node[sum] (sum) at (10, 0) {$\Sigma$};
 
   % Output
-  \node[font=\bfseries, arrowcolor] (output) at (12.5, 0) {output $u$};
+  \node[font=\bfseries, arrowcolor] (output) at (12.5, 0) {$u(t)$};
 
   % Input arrow to branch
   \draw[arrow] (input) -- (branch);
@@ -67,10 +68,14 @@
   \node[font=\scriptsize, icolor] at ($(sum)+(180:0.75)$) {$+$};
   \node[font=\scriptsize, dcolor] at ($(sum)+(240:0.75)$) {$+$};
 
-  % Labels (left-aligned just right of blocks, above/below arrow lines)
+  % Labels
   \node[font=\small, pcolor, anchor=south west] at (7.5, 2) {Proportional};
   \node[font=\small, icolor, anchor=south west] at (7.5, 0) {Integral};
-  \node[font=\small, dcolor, anchor=north west] at (7.5, -2) {Derivative};
+  \node[font=\small, dcolor, anchor=north west] at (7.5, -2) {Incomplete Derivative};
+
+  % Transfer function (below diagram)
+  \node[font=\normalsize, arrowcolor, anchor=north] at (5.5, -3.8) {%
+    $C(s) = K_p\!\left(1 + \dfrac{1}{T_i s} + \dfrac{T_d s}{\eta T_d s + 1}\right)$};
 
 \end{tikzpicture}
 \end{document}
