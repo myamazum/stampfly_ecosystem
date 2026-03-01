@@ -75,7 +75,7 @@ output = Kp * error
 ## Steps / 手順
 1. `sf lesson switch 5`
 2. Fill in the TODO sections in `student.cpp`
-3. Build and flash: `sf build workshop && sf flash workshop -m`
+3. Build and flash: `sf lesson build && sf lesson flash`
 4. **Safety checklist before flight / フライト前安全チェック:**
    - Battery fully charged / バッテリー満充電
    - Throttle stick at minimum / スロットルスティック最小

@@ -16,16 +16,16 @@
         <mxCell id="arrow1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" source="step1" target="step2" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <!-- Step 2: sf build workshop -->
-        <mxCell id="step2" value="&lt;b&gt;sf build workshop&lt;/b&gt;&lt;br&gt;ファームウェアビルド" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;arcSize=20;" vertex="1" parent="1">
+        <!-- Step 2: sf lesson build -->
+        <mxCell id="step2" value="&lt;b&gt;sf lesson build&lt;/b&gt;&lt;br&gt;ファームウェアビルド" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;arcSize=20;" vertex="1" parent="1">
           <mxGeometry x="360" y="120" width="200" height="80" as="geometry"/>
         </mxCell>
         <!-- Arrow 2→3 -->
         <mxCell id="arrow2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeWidth=2;strokeColor=#82b366;" edge="1" source="step2" target="step3" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <!-- Step 3: sf flash workshop -m -->
-        <mxCell id="step3" value="&lt;b&gt;sf flash workshop -m&lt;/b&gt;&lt;br&gt;書き込み＋モニタ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;arcSize=20;" vertex="1" parent="1">
+        <!-- Step 3: sf lesson flash -->
+        <mxCell id="step3" value="&lt;b&gt;sf lesson flash&lt;/b&gt;&lt;br&gt;書き込み＋モニタ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;arcSize=20;" vertex="1" parent="1">
           <mxGeometry x="640" y="120" width="200" height="80" as="geometry"/>
         </mxCell>
         <!-- Arrow 3→4 -->

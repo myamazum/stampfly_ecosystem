@@ -18,7 +18,7 @@
 | 時間 | 内容 | ツール/API | 備考 |
 |------|------|-----------|------|
 | 9:00-10:00 | **エコシステム全体紹介** | スライド | リポジトリ構成、設計思想、ツール群デモ |
-| 10:00-11:00 | **Lesson 0: 環境セットアップ** | `sf doctor`, `sf build workshop`, `sf flash workshop -m` | ビルド＆フラッシュの動作確認 |
+| 10:00-11:00 | **Lesson 0: 環境セットアップ** | `sf doctor`, `sf lesson build`, `sf lesson flash` | ビルド＆フラッシュの動作確認 |
 | 11:00-12:00 | **Lesson 1: モータ制御** | `ws::motor_set_duty()`, `sf monitor` | PWM、duty cycle、モータ番号 |
 
 ### 午後 (13:00-16:00)

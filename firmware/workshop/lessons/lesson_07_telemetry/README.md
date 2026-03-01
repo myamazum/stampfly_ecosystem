@@ -131,7 +131,7 @@ timestamp_ms, step_target, step_actual, step_error, step_output, step_P, step_I,
 2. Fill in the TODO sections:
    - Set `roll_step` based on experiment phase
    - Send telemetry data with `ws::telemetry_send()`
-3. Build and flash: `sf build workshop && sf flash workshop -m`
+3. Build and flash: `sf lesson build && sf lesson flash`
 4. Connect to StampFly WiFi on your PC
 5. Start capture: `sf log wifi -o step_test.csv`
 6. ARM, raise throttle > 30%, wait for experiment to complete

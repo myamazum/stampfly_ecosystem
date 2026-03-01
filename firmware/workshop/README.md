@@ -61,8 +61,8 @@ sf lesson flash
 ### ビルド & フラッシュ（直接）
 
 ```bash
-sf build workshop
-sf flash workshop -m
+sf lesson build
+sf lesson flash
 ```
 
 ## 3. 学生向け API
