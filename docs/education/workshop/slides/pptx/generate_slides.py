@@ -374,7 +374,7 @@ def build_lesson_00() -> Presentation:
         ["IMU", "BMI270 (6軸 400Hz)"],
         ["気圧", "BMP280"],
         ["ToF", "VL53L3CX"],
-        ["質量", "35g（バッテリ含む）"],
+        ["質量", "37g（バッテリ含む）"],
         ["通信", "ESP-NOW + WiFi"],
         ["バッテリ", "LiPo 1S 3.7V"],
     ])
