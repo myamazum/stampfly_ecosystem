@@ -890,16 +890,13 @@ def build_lesson_06() -> Presentation:
     add_code_slide(prs, "実習 Step 1: 理想 PID", """
 float Kp=0.5f, Ti=1.67f, Td=0.01f;
 float integral=0, prev_err=0;
-// ... inside loop_400Hz(dt) ...
-float target = ws::rc_roll() * 1.0f;
-float error  = target - ws::gyro_x();
+// inside loop_400Hz(dt)
+float error = target - ws::gyro_x();
 float P = Kp * error;
-// I term (trapezoidal)
-if (Ti > 0)
+if (Ti > 0)  // I term (trapezoidal)
     integral += (dt/(2*Ti)) * (error + prev_err);
 float I = Kp * integral;
-// D term (ideal derivative)
-float D = Kp * Td * (error - prev_err) / dt;
+float D = Kp*Td*(error - prev_err)/dt; // ideal D
 prev_err = error;
 float roll_out = P + I + D;
 """)
@@ -909,7 +906,7 @@ float roll_out = P + I + D;
 // Replace ideal D with incomplete derivative filter
 float eta = 0.125f;
 float d_filt = 0;  // persistent state
-// ... inside loop_400Hz(dt) ...
+// inside loop_400Hz(dt)
 float alpha = 2*eta*Td / dt;
 float a = (alpha - 1) / (alpha + 1);
 float b = 2*Td / ((alpha + 1) * dt);
