@@ -39,8 +39,9 @@
 
   % Feedback loop (exit right of s4, route below descriptions, enter left of s1)
   \draw[feedback] (s4.east) -- ++(8mm, 0) -- ++(0, -2.5)
-    -| node[pos=0.5, below, font=\small\itshape, text=gray1] {modify code \& rebuild}
-    ($(s1.west) + (-8mm, 0)$) -- (s1.west);
+    -| ($(s1.west) + (-8mm, 0)$) -- (s1.west);
+  \node[font=\small\itshape, text=gray1, below=1mm]
+    at ($(s2)!0.5!(s3) + (0, -2.5)$) {modify code \& rebuild};
 
 \end{tikzpicture}
 \end{document}
