@@ -155,3 +155,24 @@
   \author{StampFly Workshop}
   \date{}
 }
+
+% --- Lesson divider slide (section separator) ---
+% Dark background with large lesson number, used instead of \titlepage
+% Usage: \lessondivider{number}{title_ja}{title_en}
+\newcommand{\lessondivider}[3]{%
+  \begingroup
+  \setbeamercolor{background canvas}{bg=sfdark}
+  \begin{frame}[plain]
+    \centering
+    \vspace{1.5cm}
+    {\fontsize{64}{72}\selectfont\bfseries\textcolor{white}{L#1}}\par
+    \vspace{0.8cm}
+    {\LARGE\bfseries\textcolor{white}{#2}}\par
+    \vspace{0.3cm}
+    {\large\textcolor{sflight}{#3}}\par
+    \vfill
+    {\small\textcolor{sfblue!60!white}{StampFly Workshop}}\par
+    \vspace{0.8cm}
+  \end{frame}
+  \endgroup
+}
