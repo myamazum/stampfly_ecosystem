@@ -1,6 +1,6 @@
 \documentclass[border=10pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
 
 \begin{document}
 
@@ -37,8 +37,10 @@
   \node[desc] at (s3.south) {USB flash +\\monitor};
   \node[desc] at (s4.south) {verify\\output};
 
-  % Feedback loop
-  \draw[feedback] (s4.south) -- ++(0, -1.5) -| node[pos=0.25, below, font=\small\itshape, text=gray1] {modify code \& rebuild} (s1.south west);
+  % Feedback loop (route left of s1 and enter from west)
+  \draw[feedback] (s4.south) -- ++(0, -1.5)
+    -| node[pos=0.25, below, font=\small\itshape, text=gray1] {modify code \& rebuild}
+    ($(s1.west) + (-8mm, 0)$) -- (s1.west);
 
 \end{tikzpicture}
 \end{document}
