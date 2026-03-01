@@ -155,3 +155,31 @@
   \author{StampFly Workshop}
   \date{}
 }
+
+% --- Lesson divider slide (section separator) ---
+% White background with rounded-rectangle border around title
+% Usage: \lessondivider{number}{title_ja}{title_en}
+\newcommand{\lessondivider}[3]{%
+  \begin{frame}[plain]
+    \centering
+    \vspace*{\fill}
+    \begin{tikzpicture}
+      \node[
+        rectangle, rounded corners=8pt,
+        draw=sfblue, line width=1.5pt,
+        fill=sflight,
+        inner xsep=20pt, inner ysep=16pt,
+        align=center,
+        text width=70mm,
+      ] {%
+        {\fontsize{32}{38}\selectfont\bfseries\textcolor{sfblue}{Lesson #1}}\\[8pt]
+        {\Large\bfseries\textcolor{sfdark}{#2}}\\[4pt]
+        {\normalsize\textcolor{sfgray}{#3}}%
+      };
+    \end{tikzpicture}
+    \vspace*{\fill}
+    \par
+    {\small\textcolor{sfgray}{StampFly Workshop}}\par
+    \vspace{8mm}
+  \end{frame}
+}

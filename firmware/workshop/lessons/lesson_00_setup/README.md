@@ -4,8 +4,8 @@
 Build, flash, and verify the workshop firmware runs on StampFly.
 
 ## Steps / 手順
-1. `sf build workshop` - Build the workshop firmware
-2. `sf flash workshop -m` - Flash and open serial monitor
+1. `sf lesson build` - Build the workshop firmware
+2. `sf lesson flash` - Flash and open serial monitor
 3. Confirm "Hello StampFly!" appears in the monitor output
 
 ## Key Concepts / キーコンセプト

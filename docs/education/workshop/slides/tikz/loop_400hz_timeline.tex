@@ -1,0 +1,54 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+
+\begin{document}
+
+\definecolor{purple1}{RGB}{120, 80, 150}
+\definecolor{blue1}{RGB}{0, 100, 180}
+\definecolor{green1}{RGB}{50, 140, 50}
+\definecolor{red1}{RGB}{200, 50, 30}
+\definecolor{gray1}{RGB}{120, 120, 120}
+
+\begin{tikzpicture}[
+    step/.style={
+      rectangle, rounded corners=5pt, draw=#1, line width=1.5pt,
+      fill=#1!8, minimum width=42mm, minimum height=18mm,
+      font=\bfseries\large, text=#1, align=center
+    },
+    decision/.style={
+      diamond, draw=#1, line width=1.5pt,
+      fill=#1!8, minimum width=18mm, minimum height=18mm,
+      font=\bfseries\large, text=#1, align=center, aspect=1.6
+    },
+    desc/.style={font=\small, text=gray1, align=center, below=2mm},
+    arr/.style={-{Stealth[length=4mm]}, line width=2pt, #1},
+    feedback/.style={-{Stealth[length=3mm]}, line width=1.2pt, gray1, dashed},
+  ]
+
+  % Steps
+  \node[step=purple1] (s1) at (0, 0) {ESP Timer\\2500\,$\mu$s};
+  \node[step=blue1, right=22mm of s1] (s2) {IMU Task\\Read BMI270};
+  \node[decision=green1, right=22mm of s2] (s3) {Go!};
+  \node[step=red1, right=22mm of s3] (s4) {loop\_400Hz\\(Your Code)};
+
+  % Arrows
+  \draw[arr=purple1] (s1) -- (s2);
+  \draw[arr=blue1] (s2) -- (s3);
+  \draw[arr=green1] (s3) -- (s4);
+
+  % Descriptions
+  \node[desc] at (s1.south) {hardware timer\\interrupt};
+  \node[desc] at (s2.south) {SPI read +\\bias correction};
+  \node[desc] at (s3.south) {data\\ready};
+  \node[desc] at (s4.south) {student.cpp\\runs here};
+
+  % Feedback loop: s4.east → right → below → left → s1.west
+  % Route below descriptions (T10 compliant)
+  \draw[feedback] (s4.east) -- ++(8mm, 0) -- ++(0, -2.5)
+    -| ($(s1.west) + (-8mm, 0)$) -- (s1.west);
+  \node[font=\small\itshape, text=gray1, below=1mm]
+    at ($(s2)!0.5!(s3) + (0, -2.5)$) {repeats every 2.5\,ms = 400\,Hz};
+
+\end{tikzpicture}
+\end{document}

@@ -118,7 +118,7 @@ if (!ws::is_armed()) {
 3. Implement anti-windup (clamp integral to +/-0.5)
 4. Add output limiting (clamp output to +/-1.0)
 5. Reset state on disarm
-6. Build, flash, and test: `sf build workshop && sf flash workshop -m`
+6. Build, flash, and test: `sf lesson build && sf lesson flash`
 7. Start with recommended gains, then tune
 
 ## Challenge / チャレンジ

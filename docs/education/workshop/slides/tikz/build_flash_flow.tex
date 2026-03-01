@@ -1,6 +1,6 @@
 \documentclass[border=10pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
 
 \begin{document}
 
@@ -22,8 +22,8 @@
 
   % Steps
   \node[step=blue1] (s1) at (0, 0) {sf lesson\\switch N};
-  \node[step=green1, right=22mm of s1] (s2) {sf build\\workshop};
-  \node[step=yellow1, right=22mm of s2] (s3) {sf flash\\workshop -m};
+  \node[step=green1, right=22mm of s1] (s2) {sf lesson\\build};
+  \node[step=yellow1, right=22mm of s2] (s3) {sf lesson\\flash};
   \node[step=purple1, right=22mm of s3] (s4) {Serial\\Monitor};
 
   % Arrows
@@ -37,8 +37,11 @@
   \node[desc] at (s3.south) {USB flash +\\monitor};
   \node[desc] at (s4.south) {verify\\output};
 
-  % Feedback loop
-  \draw[feedback] (s4.south) -- ++(0, -1.5) -| node[pos=0.25, below, font=\small\itshape, text=gray1] {modify code \& rebuild} (s1.south west);
+  % Feedback loop (exit right of s4, route below descriptions, enter left of s1)
+  \draw[feedback] (s4.east) -- ++(8mm, 0) -- ++(0, -2.5)
+    -| ($(s1.west) + (-8mm, 0)$) -- (s1.west);
+  \node[font=\small\itshape, text=gray1, below=1mm]
+    at ($(s2)!0.5!(s3) + (0, -2.5)$) {modify code \& rebuild};
 
 \end{tikzpicture}
 \end{document}

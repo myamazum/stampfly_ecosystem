@@ -1,0 +1,61 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc}
+
+\begin{document}
+
+\definecolor{red1}{RGB}{200, 50, 30}
+\definecolor{blue1}{RGB}{0, 100, 180}
+\definecolor{green1}{RGB}{40, 140, 60}
+\definecolor{purple1}{RGB}{120, 80, 150}
+\definecolor{gray1}{RGB}{120, 120, 120}
+
+% Inline command for sublabel text inside nodes
+\newcommand{\sublabel}[1]{{\scriptsize\color{black!50}#1}}
+
+\begin{tikzpicture}[
+    layer/.style={
+      rectangle, rounded corners=4pt, draw=#1, line width=1.5pt,
+      fill=#1!8, minimum width=62mm, minimum height=14mm,
+      font=\bfseries\large, text=#1, align=center
+    },
+    toplayer/.style={
+      rectangle, rounded corners=4pt, draw=red1, line width=2.5pt,
+      fill=red1!10, minimum width=62mm, minimum height=14mm,
+      font=\bfseries\large, text=red1, align=center
+    },
+    api/.style={
+      font=\small, text=black!70, anchor=west
+    },
+    ann/.style={
+      font=\bfseries\large, text=red1, anchor=west
+    },
+    arr/.style={
+      -{Stealth[length=3mm]}, line width=1.2pt, black!40
+    },
+  ]
+
+  % Layers (bottom to top, spacing=8mm)
+  \node[layer=gray1]   (L1) at (0, 0)    {Hardware\\[-1pt]{\sublabel{ESP32-S3, BMI270, BMP280}}};
+  \node[layer=purple1, above=8mm of L1] (L2) {ESP-IDF / FreeRTOS\\[-1pt]{\sublabel{Tasks, timers, queues}}};
+  \node[layer=green1,  above=8mm of L2] (L3) {Vehicle Components\\[-1pt]{\sublabel{IMU, baro, motor driver}}};
+  \node[layer=blue1,   above=8mm of L3] (L4) {ws:: API\\[-1pt]{\sublabel{gyro\_x(), motor\_set\_duty()}}};
+  \node[toplayer,      above=8mm of L4] (L5) {student.cpp};
+
+  % Arrows between layers
+  \draw[arr] (L1) -- (L2);
+  \draw[arr] (L2) -- (L3);
+  \draw[arr] (L3) -- (L4);
+  \draw[arr] (L4) -- (L5);
+
+  % Right-side API labels (between layers)
+  \node[api] at ($(L1.east)!0.5!(L2.east) + (8mm, 0)$) {SPI, I2C, GPIO};
+  \node[api] at ($(L2.east)!0.5!(L3.east) + (8mm, 0)$) {xTaskCreate, xQueueSend};
+  \node[api] at ($(L3.east)!0.5!(L4.east) + (8mm, 0)$) {sensor read, filter, motor};
+  \node[api] at ($(L4.east)!0.5!(L5.east) + (8mm, 0)$) {setup() / loop\_400Hz()};
+
+  % "You are here!" annotation
+  \node[ann] at ($(L5.east) + (8mm, 0)$) {\(\leftarrow\) You are here!};
+
+\end{tikzpicture}
+\end{document}

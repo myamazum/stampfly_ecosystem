@@ -374,7 +374,7 @@ def build_lesson_00() -> Presentation:
         ["IMU", "BMI270 (6軸 400Hz)"],
         ["気圧", "BMP280"],
         ["ToF", "VL53L3CX"],
-        ["質量", "35g（バッテリ含む）"],
+        ["質量", "37g（バッテリ含む）"],
         ["通信", "ESP-NOW + WiFi"],
         ["バッテリ", "LiPo 1S 3.7V"],
     ])
@@ -402,11 +402,39 @@ def build_lesson_00() -> Presentation:
         ["キャリブレーション", "sf cal gyro/accel/mag", "センサ校正"],
     ])
 
+    # P6: Windows setup (1/2) — Prerequisites & install
+    add_content_slide(prs, "Windows 環境構築 (1/2) / Windows Setup", [
+        "【前提条件の確認】（CMD で実行）",
+        "  git --version → git version 2.x（なければ winget install Git.Git）",
+        "  python --version → Python 3.10 以上（なければ winget install Python.Python.3.12）",
+        "",
+        "【インストール手順】（CMD で実行）",
+        "  1. リポジトリをクローン",
+        "  2. install.bat を実行（ESP-IDF + sfcli 自動インストール）",
+        "  3. setup_env.bat で開発環境をアクティベート",
+        "",
+        "  git clone https://github.com/.../stampfly-ecosystem.git",
+        "  cd stampfly-ecosystem && install.bat && setup_env.bat",
+    ])
+
+    # P7: Windows setup (2/2) — Driver & verification
+    add_content_slide(prs, "Windows 環境構築 (2/2) / Driver & Verification", [
+        "【USB シリアルドライバ】",
+        "• CH9102F ドライバをインストール（M5Stack 製品用）",
+        "• https://docs.m5stack.com/en/download",
+        "",
+        "【動作確認】",
+        "• sf doctor で環境診断 — すべて OK になれば完了",
+        "",
+        "【macOS / Linux ユーザー】",
+        "• install.sh + setup_env.sh を使用してください",
+    ])
+
     add_content_slide(prs, "今日のゴール / Today's Goal", [
         "ワークショップファームウェアをビルド・書き込み・動作確認する",
         "",
-        "1. sf build workshop でビルド",
-        "2. sf flash workshop -m で書き込み",
+        "1. sf lesson build でビルド",
+        "2. sf lesson flash で書き込み",
         "3. シリアルモニタで \"Hello StampFly!\" を確認",
     ])
 
@@ -420,8 +448,8 @@ def build_lesson_00() -> Presentation:
         "コマンド", "説明",
     ], [
         ["sf doctor", "環境診断"],
-        ["sf build workshop", "ワークショップビルド"],
-        ["sf flash workshop -m", "書き込み＋モニタ"],
+        ["sf lesson build", "ワークショップビルド"],
+        ["sf lesson flash", "書き込み＋モニタ"],
         ["sf lesson switch N", "レッスン切り替え"],
         ["sf monitor", "シリアルモニタ"],
     ])
@@ -435,6 +463,43 @@ def build_lesson_00() -> Presentation:
         "ハードウェアの複雑さは ws:: 名前空間で隠蔽",
         "FreeRTOS, SPI/I2C, センサーフュージョンを意識する必要なし",
     ])
+
+    # P12: Firmware architecture
+    add_content_slide(
+        prs, "ファームウェアの全体像 / Firmware Architecture",
+        [
+            "5層構造（下から上へ）:",
+            "",
+            "  5. student.cpp ← 皆さんのコードはここ！",
+            "  4. ws:: API（gyro_x(), motor_set_duty() 等）",
+            "  3. Vehicle Components（IMU, baro, motor driver）",
+            "  2. ESP-IDF / FreeRTOS（tasks, timers, queues）",
+            "  1. Hardware（ESP32-S3, BMI270, BMP280）",
+            "",
+            "ws::gyro_x() と書くだけで SPI通信→フィルタ→バイアス補正を全部やってくれる",
+            "下のレイヤーはワークショップ中意識する必要なし",
+        ],
+        image_path=IMAGES_DIR / "firmware_layers.png",
+    )
+
+    # P13: Behind the 400Hz loop
+    add_content_slide(
+        prs, "400Hz ループの裏側 / Behind the 400Hz Loop",
+        [
+            "loop_400Hz() が呼ばれるまでの流れ:",
+            "",
+            "  1. ESP Timer（2500μs）→ ハードウェアタイマ割り込み",
+            "  2. IMU Task（Read BMI270）→ SPI読み取り + バイアス補正",
+            "  3. Go!（data ready）→ データ準備完了",
+            "  4. loop_400Hz (Your Code) → student.cpp が実行される",
+            "",
+            "→ 2.5ms ごとに繰り返し = 400Hz",
+            "",
+            "【ポイント】loop_400Hz(dt) は常にIMUデータ更新後に呼ばれる",
+            "学生はタイマー管理不要、ただ関数を書くだけ！",
+        ],
+        image_path=IMAGES_DIR / "loop_400hz_timeline.png",
+    )
 
     add_code_slide(prs, "実習: Hello StampFly", """
 #include "workshop_api.hpp"
@@ -450,10 +515,60 @@ void loop_400Hz(float dt)
 }
 """)
 
+    # P15: Workflow
+    add_content_slide(prs, "作業の進め方 / Workflow", [
+        "【ファイル構造】",
+        "  firmware/workshop/",
+        "    ├── lessons/",
+        "    │   ├── lesson_00/student.cpp  ← テンプレート",
+        "    │   ├── lesson_01/student.cpp",
+        "    │   └── ...",
+        "    └── main/",
+        "        └── user_code.cpp  ← ここを編集！",
+        "",
+        "【手順】",
+        "  1. sf lesson switch N → テンプレートを user_code.cpp にコピー",
+        "  2. user_code.cpp を編集",
+        "  3. sf lesson build",
+        "  4. sf lesson flash",
+        "",
+        "⚠ student.cpp はテンプレート — 直接編集しない！ switch で何度でもリセット可能",
+    ])
+
+    # P16: Controller setup
+    add_content_slide(prs, "コントローラのセットアップ / Controller Setup", [
+        "【コントローラのビルドと書き込み】",
+        "  1. コントローラを USB 接続",
+        "  2. sf build controller",
+        "  3. sf flash controller",
+        "",
+        "【確認】",
+        "  LCD に起動画面が表示されれば OK",
+        "  Lesson 2 でペアリングして使用する",
+    ])
+
+    # P17: Simulator
+    add_content_slide(prs, "シミュレータで遊ぶ / Try the Simulator", [
+        "【USB HID モードに切替】",
+        "  1. 画面タッチでメニューを開く",
+        "  2. Comm: を選択",
+        "  3. USB HID に切替 → 自動再起動",
+        "",
+        "【コマンド】",
+        "  sf sim run                  ← デフォルト（VPython + ボクセルワールド）",
+        "  sf sim run -w ringworld     ← 軽量ワールド",
+        "",
+        "【操作】スロットル → 上昇 / ロール・ピッチ → 傾き / ヨー → 回転",
+        "",
+        "アクロモード（角速度制御）で飛行 → まずは感覚をつかもう",
+        "⚠ 終了後は Comm: を ESP-NOW に戻すこと（実機飛行用）",
+    ])
+
     add_checkpoint_slide(prs, [
         "sf doctor がエラーなしで通る",
-        "ビルドが成功する",
-        "シリアルモニタに \"Hello StampFly!\" が表示される",
+        "ビルドが成功し \"Hello StampFly!\" が表示される",
+        "コントローラのビルド・書き込みが完了した",
+        "シミュレータが起動し操縦を試した",
     ], "Lesson 1: モータ制御")
 
     return prs
@@ -534,11 +649,11 @@ def build_lesson_02() -> Presentation:
     add_title_slide(prs, "Lesson 2: コントローラ入力", "Controller Input")
 
     add_content_slide(prs, "今日のゴール / Today's Goal", [
-        "コントローラのスティック値を読み取り、モータを操作する",
+        "スティック値を変数に読み取り、演算でモータを個別制御する",
         "",
         "• ESP-NOW 無線通信の仕組みを理解",
-        "• スティック値の正規化（ADC → 浮動小数点）",
-        "• オープンループ制御の限界を体感",
+        "• 変数と四則演算でスティック → モータ Duty を計算",
+        "• オープンループ手動操縦の限界を体感",
     ])
 
     add_content_slide(
@@ -558,6 +673,26 @@ def build_lesson_02() -> Presentation:
         ["rc_pitch()", "ピッチ", "-1.0 -- +1.0"],
         ["rc_yaw()", "ヨー", "-1.0 -- +1.0"],
         ["is_armed()", "ARM状態", "true / false"],
+        ["motor_set_duty(id, v)", "モータ個別制御", "id=1-4, v=0.0-1.0"],
+    ])
+
+    add_content_slide(prs, "ペアリング手順 / Pairing", [
+        "Step 1: コントローラの M5ボタンを押しながら電源ON → LCD に \"Pairing mode...\" 表示",
+        "Step 2: StampFly のボタンを 3秒長押し → 青LED高速点滅 + ビープ音",
+        "Step 3: ペアリング完了 → ビープ音が鳴り、次回から自動接続",
+        "",
+        "⚠ 教室では一組ずつペアリングする（ブロードキャスト通信のため近くの機体と干渉する可能性）",
+        "⚠ うまくいかない場合: 両方を再起動して Step 1 からやり直す",
+    ])
+
+    # Motor layout + mixing sign table
+    add_table_slide(prs, "モータ配置とミキシング / Motor Layout & Mixing", [
+        "Motor", "T", "Roll", "Pitch", "Yaw",
+    ], [
+        ["M1 FR", "+", "+", "-", "-"],
+        ["M2 RR", "+", "+", "+", "+"],
+        ["M3 RL", "+", "-", "+", "-"],
+        ["M4 FL", "+", "-", "-", "+"],
     ])
 
     add_content_slide(
@@ -570,35 +705,31 @@ def build_lesson_02() -> Presentation:
         image_path=IMAGES_DIR / "open_loop.png",
     )
 
-    add_code_slide(prs, "実習: スロットル → モータ", """
+    add_code_slide(prs, "実習: 手動ミキシング", """
 #include "workshop_api.hpp"
-
 static uint32_t tick = 0;
-
-void setup() {
-    ws::print("Lesson 2: Controller Input");
-}
-
+void setup() { ws::print("L2: Open-Loop Control"); }
 void loop_400Hz(float dt) {
     tick++;
-    float throttle = ws::rc_throttle();
-
-    // Direct throttle-to-motor (open loop)
-    ws::motor_set_all(throttle);
-
-    // Print every 200ms
-    if (tick % 80 == 0) {
+    float t = ws::rc_throttle();
+    float r = ws::rc_roll()  * 0.3f;
+    float p = ws::rc_pitch() * 0.3f;
+    float y = ws::rc_yaw()   * 0.3f;
+    ws::motor_set_duty(1, t + r - p - y); // FR
+    ws::motor_set_duty(2, t + r + p + y); // RR
+    ws::motor_set_duty(3, t - r + p - y); // RL
+    ws::motor_set_duty(4, t - r - p + y); // FL
+    if (tick % 80 == 0)
         ws::print("T=%.2f R=%.2f P=%.2f Y=%.2f",
-            throttle, ws::rc_roll(),
-            ws::rc_pitch(), ws::rc_yaw());
-    }
+            t, r, p, y);
 }
 """)
 
     add_checkpoint_slide(prs, [
         "コントローラとペアリングできた",
-        "ARM 後、スロットルでモータが回る",
-        "シリアルモニタに T/R/P/Y 値が表示される",
+        "スロットルで全モータが均等に回る",
+        "ピッチスティックで前後モータの回転差が出る",
+        "ゲイン(0.3f)を変えて挙動の違いを確認した",
     ], "Lesson 3: LED 制御")
 
     return prs
@@ -816,71 +947,109 @@ void loop_400Hz(float dt) {
 def build_lesson_06() -> Presentation:
     prs = new_presentation()
 
+    # Slide 1: Title
     add_title_slide(prs, "Lesson 6: PID 制御", "PID Control")
 
+    # Slide 2: Goal (updated)
     add_content_slide(prs, "今日のゴール / Today's Goal", [
-        "I 項・D 項を追加し、定常偏差除去とオーバーシュート低減を実現する",
+        "工学形式 PID を実装し、不完全微分でノイズに強い制御を実現する",
         "",
-        "• P 制御の限界（定常偏差が残る）",
-        "• I 項: 偏差の積分で定常偏差を除去",
-        "• D 項: 偏差の微分でオーバーシュートを低減",
+        "• P 制御の限界（定常偏差、振動）",
+        "• 工学形式 Kp / Ti / Td とは",
+        "• 不完全微分: ノイズに強い微分項",
+        "• ログから調整する方法",
     ])
 
+    # Slide 3: PID Block Diagram
     add_content_slide(
         prs, "PID 制御器 / PID Controller",
         [
             "P（比例）: 現在の誤差に比例した出力",
-            "I（積分）: 誤差の蓄積を補正",
-            "D（微分）: 誤差の変化率で振動を抑制",
+            "I（積分）: Kp/Ti で偏差の蓄積を補正",
+            "D（不完全微分）: Td·s/(η·Td·s+1) で高周波をカット",
+            "",
+            "C(s) = Kp(1 + 1/(Ti·s) + Td·s/(η·Td·s+1))",
         ],
         image_path=IMAGES_DIR / "pid_block.png",
     )
 
-    add_table_slide(prs, "推奨ゲイン / Recommended Gains", [
-        "軸", "Kp", "Ki", "Kd",
+    # Slide 4: Why Incomplete Derivative? (new)
+    add_content_slide(prs, "なぜ不完全微分か / Why Incomplete Derivative?", [
+        "【問題】",
+        "• ジャイロセンサにはノイズがある",
+        "• 理想微分 de/dt はノイズを増幅",
+        "• 高周波振動 → モータに悪影響",
+        "",
+        "【解決策】",
+        "• 不完全微分フィルタ η で高周波をカット",
+        "• η = 0.1〜0.2（小→フィルタ弱い、大→フィルタ強い）",
+        "• 微分の効きとノイズ除去のトレードオフ",
+    ])
+
+    # Slide 5: Engineering Form Parameters (new)
+    add_table_slide(prs, "工学形式パラメータ / Engineering Form", [
+        "パラメータ", "意味", "効果",
     ], [
-        ["Roll", "0.5", "0.3", "0.005"],
-        ["Pitch", "0.5", "0.3", "0.005"],
-        ["Yaw", "2.0", "0.5", "0.01"],
+        ["Kp", "比例ゲイン", "大→応答速い、大きすぎ→振動"],
+        ["Ti", "積分時間 [s]", "小→積分強い、小さすぎ→ワインドアップ"],
+        ["Td", "微分時間 [s]", "大→微分強い、大きすぎ→ノイズ増幅"],
+        ["η", "フィルタ係数", "0.1〜0.2、大→ノイズに強い"],
     ])
 
-    add_content_slide(prs, "チューニングの順序 / Tuning Procedure", [
-        "1. Ki = Kd = 0 にして Kp を調整（振動しない最大値）",
-        "2. Ki を少しずつ追加（定常偏差が消えるまで）",
-        "3. Kd を少しずつ追加（振動が収まるまで）",
+    # Slide 6: Log-Based Tuning Guide (new)
+    add_table_slide(prs, "ログから調整する / Log-Based Tuning", [
+        "ログで見える症状", "原因", "調整",
+    ], [
+        ["振動が収まらない", "Kp 過大", "Kp↓"],
+        ["応答が遅い", "Kp 過小", "Kp↑"],
+        ["定常偏差が残る", "I項不足", "Ti↓（積分強化）"],
+        ["オーバーシュート大", "D項不足", "Td↑（微分強化）"],
+        ["高周波ノイズ", "η 過小", "η↑（0.1→0.2）"],
+        ["ゆっくり発散", "ワインドアップ", "Ti↑"],
     ])
 
-    add_code_slide(prs, "実習: ロール軸 PID", """
-#include "workshop_api.hpp"
-float Kp=0.5f, Ki=0.3f, Kd=0.005f;
+    # Slide 7: Recommended Gains (Ti/Td form)
+    add_table_slide(prs, "推奨ゲイン / Recommended Gains", [
+        "軸", "Kp", "Ti [s]", "Td [s]", "η",
+    ], [
+        ["Roll", "0.5", "1.67", "0.01", "0.125"],
+        ["Pitch", "0.5", "1.67", "0.01", "0.125"],
+        ["Yaw", "2.0", "4.0", "0.005", "0.125"],
+    ])
+
+    # Slide 8: Hands-on Step 1 -- Ideal PID
+    add_code_slide(prs, "実習 Step 1: 理想 PID", """
+float Kp=0.5f, Ti=1.67f, Td=0.01f;
 float integral=0, prev_err=0;
-void setup() { ws::print("Lesson 6: PID"); }
-void loop_400Hz(float dt) {
-    if (!ws::is_armed()) {
-        ws::motor_stop_all();
-        integral = 0; prev_err = 0;  // Reset
-        return;
-    }
-    float target = ws::rc_roll() * 1.0f;
-    float error  = target - ws::gyro_x();
-    float P = Kp * error;
-    integral += error * dt;
-    if (integral >  0.5f) integral =  0.5f;
-    if (integral < -0.5f) integral = -0.5f;
-    float I = Ki * integral;
-    float D = Kd * (error - prev_err) / dt;
-    prev_err = error;
-    float roll_out = P + I + D;
-    // Repeat for pitch and yaw axes
-    ws::motor_mixer(ws::rc_throttle(), roll_out,
-                    pitch_out, yaw_out);
-}
+// inside loop_400Hz(dt)
+float error = target - ws::gyro_x();
+float P = Kp * error;
+if (Ti > 0)  // I term (trapezoidal)
+    integral += (dt/(2*Ti)) * (error + prev_err);
+float I = Kp * integral;
+float D = Kp*Td*(error - prev_err)/dt; // ideal D
+prev_err = error;
+float roll_out = P + I + D;
 """)
 
+    # Slide 9: Hands-on Step 2 -- Incomplete Derivative
+    add_code_slide(prs, "実習 Step 2: 不完全微分", """
+// Replace ideal D with incomplete derivative filter
+float eta = 0.125f;
+float d_filt = 0;  // persistent state
+// inside loop_400Hz(dt)
+float alpha = 2*eta*Td / dt;
+float a = (alpha - 1) / (alpha + 1);
+float b = 2*Td / ((alpha + 1) * dt);
+d_filt = a * d_filt + b * (error - prev_err);
+float D = Kp * d_filt;  // Filtered!
+""")
+
+    # Slide 10: Checkpoint (updated)
     add_checkpoint_slide(prs, [
+        "理想微分 vs 不完全微分で高周波振動の違いを確認",
         "定常偏差がなくなった（P のみと比較）",
-        "振動なく安定してホバリング",
-        "ゲインを変更して応答の変化を確認",
+        "ゲイン調整表を使って応答を改善できた",
     ], "Lesson 7: テレメトリ + ステップ応答")
 
     return prs

@@ -247,6 +247,7 @@ ASCII アートを活用する：
 | T7 | **図のサイズ:** Beamer に `\resizebox` で埋め込んだときスライド領域に収まるか | gyro\_drift 12x6→8x5 |
 | T8 | **数式・物理量の正確性:** 伝達関数・単位・パラメータが技術的に正しいか | step\_response 2nd-order TF |
 | T9 | **色定義:** `\definecolor` は `\begin{document}` の後に記述（standalone パッケージの互換性） | 全 TikZ ファイル |
+| T10 | **フィードバック矢印の経路:** フィードバックループの矢印がノード下の説明テキスト（`desc` ノード等）を貫通していないか。矢印の終点はボックスの角（`south west` 等）ではなく辺の中点（`west`, `south` 等）に接続し、経路は説明テキストの外側を通すこと | build\_flash\_flow feedback → s1.south west |
 
 #### C: コンテンツ整合性（Beamer ↔ PPTX）
 
@@ -271,6 +272,7 @@ ASCII アートを活用する：
 3. **ラベル重なり:** `above`/`below`/`left`/`right` の位置変更、または `xshift`/`yshift` で微調整
 4. **ブロック図の信号フロー:** フィードバック分岐は出力信号線上に junction dot を置く
 5. **Beamer/PPTX 不一致:** Beamer を正（SSOT）として PPTX を合わせる
+6. **フィードバック矢印の経路:** 終点を `.west` や `.south` に変更し、説明テキストの外側を迂回させる（例: `-| ($(node.west)+(-8mm,0)$) -- (node.west)`）
 
 ## Project Overview
 

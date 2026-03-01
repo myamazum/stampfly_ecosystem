@@ -138,7 +138,7 @@ ws::motor_set_duty(4, clamp(m4));
 2. Implement the mixer equations in `student.cpp`
 3. Use `ws::motor_set_duty()` for each motor individually
 4. Clamp all motor values to [0.0, 1.0]
-5. Build and flash: `sf build workshop && sf flash workshop -m`
+5. Build and flash: `sf lesson build && sf lesson flash`
 6. Compare behavior with Lesson 6 (should be identical!)
 7. Try changing L and observe the effect
 

@@ -1,38 +1,49 @@
 #include "workshop_api.hpp"
 
 // =========================================================================
-// Lesson 2: Controller Input
-// レッスン 2: コントローラ入力
+// Lesson 2: Open-Loop Control (Manual Mixing)
+// レッスン 2: オープンループ制御（手動ミキシング）
 // =========================================================================
 //
-// Goal: Read controller stick values and map them to motors.
-// 目標: コントローラスティックの値を読み取り、モータにマッピングする
+// Goal: Read stick values into variables and compute each motor's Duty
+//       using arithmetic (addition / subtraction / scaling).
+// 目標: スティック値を変数に読み取り、四則演算で各モータの Duty を計算する
 //
-// Stick ranges:
-// スティック範囲:
-//   Throttle: 0.0 to 1.0   (スロットル: 0.0〜1.0)
-//   Roll:    -1.0 to 1.0   (ロール: -1.0〜1.0)
-//   Pitch:   -1.0 to 1.0   (ピッチ: -1.0〜1.0)
-//   Yaw:     -1.0 to 1.0   (ヨー: -1.0〜1.0)
+// Motor sign convention (see motor_layout diagram):
+// モータ符号規則（motor_layout 図を参照）:
+//   M1 FR: T + R - P - Y
+//   M2 RR: T + R + P + Y
+//   M3 RL: T - R + P - Y
+//   M4 FL: T - R - P + Y
+
+static uint32_t tick = 0;
 
 void setup()
 {
-    ws::print("Lesson 2: Controller Input");
+    ws::print("L2: Open-Loop Control");
 }
 
 void loop_400Hz(float dt)
 {
-    // TODO: Read controller input
-    // TODO: コントローラ入力を読み取る
-    // float throttle = ws::rc_throttle();  // 0.0 to 1.0
-    // float roll = ws::rc_roll();          // -1.0 to 1.0
-    // float pitch = ws::rc_pitch();        // -1.0 to 1.0
-    // float yaw = ws::rc_yaw();            // -1.0 to 1.0
+    tick++;
 
-    // TODO: Map throttle directly to all motors (open-loop control)
-    // TODO: スロットルを全モータに直接マッピング（開ループ制御）
-    // ヒント: ws::motor_set_all(throttle);
+    // Step 1: Read stick values into variables
+    // Step 1: スティック値を変数に読み取る
+    //   float t = ws::rc_throttle();
+    //   float r = ws::rc_roll()  * 0.3f;   // Scale for gentle response
+    //   float p = ws::rc_pitch() * 0.3f;
+    //   float y = ws::rc_yaw()   * 0.3f;
 
-    // TODO: Print values every 200ms (80 ticks at 400Hz)
-    // TODO: 200ms毎に値を表示（400Hzで80ティック）
+    // Step 2: Compute each motor's Duty and set it
+    // Step 2: 各モータの Duty を計算して設定する
+    //   ws::motor_set_duty(1, t + r - p - y);  // FR
+    //   ws::motor_set_duty(2, t + r + p + y);  // RR
+    //   ws::motor_set_duty(3, t - r + p - y);  // RL
+    //   ws::motor_set_duty(4, t - r - p + y);  // FL
+
+    // Step 3: Print values every 200ms (80 ticks at 400Hz)
+    // Step 3: 200ms毎に値を表示（400Hzで80ティック）
+    //   if (tick % 80 == 0)
+    //       ws::print("T=%.2f R=%.2f P=%.2f Y=%.2f",
+    //           t, r, p, y);
 }
