@@ -6,8 +6,10 @@
 *.toc
 *.vrb
 
-# Generated files (rebuild with `make all`)
+# Generated intermediate files (rebuild with `make all`)
 tikz/*.pdf
-beamer/*.pdf
 images/*.png
 pptx/output/*.pptx
+
+# Beamer PDFs are tracked (committed for distribution)
+# beamer/*.pdf
