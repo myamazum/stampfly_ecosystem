@@ -583,8 +583,8 @@ def build_lesson_01() -> Presentation:
         "モータの番号と配置を理解し、PWM で個別制御する",
         "",
         "• モータ番号 M1-M4 の位置を覚える",
+        "• ARM / DISARM の仕組みを理解する",
         "• PWM デューティ比でモータ回転数を制御",
-        "• 安全な地上テストの方法を学ぶ",
     ])
 
     add_content_slide(
@@ -607,9 +607,21 @@ def build_lesson_01() -> Presentation:
         image_path=IMAGES_DIR / "pwm_waveform.png",
     )
 
+    add_content_slide(prs, "ARM / DISARM とは / What is ARM?", [
+        "【安全スイッチ】",
+        "• ARM = モーター出力を有効化（回転可能になる）",
+        "• DISARM = モーター出力を無効化（強制停止）",
+        "• コードから ws::arm() で ARM できる",
+        "",
+        "⚠ arm() を呼ばないとモーターは回らない！",
+        "  setup() 内で最初に呼ぶこと",
+    ])
+
     add_table_slide(prs, "モータ制御 API", [
         "関数", "説明", "引数",
     ], [
+        ["arm()", "モーター出力を有効化", "---"],
+        ["disarm()", "モーター出力を無効化", "---"],
         ["motor_set_duty(id, duty)", "個別モータ設定", "id=1-4, duty=0.0-1.0"],
         ["motor_set_all(duty)", "全モータ一括", "duty=0.0-1.0"],
         ["motor_stop_all()", "全モータ停止", "---"],
@@ -622,6 +634,7 @@ static uint32_t timer = 0;
 
 void setup() {
     ws::print("Lesson 1: Motor Control");
+    ws::arm();  // Enable motor output
 }
 
 void loop_400Hz(float dt) {
@@ -635,9 +648,9 @@ void loop_400Hz(float dt) {
 """)
 
     add_checkpoint_slide(prs, [
+        "arm() なしではモータが回らないことを確認した",
         "M1 が FR（右前）のプロペラを回す",
         "M1→M2→M3→M4 の順に回転する",
-        "各モータ 2 秒ごとに切り替わる",
     ], "Lesson 2: コントローラ入力")
 
     return prs
