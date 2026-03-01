@@ -106,7 +106,7 @@ def run(args: argparse.Namespace) -> int:
     env = espidf.prepare_idf_env(idf_path)
 
     # Flash command
-    cmd = ["idf.py", "-p", port, "-b", str(args.baud)]
+    cmd = espidf.idf_command(["-p", port, "-b", str(args.baud)])
 
     if args.monitor:
         cmd.append("flash")

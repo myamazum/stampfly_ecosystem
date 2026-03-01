@@ -83,7 +83,7 @@ def run(args: argparse.Namespace) -> int:
     env = espidf.prepare_idf_env(idf_path)
 
     # Monitor command
-    cmd = ["idf.py", "-p", port, "-b", str(args.baud), "monitor"]
+    cmd = espidf.idf_command(["-p", port, "-b", str(args.baud), "monitor"])
 
     # Execute monitor
     result = subprocess.run(cmd, cwd=target_dir, env=env)

@@ -81,7 +81,7 @@ def run(args: argparse.Namespace) -> int:
     if args.clean:
         console.info("Cleaning build directory...")
         result = subprocess.run(
-            ["idf.py", "fullclean"],
+            espidf.idf_command(["fullclean"]),
             cwd=target_dir,
             env=env,
         )
@@ -89,7 +89,7 @@ def run(args: argparse.Namespace) -> int:
             console.warning("Clean failed, continuing with build...")
 
     # Build command
-    cmd = ["idf.py", "build"]
+    cmd = espidf.idf_command(["build"])
 
     if args.jobs:
         cmd.extend(["-j", str(args.jobs)])

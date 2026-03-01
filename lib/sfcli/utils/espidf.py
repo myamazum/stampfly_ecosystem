@@ -6,15 +6,43 @@ ESP-IDF環境のセットアップとコマンド実行を処理
 """
 
 import os
+import sys
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from .platform import platform
 
 
 def find_idf_path() -> Optional[Path]:
     """Find ESP-IDF installation path"""
     return platform.esp_idf_path()
+
+
+def idf_command(args: List[str]) -> List[str]:
+    """Build command list to invoke idf.py cross-platform.
+    idf.pyをクロスプラットフォームで呼び出すコマンドリストを構築
+
+    On Windows, idf.py cannot be executed directly (WinError 193).
+    We invoke it via sys.executable (the ESP-IDF venv Python).
+
+    Args:
+        args: Arguments to pass to idf.py (e.g., ["build"], ["-p", "COM3", "flash"])
+
+    Returns:
+        Command list suitable for subprocess.run()
+        ['build'] → [sys.executable, '<IDF_PATH>/tools/idf.py', 'build']  (Windows)
+        ['build'] → ['idf.py', 'build']                                    (Unix)
+    """
+    if platform.is_windows():
+        idf_path = find_idf_path()
+        if idf_path:
+            idf_py = idf_path / "tools" / "idf.py"
+            return [sys.executable, str(idf_py)] + args
+        # Fallback: try python + idf.py on PATH
+        # フォールバック: PATH上のidf.pyをpython経由で実行
+        return [sys.executable, "idf.py"] + args
+    else:
+        return ["idf.py"] + args
 
 
 def prepare_idf_env(idf_path: Optional[Path] = None) -> dict:
@@ -134,5 +162,10 @@ def run_idf_command(
         idf_path = find_idf_path()
 
     env = prepare_idf_env(idf_path)
+
+    # Use idf_command() for cross-platform compatibility
+    # クロスプラットフォーム対応のため idf_command() を使用
+    if cmd and cmd[0] == "idf.py":
+        cmd = idf_command(cmd[1:])
 
     return subprocess.run(cmd, cwd=cwd, env=env)
