@@ -126,34 +126,38 @@ extern "C" esp_err_t joy_init(void)
         return ESP_OK;
     }
 
-    // lgfxのEx_I2Cを解放してESP-IDF I2Cドライバに切り替え
-    // Release lgfx Ex_I2C and switch to ESP-IDF I2C master driver
-    // (lgfx I2Cにはタイムアウトがなく、バス異常時に永久ブロックする問題がある)
-    // (lgfx I2C lacks proper timeout, causing infinite block on bus error)
-    ESP_LOGI(TAG, "Ex_I2Cを解放してESP-IDF I2Cドライバに切替");
-    m5::Ex_I2C.release();
+    // Ex_I2Cを正しいピンで初期化（lgfxがI2Cバスを作成する）
+    // Initialize Ex_I2C with correct pins (lgfx creates the I2C bus)
+    ESP_LOGI(TAG, "Ex_I2C 現在: enabled=%d, SDA=%d, SCL=%d",
+             m5::Ex_I2C.isEnabled(), m5::Ex_I2C.getSDA(), m5::Ex_I2C.getSCL());
 
-    // ESP-IDF I2Cマスターバス作成
-    // Create ESP-IDF I2C master bus with timeout support
-    i2c_master_bus_config_t bus_config = {
-        .i2c_port = I2C_NUM_1,
-        .sda_io_num = (gpio_num_t)JOY_I2C_SDA_PIN,
-        .scl_io_num = (gpio_num_t)JOY_I2C_SCL_PIN,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags = {
-            .enable_internal_pullup = true,
-        },
-    };
-
-    esp_err_t ret = i2c_new_master_bus(&bus_config, &joy_i2c_bus);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "I2Cバス作成失敗: %s", esp_err_to_name(ret));
-        return ret;
+    if (m5::Ex_I2C.getSDA() != JOY_I2C_SDA_PIN || m5::Ex_I2C.getSCL() != JOY_I2C_SCL_PIN) {
+        ESP_LOGI(TAG, "Ex_I2C を再設定中 (SDA=%d, SCL=%d)", JOY_I2C_SDA_PIN, JOY_I2C_SCL_PIN);
+        if (!m5::Ex_I2C.begin(I2C_NUM_1, JOY_I2C_SDA_PIN, JOY_I2C_SCL_PIN)) {
+            ESP_LOGE(TAG, "Ex_I2C 初期化失敗");
+            return ESP_ERR_INVALID_STATE;
+        }
+    } else if (!m5::Ex_I2C.isEnabled()) {
+        ESP_LOGI(TAG, "Ex_I2C を初期化中");
+        if (!m5::Ex_I2C.begin()) {
+            ESP_LOGE(TAG, "Ex_I2C 初期化失敗");
+            return ESP_ERR_INVALID_STATE;
+        }
     }
 
-    // ジョイスティックデバイス登録
-    // Add joystick device to I2C bus
+    // lgfxが作成済みのI2Cバスハンドルを取得し、ESP-IDF APIでアクセスする
+    // Get existing I2C bus handle created by lgfx, access via ESP-IDF API
+    // (lgfx I2Cにはタイムアウトがなく、バス異常時に永久ブロックする問題がある)
+    // (lgfx I2C lacks proper timeout, causing infinite block on bus error)
+    esp_err_t ret = i2c_master_get_bus_handle(I2C_NUM_1, &joy_i2c_bus);
+    if (ret != ESP_OK || joy_i2c_bus == NULL) {
+        ESP_LOGE(TAG, "I2Cバスハンドル取得失敗: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "lgfx I2Cバスハンドル取得成功、ESP-IDF APIに切替");
+
+    // ジョイスティックデバイス登録（タイムアウト付きESP-IDF APIで使用）
+    // Add joystick device (used via ESP-IDF API with timeout)
     i2c_device_config_t dev_config = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = JOY_I2C_ADDRESS,
@@ -180,7 +184,8 @@ extern "C" esp_err_t joy_init(void)
     }
 
     joy_initialized = true;
-    ESP_LOGI(TAG, "ジョイスティック初期化完了 (I2C addr: 0x%02X, ESP-IDF I2Cドライバ)", JOY_I2C_ADDRESS);
+    ESP_LOGI(TAG, "ジョイスティック初期化完了 (I2C addr: 0x%02X, ESP-IDF API, timeout=%dms)",
+             JOY_I2C_ADDRESS, JOY_I2C_TIMEOUT_MS);
 
     return ESP_OK;
 }
