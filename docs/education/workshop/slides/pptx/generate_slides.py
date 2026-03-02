@@ -806,6 +806,7 @@ def build_lesson_03() -> Presentation:
     add_table_slide(prs, "LED 制御 API", [
         "関数", "説明", "引数",
     ], [
+        ["disable_led_task()", "システム LED 更新を無効化", "---"],
         ["led_color(r, g, b)", "LED 色設定（裏表両方）", "各 0-255"],
         ["is_armed()", "ARM 状態確認", "true / false"],
         ["battery_voltage()", "バッテリー電圧", "3.0-4.2 V"],
@@ -827,6 +828,7 @@ def build_lesson_03() -> Presentation:
 
 void setup() {
     ws::print("Lesson 3: LED Control");
+    ws::disable_led_task();  // Student LED control
 }
 
 void loop_400Hz(float dt) {

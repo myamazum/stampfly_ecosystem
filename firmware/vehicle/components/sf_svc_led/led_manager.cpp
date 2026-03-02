@@ -109,9 +109,26 @@ void LEDManager::setDirect(LEDIndex led, LEDPattern pattern, uint32_t color)
     applyToLED(led, pattern, color);
 }
 
+void LEDManager::setSystemEventsEnabled(bool enabled)
+{
+    system_events_enabled_ = enabled;
+    if (!enabled) {
+        // Release all system event priorities on all channels
+        // 全チャンネルのシステムイベント優先度を解放
+        for (int ch = 0; ch < static_cast<int>(LEDChannel::NUM_CHANNELS); ch++) {
+            auto channel = static_cast<LEDChannel>(ch);
+            releaseChannel(channel, LEDPriority::FLIGHT_STATE);
+            releaseChannel(channel, LEDPriority::LOW_BATTERY);
+            releaseChannel(channel, LEDPriority::PAIRING);
+            releaseChannel(channel, LEDPriority::DEBUG_ALERT);
+        }
+    }
+}
+
 void LEDManager::onFlightStateChanged(FlightState state)
 {
     if (!initialized_) return;
+    if (!system_events_enabled_) return;
 
     LEDPattern pattern = LEDPattern::SOLID;
     uint32_t color = 0x00FF00;  // Default green
@@ -153,6 +170,7 @@ void LEDManager::onFlightStateChanged(FlightState state)
 void LEDManager::onFlightModeChanged(FlightMode mode)
 {
     if (!initialized_) return;
+    if (!system_events_enabled_) return;
 
     // SYSTEMチャンネル（MCU LED）でフライトモードを表示
     // ACRO: 青（角速度制御 - アクロバティック）
@@ -182,6 +200,7 @@ void LEDManager::onFlightModeChanged(FlightMode mode)
 void LEDManager::onBatteryStateChanged(float voltage, bool low_battery)
 {
     if (!initialized_) return;
+    if (!system_events_enabled_) return;
 
     if (low_battery) {
         // 低電圧警告（シアン点滅）

@@ -76,6 +76,14 @@ public:
     // =========================================================================
 
     /**
+     * @brief システムイベント（飛行状態、バッテリー等）の自動LED更新を有効/無効化
+     *        Enable/disable automatic LED updates from system events
+     * @param enabled true=有効（デフォルト）, false=無効
+     */
+    void setSystemEventsEnabled(bool enabled);
+    bool isSystemEventsEnabled() const { return system_events_enabled_; }
+
+    /**
      * @brief フライト状態変更通知
      * @param state 新しいフライト状態
      */
@@ -162,6 +170,7 @@ private:
     static LED::Pattern toHALPattern(LEDPattern pattern);
 
     bool initialized_ = false;
+    bool system_events_enabled_ = true;
 
     // チャンネル状態
     ChannelState channels_[static_cast<int>(LEDChannel::NUM_CHANNELS)];

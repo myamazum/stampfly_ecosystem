@@ -153,6 +153,17 @@ bool is_armed();
 // -----------------------------------------------------------------------------
 
 /**
+ * @brief Disable system LED updates (flight state, battery, etc.)
+ *        システムLED更新を無効化（飛行状態、バッテリー等）
+ *
+ * Call this in setup() so that ws::led_color() takes effect.
+ * setup() 内で呼ぶと ws::led_color() の色が反映されるようになる。
+ * Also enables loop_400Hz() to run during IDLE state.
+ * IDLE状態でも loop_400Hz() が呼ばれるようになる。
+ */
+void disable_led_task();
+
+/**
  * @brief Set LED color (RGB)
  *        LEDカラーを設定
  * @param r Red (0-255)
@@ -218,6 +229,9 @@ float estimated_altitude();
 // Utility
 // ユーティリティ
 // -----------------------------------------------------------------------------
+
+/** @brief Check if system LED task is disabled */
+bool is_led_task_disabled();
 
 /** @brief Get elapsed time since boot [ms] */
 uint32_t millis();

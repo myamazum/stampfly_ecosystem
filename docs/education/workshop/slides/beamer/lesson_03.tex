@@ -40,6 +40,7 @@
       \hline
       \textbf{関数} & \textbf{説明} & \textbf{引数} \\
       \hline
+      \api{disable\_led\_task()} & システム LED 更新を無効化 & --- \\
       \api{led\_color(r, g, b)} & LED 色設定 & 各 0--255 \\
       \api{is\_armed()}         & ARM 状態確認 & true / false \\
       \api{battery\_voltage()}  & バッテリー電圧 & 3.0--4.2 V \\
@@ -96,6 +97,7 @@
 #include "workshop_api.hpp"
 void setup() {
     ws::print("Lesson 3: LED Control");
+    ws::disable_led_task();  // Student LED control
 }
 void loop_400Hz(float dt) {
     if (ws::is_armed()) {

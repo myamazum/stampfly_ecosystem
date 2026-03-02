@@ -85,12 +85,21 @@ void ControlTask(void* pvParameters)
         auto& state = stampfly::StampFlyState::getInstance();
         stampfly::FlightState flight_state = state.getFlightState();
 
-        // Only call user loop when armed (safety)
+        // Only call user loop when armed OR when LED task disabled (safety)
+        // ARM状態、または LED タスク無効時のみユーザーループを呼ぶ
         if (flight_state == stampfly::FlightState::ARMED ||
-            flight_state == stampfly::FlightState::FLYING) {
+            flight_state == stampfly::FlightState::FLYING ||
+            ws::is_led_task_disabled()) {
             loop_400Hz(dt);
         } else {
             // Not armed - ensure motors are stopped
+            ws::motor_stop_all();
+        }
+
+        // Safety: always stop motors when not armed, regardless of user code
+        // 安全対策: ARM状態でない場合は常にモーターを停止
+        if (flight_state != stampfly::FlightState::ARMED &&
+            flight_state != stampfly::FlightState::FLYING) {
             ws::motor_stop_all();
         }
     }

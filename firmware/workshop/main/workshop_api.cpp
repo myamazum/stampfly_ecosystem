@@ -173,16 +173,33 @@ bool ws::is_armed()
 // LED Control
 // =============================================================================
 
+static bool s_led_task_disabled = false;
+
+void ws::disable_led_task()
+{
+    auto& led_mgr = stampfly::LEDManager::getInstance();
+    led_mgr.setSystemEventsEnabled(false);
+    s_led_task_disabled = true;
+}
+
+bool ws::is_led_task_disabled() { return s_led_task_disabled; }
+
 void ws::led_color(uint8_t r, uint8_t g, uint8_t b)
 {
     uint32_t color = (static_cast<uint32_t>(r) << 16) |
                      (static_cast<uint32_t>(g) << 8) |
                      static_cast<uint32_t>(b);
-    stampfly::LEDManager::getInstance().requestChannel(
-        stampfly::LEDChannel::STATUS,
-        stampfly::LEDPriority::DEFAULT,
-        stampfly::LEDPattern::SOLID,
-        color);
+    auto& led_mgr = stampfly::LEDManager::getInstance();
+    if (s_led_task_disabled) {
+        led_mgr.setDirect(stampfly::LEDIndex::ALL, stampfly::LEDPattern::SOLID, color);
+        led_mgr.update();
+    } else {
+        led_mgr.requestChannel(
+            stampfly::LEDChannel::STATUS,
+            stampfly::LEDPriority::DEFAULT,
+            stampfly::LEDPattern::SOLID,
+            color);
+    }
 }
 
 // =============================================================================
