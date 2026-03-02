@@ -1,6 +1,6 @@
-\documentclass[border=10pt]{standalone}
+\documentclass[border=5pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, calc}
+\usetikzlibrary{arrows.meta, calc, decorations.markings}
 
 \begin{document}
 
@@ -8,77 +8,108 @@
 \definecolor{axisY}{RGB}{40, 160, 40}   % Green - Y right (East)
 \definecolor{axisZ}{RGB}{0, 120, 200}   % Blue - Z down
 \definecolor{bodycolor}{RGB}{80, 80, 80}
-\definecolor{gyrocolor}{RGB}{120, 80, 150}
 
 \begin{tikzpicture}[
-    axis/.style={-{Stealth[length=4mm]}, line width=2pt},
-    gyro/.style={-{Stealth[length=3mm]}, line width=1.5pt, gyrocolor},
+    axis/.style={-{Stealth[length=5mm, width=3mm]}, line width=2.5pt},
+    rotarrow/.style={
+      -{Stealth[length=3.5mm, width=2.5mm]},
+      line width=1.8pt,
+    },
   ]
 
   % Isometric unit vectors
-  % X (Forward/North): upper-left
-  \pgfmathsetmacro{\Xx}{-0.7}
-  \pgfmathsetmacro{\Xy}{0.5}
-  % Y (Right/East): right
+  \pgfmathsetmacro{\Xx}{-0.71}
+  \pgfmathsetmacro{\Xy}{0.50}
   \pgfmathsetmacro{\Yx}{1.0}
   \pgfmathsetmacro{\Yy}{0.0}
-  % Z (Down): straight down
   \pgfmathsetmacro{\Zx}{0.0}
   \pgfmathsetmacro{\Zy}{-1.0}
 
-  % Body - isometric parallelogram (top face of drone)
-  \coordinate (O) at (0, 0);
-  \coordinate (A) at ({1.2*\Xx + 1.2*\Yx}, {1.2*\Xy + 1.2*\Yy});   % front-right
-  \coordinate (B) at ({1.2*\Xx - 1.2*\Yx}, {1.2*\Xy - 1.2*\Yy});   % front-left
-  \coordinate (C) at ({-1.2*\Xx - 1.2*\Yx}, {-1.2*\Xy - 1.2*\Yy}); % rear-left
-  \coordinate (D) at ({-1.2*\Xx + 1.2*\Yx}, {-1.2*\Xy + 1.2*\Yy}); % rear-right
+  % Body - isometric parallelogram
+  \fill[bodycolor!10]
+    ({1.1*\Xx+1.1*\Yx},{1.1*\Xy+1.1*\Yy}) --
+    ({1.1*\Xx-1.1*\Yx},{1.1*\Xy-1.1*\Yy}) --
+    ({-1.1*\Xx-1.1*\Yx},{-1.1*\Xy-1.1*\Yy}) --
+    ({-1.1*\Xx+1.1*\Yx},{-1.1*\Xy+1.1*\Yy}) -- cycle;
+  \draw[bodycolor, line width=1.5pt]
+    ({1.1*\Xx+1.1*\Yx},{1.1*\Xy+1.1*\Yy}) --
+    ({1.1*\Xx-1.1*\Yx},{1.1*\Xy-1.1*\Yy}) --
+    ({-1.1*\Xx-1.1*\Yx},{-1.1*\Xy-1.1*\Yy}) --
+    ({-1.1*\Xx+1.1*\Yx},{-1.1*\Xy+1.1*\Yy}) -- cycle;
 
-  \fill[bodycolor!12] (A) -- (B) -- (C) -- (D) -- cycle;
-  \draw[bodycolor, line width=1.5pt] (A) -- (B) -- (C) -- (D) -- cycle;
-
-  % "Front" marker
-  \coordinate (front) at ({1.2*\Xx}, {1.2*\Xy});
-  \fill[axisX!60] ($(front)+(-0.3, 0.05)$) -- ($(front)+(0.3, 0.05)$)
-                  -- ($(front)+(0, 0.25)$) -- cycle;
-
-  \node[font=\footnotesize, text=bodycolor] at (0, -0.15) {IMU};
+  % Front marker triangle
+  \fill[axisX!50]
+    ({1.1*\Xx-0.35},{1.1*\Xy}) --
+    ({1.1*\Xx+0.35},{1.1*\Xy}) --
+    ({1.1*\Xx},{1.1*\Xy+0.3}) -- cycle;
 
   % Axis length
-  \pgfmathsetmacro{\Alen}{3.5}
+  \pgfmathsetmacro{\AL}{4.5}
 
   % X axis (Forward / North)
-  \draw[axis, axisX] (0, 0) -- ({\Alen*\Xx}, {\Alen*\Xy});
-  \node[font=\large\bfseries, axisX, above left] at ({\Alen*\Xx}, {\Alen*\Xy}) {X (Forward)};
+  \draw[axis, axisX] (0,0) -- ({\AL*\Xx},{\AL*\Xy});
+  \node[font=\Large\bfseries, axisX, above left]
+    at ({\AL*\Xx},{\AL*\Xy}) {X (Forward)};
 
   % Y axis (Right / East)
-  \draw[axis, axisY] (0, 0) -- ({\Alen*\Yx}, {\Alen*\Yy});
-  \node[font=\large\bfseries, axisY, right] at ({\Alen*\Yx}, {\Alen*\Yy}) {Y (Right)};
+  \draw[axis, axisY] (0,0) -- ({\AL*\Yx},{\AL*\Yy});
+  \node[font=\Large\bfseries, axisY, above right]
+    at ({\AL*\Yx},{\AL*\Yy}) {Y (Right)};
 
   % Z axis (Down)
-  \draw[axis, axisZ] (0, 0) -- ({\Alen*\Zx}, {\Alen*\Zy});
-  \node[font=\large\bfseries, axisZ, below] at ({\Alen*\Zx}, {\Alen*\Zy}) {Z (Down)};
+  \draw[axis, axisZ] (0,0) -- ({\AL*\Zx},{\AL*\Zy});
+  \node[font=\Large\bfseries, axisZ, right]
+    at ({\AL*\Zx},{\AL*\Zy}) {Z (Down)};
 
-  % Gyro rotation arrows
-  % Roll (rotation around X axis)
-  \coordinate (rollC) at ({2.2*\Xx}, {2.2*\Xy});
-  \draw[gyro] ($(rollC)+(0, -0.6)$) arc[start angle=-90, end angle=90, radius=0.6cm];
-  \node[font=\small, gyrocolor, above right] at ($(rollC)+(0.1, 0.6)$) {Roll};
+  % === Rotation arrows (elliptical arcs wrapping around each axis) ===
 
-  % Pitch (rotation around Y axis)
-  \coordinate (pitchC) at ({2.2*\Yx}, {2.2*\Yy});
-  \draw[gyro] ($(pitchC)+(-0.1, 0.6)$) arc[start angle=100, end angle=-100, radius=0.6cm];
-  \node[font=\small, gyrocolor, right] at ($(pitchC)+(0.2, 0.7)$) {Pitch};
+  % Roll - rotation around X axis
+  % Arc lies in the Y-Z plane, centered on X axis
+  % Projected semi-axes: Y direction (1,0) and Z direction (0,-1)
+  \pgfmathsetmacro{\Rcx}{2.6*\Xx}  % center on X axis
+  \pgfmathsetmacro{\Rcy}{2.6*\Xy}
+  \pgfmathsetmacro{\Rr}{0.9}        % arc radius
+  \draw[rotarrow, axisX!70!black]
+    ({\Rcx+\Rr*\Yx*cos(200)+\Rr*\Zx*sin(200)},
+     {\Rcy+\Rr*\Yy*cos(200)+\Rr*\Zy*sin(200)})
+    \foreach \a in {200,210,...,490} {
+      -- ({\Rcx+\Rr*\Yx*cos(\a)+\Rr*\Zx*sin(\a)},
+          {\Rcy+\Rr*\Yy*cos(\a)+\Rr*\Zy*sin(\a)})
+    };
+  \node[font=\normalsize\bfseries, axisX!70!black, above]
+    at ({\Rcx},{\Rcy+\Rr+0.15}) {Roll};
 
-  % Yaw (rotation around Z axis)
-  \coordinate (yawC) at ({0*\Zx}, {1.8*\Zy});
-  \draw[gyro] ($(yawC)+(0.6, 0.1)$) arc[start angle=10, end angle=170, radius=0.6cm];
-  \node[font=\small, gyrocolor, left] at ($(yawC)+(-0.7, 0)$) {Yaw};
+  % Pitch - rotation around Y axis
+  % Arc lies in the X-Z plane, centered on Y axis
+  % Projected semi-axes: X direction (-0.71,0.5) and Z direction (0,-1)
+  \pgfmathsetmacro{\Pcx}{2.6*\Yx}
+  \pgfmathsetmacro{\Pcy}{2.6*\Yy}
+  \pgfmathsetmacro{\Pr}{0.9}
+  \draw[rotarrow, axisY!70!black]
+    ({\Pcx+\Pr*\Xx*cos(200)+\Pr*\Zx*sin(200)},
+     {\Pcy+\Pr*\Xy*cos(200)+\Pr*\Zy*sin(200)})
+    \foreach \a in {200,210,...,490} {
+      -- ({\Pcx+\Pr*\Xx*cos(\a)+\Pr*\Zx*sin(\a)},
+          {\Pcy+\Pr*\Xy*cos(\a)+\Pr*\Zy*sin(\a)})
+    };
+  \node[font=\normalsize\bfseries, axisY!70!black, above right]
+    at ({\Pcx+\Pr*0.3},{\Pcy+\Pr*0.7}) {Pitch};
 
-  % Legend
-  \node[anchor=west, font=\small] at (-4.0, -4.5) {%
-    \textcolor{axisX}{\rule{8pt}{8pt}} X (gyro\_x = Roll rate) \quad
-    \textcolor{axisY}{\rule{8pt}{8pt}} Y (gyro\_y = Pitch rate) \quad
-    \textcolor{axisZ}{\rule{8pt}{8pt}} Z (gyro\_z = Yaw rate)};
+  % Yaw - rotation around Z axis
+  % Arc lies in the X-Y plane, centered on Z axis
+  % Projected semi-axes: X direction (-0.71,0.5) and Y direction (1,0)
+  \pgfmathsetmacro{\Wcx}{2.6*\Zx}
+  \pgfmathsetmacro{\Wcy}{2.6*\Zy}
+  \pgfmathsetmacro{\Wr}{0.9}
+  \draw[rotarrow, axisZ!70!black]
+    ({\Wcx+\Wr*\Xx*cos(160)+\Wr*\Yx*sin(160)},
+     {\Wcy+\Wr*\Xy*cos(160)+\Wr*\Yy*sin(160)})
+    \foreach \a in {160,170,...,450} {
+      -- ({\Wcx+\Wr*\Xx*cos(\a)+\Wr*\Yx*sin(\a)},
+          {\Wcy+\Wr*\Xy*cos(\a)+\Wr*\Yy*sin(\a)})
+    };
+  \node[font=\normalsize\bfseries, axisZ!70!black, left]
+    at ({\Wcx-\Wr*0.8},{\Wcy+\Wr*0.3}) {Yaw};
 
 \end{tikzpicture}
 \end{document}

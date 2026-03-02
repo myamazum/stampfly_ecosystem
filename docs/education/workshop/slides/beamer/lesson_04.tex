@@ -28,29 +28,17 @@
 
 % ------------------------------------------------------------------
 \begin{frame}{NED 座標系 / NED Coordinate System}
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      \begin{center}
-        \resizebox{\textwidth}{!}{\input{../tikz/imu_axes}}
-      \end{center}
-    \end{column}
-    \begin{column}{0.47\textwidth}
-      \begin{itemize}
-        \item \textbf{X}: 前方 (Forward)
-        \item \textbf{Y}: 右方 (Right)
-        \item \textbf{Z}: 下方 (Down)
-      \end{itemize}
-
-      \vspace{1em}
-
-      \begin{block}{BMI270 IMU}
-        \begin{itemize}
-          \item 6軸: 3軸ジャイロ + 3軸加速度
-          \item サンプリングレート: 400\,Hz
-        \end{itemize}
-      \end{block}
-    \end{column}
-  \end{columns}
+  \vspace{-0.5em}
+  \begin{center}
+    \resizebox{0.65\textwidth}{!}{\input{../tikz/imu_axes}}
+  \end{center}
+  \vspace{-0.5em}
+  \begin{block}{}
+    \centering\small
+    BMI270 IMU --- 6軸（3軸ジャイロ + 3軸加速度）400\,Hz
+    \quad|\quad
+    回転矢印 = ジャイロ正方向（右手の法則）
+  \end{block}
 \end{frame}
 
 % ------------------------------------------------------------------
