@@ -53,7 +53,7 @@ static volatile int64_t frame_start_time_us = 0;
 // ビーコン同期状態
 volatile bool first_beacon_received = false;
 volatile int64_t last_beacon_time_us = 0;
-static const uint32_t BEACON_TIMEOUT_US = 50000;  // 50ms = 5フレーム
+static const uint32_t BEACON_TIMEOUT_US = 200000;  // 200ms = 10フレーム
 
 // 送信統計
 volatile uint32_t send_success_count = 0;
@@ -280,15 +280,19 @@ static void IRAM_ATTR tdma_timer_callback(void* arg)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    // フレーム開始時刻を記録
-    frame_start_time_us = esp_timer_get_time();
+    // マスターのみフレーム開始時刻を記録（スレーブはビーコン受信で設定）
+    // Only master updates frame start time (slaves use beacon reception)
+    if (g_tdma_device_id == 0) {
+        frame_start_time_us = esp_timer_get_time();
+    }
 
     // マスター: ビーコン送信タスクに通知
     if (g_tdma_device_id == 0 && beacon_task_handle != NULL) {
         vTaskNotifyGiveFromISR(beacon_task_handle, &xHigherPriorityTaskWoken);
     }
 
-    // セマフォを解放
+    // セマフォを解放（マスター・スレーブ共通）
+    // Release semaphore for both master and slave
     xSemaphoreGiveFromISR(beacon_sem, &xHigherPriorityTaskWoken);
 
     if (xHigherPriorityTaskWoken == pdTRUE) {
