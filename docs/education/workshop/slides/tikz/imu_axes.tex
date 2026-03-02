@@ -1,56 +1,81 @@
 \documentclass[border=10pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning}
+\usetikzlibrary{arrows.meta, positioning, calc}
 
 \begin{document}
 
-\definecolor{axisX}{RGB}{220, 50, 30}   % Red - X forward
-\definecolor{axisY}{RGB}{40, 160, 40}   % Green - Y right
+\definecolor{axisX}{RGB}{220, 50, 30}   % Red - X forward (North)
+\definecolor{axisY}{RGB}{40, 160, 40}   % Green - Y right (East)
 \definecolor{axisZ}{RGB}{0, 120, 200}   % Blue - Z down
 \definecolor{bodycolor}{RGB}{80, 80, 80}
 \definecolor{gyrocolor}{RGB}{120, 80, 150}
+
 \begin{tikzpicture}[
     axis/.style={-{Stealth[length=4mm]}, line width=2pt},
     gyro/.style={-{Stealth[length=3mm]}, line width=1.5pt, gyrocolor},
   ]
 
-  % Body rectangle (top view)
-  \fill[bodycolor!15, rounded corners=3pt] (-1.2, -1.2) rectangle (1.2, 1.2);
-  \draw[bodycolor, line width=1.5pt, rounded corners=3pt] (-1.2, -1.2) rectangle (1.2, 1.2);
-  \node[font=\footnotesize, text=bodycolor] at (0, 0) {IMU};
+  % Isometric unit vectors
+  % X (Forward/North): upper-left
+  \pgfmathsetmacro{\Xx}{-0.7}
+  \pgfmathsetmacro{\Xy}{0.5}
+  % Y (Right/East): right
+  \pgfmathsetmacro{\Yx}{1.0}
+  \pgfmathsetmacro{\Yy}{0.0}
+  % Z (Down): straight down
+  \pgfmathsetmacro{\Zx}{0.0}
+  \pgfmathsetmacro{\Zy}{-1.0}
 
-  % X axis (forward = up on the page)
-  \draw[axis, axisX] (0, 1.5) -- (0, 4.0);
-  \node[font=\large\bfseries, axisX, above] at (0, 4.0) {X (Forward)};
+  % Body - isometric parallelogram (top face of drone)
+  \coordinate (O) at (0, 0);
+  \coordinate (A) at ({1.2*\Xx + 1.2*\Yx}, {1.2*\Xy + 1.2*\Yy});   % front-right
+  \coordinate (B) at ({1.2*\Xx - 1.2*\Yx}, {1.2*\Xy - 1.2*\Yy});   % front-left
+  \coordinate (C) at ({-1.2*\Xx - 1.2*\Yx}, {-1.2*\Xy - 1.2*\Yy}); % rear-left
+  \coordinate (D) at ({-1.2*\Xx + 1.2*\Yx}, {-1.2*\Xy + 1.2*\Yy}); % rear-right
 
-  % Y axis (right)
-  \draw[axis, axisY] (1.5, 0) -- (4.0, 0);
-  \node[font=\large\bfseries, axisY, right] at (4.0, 0) {Y (Right)};
+  \fill[bodycolor!12] (A) -- (B) -- (C) -- (D) -- cycle;
+  \draw[bodycolor, line width=1.5pt] (A) -- (B) -- (C) -- (D) -- cycle;
 
-  % Z axis (down - draw diagonally to show 3D perspective)
-  \draw[axis, axisZ] (-0.8, -0.8) -- (-2.5, -2.5);
-  \node[font=\large\bfseries, axisZ, below left] at (-2.5, -2.5) {Z (Down)};
+  % "Front" marker
+  \coordinate (front) at ({1.2*\Xx}, {1.2*\Xy});
+  \fill[axisX!60] ($(front)+(-0.3, 0.05)$) -- ($(front)+(0.3, 0.05)$)
+                  -- ($(front)+(0, 0.25)$) -- cycle;
+
+  \node[font=\footnotesize, text=bodycolor] at (0, -0.15) {IMU};
+
+  % Axis length
+  \pgfmathsetmacro{\Alen}{3.5}
+
+  % X axis (Forward / North)
+  \draw[axis, axisX] (0, 0) -- ({\Alen*\Xx}, {\Alen*\Xy});
+  \node[font=\large\bfseries, axisX, above left] at ({\Alen*\Xx}, {\Alen*\Xy}) {X (Forward)};
+
+  % Y axis (Right / East)
+  \draw[axis, axisY] (0, 0) -- ({\Alen*\Yx}, {\Alen*\Yy});
+  \node[font=\large\bfseries, axisY, right] at ({\Alen*\Yx}, {\Alen*\Yy}) {Y (Right)};
+
+  % Z axis (Down)
+  \draw[axis, axisZ] (0, 0) -- ({\Alen*\Zx}, {\Alen*\Zy});
+  \node[font=\large\bfseries, axisZ, below] at ({\Alen*\Zx}, {\Alen*\Zy}) {Z (Down)};
 
   % Gyro rotation arrows
-  % Roll (rotation around X)
-  \draw[gyro] ([shift={(80:1.8)}]0, 2.8)
-    arc[start angle=80, end angle=-80, radius=0.6cm];
-  \node[font=\small, gyrocolor, right] at (0.8, 2.8) {Roll};
+  % Roll (rotation around X axis)
+  \coordinate (rollC) at ({2.2*\Xx}, {2.2*\Xy});
+  \draw[gyro] ($(rollC)+(0, -0.6)$) arc[start angle=-90, end angle=90, radius=0.6cm];
+  \node[font=\small, gyrocolor, above right] at ($(rollC)+(0.1, 0.6)$) {Roll};
 
-  % Pitch (rotation around Y)
-  \draw[gyro] ([shift={(170:1.8)}]2.8, 0)
-    arc[start angle=170, end angle=10, radius=0.6cm];
-  \node[font=\small, gyrocolor, above] at (2.8, 0.8) {Pitch};
+  % Pitch (rotation around Y axis)
+  \coordinate (pitchC) at ({2.2*\Yx}, {2.2*\Yy});
+  \draw[gyro] ($(pitchC)+(-0.1, 0.6)$) arc[start angle=100, end angle=-100, radius=0.6cm];
+  \node[font=\small, gyrocolor, right] at ($(pitchC)+(0.2, 0.7)$) {Pitch};
 
-  % Yaw (rotation around Z)
-  \draw[gyro] ([shift={(200:1.5)}]-1.6, -1.6)
-    arc[start angle=200, end angle=340, radius=0.6cm];
-  \node[font=\small, gyrocolor, left] at (-2.5, -1.2) {Yaw};
-
-  % NED label removed — Beamer frame title already shows it
+  % Yaw (rotation around Z axis)
+  \coordinate (yawC) at ({0*\Zx}, {1.8*\Zy});
+  \draw[gyro] ($(yawC)+(0.6, 0.1)$) arc[start angle=10, end angle=170, radius=0.6cm];
+  \node[font=\small, gyrocolor, left] at ($(yawC)+(-0.7, 0)$) {Yaw};
 
   % Legend
-  \node[anchor=west, font=\small] at (-4.5, -3.5) {%
+  \node[anchor=west, font=\small] at (-4.0, -4.5) {%
     \textcolor{axisX}{\rule{8pt}{8pt}} X (gyro\_x = Roll rate) \quad
     \textcolor{axisY}{\rule{8pt}{8pt}} Y (gyro\_y = Pitch rate) \quad
     \textcolor{axisZ}{\rule{8pt}{8pt}} Z (gyro\_z = Yaw rate)};

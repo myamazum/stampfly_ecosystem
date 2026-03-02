@@ -29,12 +29,12 @@
 % ------------------------------------------------------------------
 \begin{frame}{NED 座標系 / NED Coordinate System}
   \begin{columns}[T]
-    \begin{column}{0.45\textwidth}
+    \begin{column}{0.5\textwidth}
       \begin{center}
-        \resizebox{!}{0.72\textheight}{\input{../tikz/imu_axes}}
+        \resizebox{\textwidth}{!}{\input{../tikz/imu_axes}}
       \end{center}
     \end{column}
-    \begin{column}{0.5\textwidth}
+    \begin{column}{0.47\textwidth}
       \begin{itemize}
         \item \textbf{X}: 前方 (Forward)
         \item \textbf{Y}: 右方 (Right)
@@ -45,7 +45,7 @@
 
       \begin{block}{BMI270 IMU}
         \begin{itemize}
-          \item 6 軸: 3軸ジャイロ + 3軸加速度
+          \item 6軸: 3軸ジャイロ + 3軸加速度
           \item サンプリングレート: 400\,Hz
         \end{itemize}
       \end{block}
