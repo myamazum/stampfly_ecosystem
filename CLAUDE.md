@@ -219,7 +219,34 @@ ASCII アートを活用する：
 1. **Beamer の `.tex` を1ページずつ読み、チェックリストを適用する**
 2. **TikZ の `.tex` を1ファイルずつ読み、チェックリストを適用する**
 3. **PPTX ビルダー (`generate_slides.py`) と Beamer の内容を突き合わせる**
-4. 問題を発見したら修正し、修正ごとに fix コミットする
+4. **PDF を画像化して全ページ目視確認する**（テキストレビューだけでは検出できないレイアウト崩れを発見するため）
+5. 問題を発見したら修正し、修正ごとに fix コミットする
+
+### 画像化による目視確認手順
+
+テキストベースのレビューでは検出できない問題（はみ出し、重なり、切れ）を発見するため、**必ず PDF を画像化して全ページ確認する**。
+
+```bash
+# 1. TikZ standalone をコンパイル・画像化
+cd docs/education/workshop/slides/tikz
+pdflatex -interaction=nonstopmode <file>.tex
+magick -density 200 <file>.pdf -quality 95 /tmp/tikz_<file>.png
+
+# 2. Beamer をコンパイル・全ページ画像化
+cd docs/education/workshop/slides/beamer
+lualatex -interaction=nonstopmode <lesson>.tex
+magick -density 200 "<lesson>.pdf[0]" -quality 95 /tmp/beamer_<lesson>_p1.png
+magick -density 200 "<lesson>.pdf[1]" -quality 95 /tmp/beamer_<lesson>_p2.png
+# ... 全ページ分
+
+# 3. Read ツールで各画像を確認（マルチモーダル対応）
+```
+
+**確認ポイント:**
+- 図・テキストがスライド端で切れていないか
+- ノード・ラベルが重なっていないか
+- `\resizebox` のスケーリングで横幅・縦幅が収まっているか
+- フッターにコンテンツが被っていないか
 
 ### チェック項目
 
