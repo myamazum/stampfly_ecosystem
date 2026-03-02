@@ -930,7 +930,7 @@ void loop_400Hz(float dt) {
         "• --mode attitude … 姿勢推定（Roll/Pitch/Yaw）",
         "",
         "• --save plot.png でファイル保存可能",
-        "• ドローンを手で傾けながらキャプチャし、ジャイロの変化をグラフで確認しよう",
+        "• StampFly を手で揺らしながらキャプチャし、ジャイロの変化をグラフで確認しよう",
     ])
 
     add_checkpoint_slide(prs, [
