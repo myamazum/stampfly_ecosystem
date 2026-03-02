@@ -29,13 +29,6 @@ void loop_400Hz(float dt)
     float ay = ws::accel_y();
     float az = ws::accel_z();
 
-    // Send via WiFi telemetry (viewable with sf log wifi)
-    // WiFiテレメトリで送信（sf log wifi で確認可能）
-    ws::telemetry_send("gyro_x", gx);
-    ws::telemetry_send("gyro_y", gy);
-    ws::telemetry_send("gyro_z", gz);
-    ws::telemetry_send("accel_z", az);
-
     // Print every 100ms
     // 100ms毎に表示
     if (tick % 40 == 0) {

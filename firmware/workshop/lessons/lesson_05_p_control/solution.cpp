@@ -68,19 +68,6 @@ void loop_400Hz(float dt)
     // モーターに適用
     ws::motor_mixer(throttle, roll_output, pitch_output, yaw_output);
 
-    // --- Telemetry (10Hz) ---
-    // テレメトリ送信 (10Hz)
-    if (tick % 40 == 0) {
-        ws::telemetry_send("roll_target", roll_target);
-        ws::telemetry_send("roll_actual", roll_actual);
-        ws::telemetry_send("roll_error",  roll_error);
-        ws::telemetry_send("pitch_target", pitch_target);
-        ws::telemetry_send("pitch_actual", pitch_actual);
-        ws::telemetry_send("yaw_target", yaw_target);
-        ws::telemetry_send("yaw_actual", yaw_actual);
-        ws::telemetry_send("throttle", throttle);
-    }
-
     // --- Debug print (2Hz) ---
     // デバッグ出力 (2Hz): 実測値/目標値
     if (tick % 200 == 0) {

@@ -196,19 +196,6 @@ float accel_y();
 float accel_z();
 
 // -----------------------------------------------------------------------------
-// Telemetry (Lesson 7)
-// テレメトリ
-// -----------------------------------------------------------------------------
-
-/**
- * @brief Send a named float value via WiFi telemetry
- *        名前付きfloat値をWiFiテレメトリで送信
- * @param name Variable name (shown in sf log wifi)
- * @param value Float value to send
- */
-void telemetry_send(const char* name, float value);
-
-// -----------------------------------------------------------------------------
 // Estimation (Lesson 9)
 // 姿勢推定
 // -----------------------------------------------------------------------------

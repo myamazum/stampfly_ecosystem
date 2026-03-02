@@ -143,22 +143,10 @@ void loop_400Hz(float dt)
     ws::motor_mixer(throttle, roll_output, pitch_output, yaw_output);
 
     // =====================================================================
-    // TODO: Send telemetry data
-    // テレメトリデータを送信
+    // LED + phase display during experiment
+    // 実験中のLED表示 + フェーズ表示
     // =====================================================================
-    // Send at 400Hz during the experiment for high-resolution data
-    // 実験中は400Hzで送信し、高解像度データを取得
-
     if (step_active && elapsed < total_duration) {
-        // TODO: Send the following via ws::telemetry_send():
-        //   "step_target" - the step input (roll_step)
-        //   "step_actual" - gyro roll rate (roll_actual)
-        //   "step_error"  - tracking error (roll_error)
-        //   "step_output" - PID output (roll_output)
-        //   "step_P"      - P term (roll_P)
-        //   "step_I"      - I term (roll_I)
-        //   "step_D"      - D term (roll_D)
-
         // LED: red during step, green otherwise
         // LED: ステップ中は赤、それ以外は緑
         if (elapsed >= step_delay && elapsed < step_delay + step_duration) {

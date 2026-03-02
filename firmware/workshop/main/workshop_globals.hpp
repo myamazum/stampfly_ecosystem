@@ -31,16 +31,3 @@ extern volatile bool g_boot_complete;   // Set by app_main after init
 extern volatile bool g_setup_complete;  // Set by ControlTask after setup()
 } // namespace globals
 
-namespace ws_internal {
-
-inline constexpr int MAX_USER_TELEM = 8;
-
-struct UserTelemetryEntry {
-    char name[16];
-    float value;
-    bool active;
-};
-
-extern UserTelemetryEntry g_user_telemetry[MAX_USER_TELEM];
-
-} // namespace ws_internal

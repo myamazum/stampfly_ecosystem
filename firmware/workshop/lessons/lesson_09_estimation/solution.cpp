@@ -43,13 +43,6 @@ void loop_400Hz(float dt)
     float eskf_roll  = ws::estimated_roll();
     float eskf_pitch = ws::estimated_pitch();
 
-    // Telemetry: compare CF vs ESKF (convert rad -> deg)
-    // テレメトリ: 相補フィルタとESKFを比較（rad -> deg変換）
-    ws::telemetry_send("cf_roll",    cf_roll  * 57.3f);
-    ws::telemetry_send("eskf_roll",  eskf_roll  * 57.3f);
-    ws::telemetry_send("cf_pitch",   cf_pitch * 57.3f);
-    ws::telemetry_send("eskf_pitch", eskf_pitch * 57.3f);
-
     // Print every 200ms (80 ticks at 400Hz)
     // 200ms毎に表示
     if (tick % 80 == 0) {

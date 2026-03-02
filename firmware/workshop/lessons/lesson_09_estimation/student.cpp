@@ -46,11 +46,7 @@ void loop_400Hz(float dt)
     // float eskf_roll  = ws::estimated_roll();
     // float eskf_pitch = ws::estimated_pitch();
 
-    // TODO: Send telemetry to compare CF vs ESKF
-    // テレメトリで相補フィルタとESKFを比較する
-    // ws::telemetry_send("cf_roll",   cf_roll * 57.3f);
-    // ws::telemetry_send("eskf_roll", eskf_roll * 57.3f);
-
     // TODO: Print values every 200ms (80 ticks)
+    // 200ms毎に値を表示する（CF vs ESKF を比較）
     // 200ms毎に値を表示する
 }

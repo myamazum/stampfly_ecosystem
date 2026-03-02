@@ -156,19 +156,10 @@ void loop_400Hz(float dt)
     ws::motor_mixer(throttle, roll_output, pitch_output, yaw_output);
 
     // =====================================================================
-    // Telemetry: send at 400Hz during experiment
-    // テレメトリ: 実験中は400Hzで送信
+    // LED + phase display during experiment
+    // 実験中のLED表示 + フェーズ表示
     // =====================================================================
     if (step_active && elapsed < total_duration) {
-        ws::telemetry_send("step_target", roll_step);
-        ws::telemetry_send("step_actual", roll_actual);
-        ws::telemetry_send("step_error",  roll_error);
-        ws::telemetry_send("step_output", roll_output);
-        ws::telemetry_send("step_P",      roll_P);
-        ws::telemetry_send("step_I",      roll_I);
-        ws::telemetry_send("step_D",      roll_D);
-        ws::telemetry_send("throttle",    throttle);
-
         // LED feedback / LED表示
         if (elapsed < step_delay) {
             ws::led_color(50, 50, 0);    // Yellow = waiting / 黄 = 待機中
@@ -200,12 +191,4 @@ void loop_400Hz(float dt)
         ws::led_color(0, 0, 50);  // Blue = done / 青 = 完了
     }
 
-    // Normal telemetry when not in experiment (10Hz)
-    // 実験外では通常テレメトリ (10Hz)
-    if (!step_active && tick % 40 == 0) {
-        ws::telemetry_send("roll_rate", roll_actual);
-        ws::telemetry_send("pitch_rate", pitch_actual);
-        ws::telemetry_send("yaw_rate", yaw_actual);
-        ws::telemetry_send("throttle", throttle);
-    }
 }

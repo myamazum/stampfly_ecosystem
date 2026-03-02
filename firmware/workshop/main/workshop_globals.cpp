@@ -184,10 +184,3 @@ extern "C" {
     volatile uint32_t g_optflow_last_loop = 0;
 }
 
-// =============================================================================
-// Workshop-specific: User Telemetry
-// =============================================================================
-
-namespace ws_internal {
-UserTelemetryEntry g_user_telemetry[MAX_USER_TELEM] = {};
-} // namespace ws_internal

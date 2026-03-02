@@ -23,7 +23,6 @@
 #include <algorithm>
 
 using namespace globals;
-using namespace ws_internal;
 
 // =============================================================================
 // Communication Setup
@@ -246,32 +245,6 @@ float ws::accel_z()
     stampfly::Vec3 a, g;
     stampfly::StampFlyState::getInstance().getIMUCorrected(a, g);
     return a.z;
-}
-
-// =============================================================================
-// Telemetry
-// =============================================================================
-
-void ws::telemetry_send(const char* name, float value)
-{
-    // Update existing entry
-    for (int i = 0; i < MAX_USER_TELEM; i++) {
-        if (g_user_telemetry[i].active &&
-            strncmp(g_user_telemetry[i].name, name, sizeof(g_user_telemetry[i].name) - 1) == 0) {
-            g_user_telemetry[i].value = value;
-            return;
-        }
-    }
-    // Find empty slot
-    for (int i = 0; i < MAX_USER_TELEM; i++) {
-        if (!g_user_telemetry[i].active) {
-            strncpy(g_user_telemetry[i].name, name, sizeof(g_user_telemetry[i].name) - 1);
-            g_user_telemetry[i].name[sizeof(g_user_telemetry[i].name) - 1] = '\0';
-            g_user_telemetry[i].value = value;
-            g_user_telemetry[i].active = true;
-            return;
-        }
-    }
 }
 
 // =============================================================================

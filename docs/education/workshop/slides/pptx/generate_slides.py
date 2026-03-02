@@ -862,7 +862,7 @@ def build_lesson_04() -> Presentation:
     add_title_slide(prs, "Lesson 4: IMU センサ", "IMU Sensor")
 
     add_content_slide(prs, "今日のゴール / Today's Goal", [
-        "IMU（ジャイロ+加速度）データを読み取り、テレメトリで可視化する",
+        "IMU（ジャイロ+加速度）データを読み取り、シリアルモニタと WiFi テレメトリで確認する",
         "",
         "• NED 座標系（北-東-下）の理解",
         "• ジャイロスコープで角速度を取得",
@@ -887,10 +887,9 @@ def build_lesson_04() -> Presentation:
     ], [
         ["gyro_x/y/z()", "角速度 (Roll/Pitch/Yaw)", "rad/s"],
         ["accel_x/y/z()", "加速度 (X/Y/Z)", "m/s²"],
-        ["telemetry_send(name, val)", "WiFi テレメトリ送信", "---"],
     ])
 
-    add_code_slide(prs, "実習: 6軸読み取り + テレメトリ", """
+    add_code_slide(prs, "実習: 6軸読み取り + シリアル表示", """
 #include "workshop_api.hpp"
 static uint32_t tick = 0;
 void setup() {
@@ -901,18 +900,20 @@ void loop_400Hz(float dt) {
     float gx = ws::gyro_x();
     float gy = ws::gyro_y();
     float gz = ws::gyro_z();
-    // Send via WiFi telemetry
-    ws::telemetry_send("gyro_x", gx);
-    ws::telemetry_send("gyro_y", gy);
-    ws::telemetry_send("gyro_z", gz);
-    // Print every 200ms (80 ticks)
-    if (tick % 80 == 0) {
-        ws::print("gx=%.2f gy=%.2f gz=%.2f", gx, gy, gz);
+    float ax = ws::accel_x();
+    float ay = ws::accel_y();
+    float az = ws::accel_z();
+    // Print every 100ms (40 ticks)
+    if (tick % 40 == 0) {
+        ws::print("G=(%.3f,%.3f,%.3f) A=(%.2f,%.2f,%.2f)",
+                  gx, gy, gz, ax, ay, az);
     }
 }
 """)
 
     add_content_slide(prs, "WiFi テレメトリ受信 / Receiving WiFi Telemetry", [
+        "システムが IMU・姿勢・センサデータを自動的に 400Hz で送信しています",
+        "",
         "手順:",
         "1. シリアルモニタで SSID を確認（StampFly_XXXX）",
         "2. PC の WiFi で StampFly に接続（IP: 192.168.4.1）",
@@ -936,10 +937,10 @@ void loop_400Hz(float dt) {
     ])
 
     add_checkpoint_slide(prs, [
-        "手で傾けるとジャイロ値が変化する",
+        "シリアルモニタでジャイロ・加速度の値を確認できる",
         "静止時に accel_z ≈ 9.81 を確認",
-        "sf log wifi でテレメトリデータを受信できる",
-        "sf log viz でジャイロデータをグラフ表示できる",
+        "sf log wifi でセンサデータを受信できる",
+        "sf log viz でデータをグラフ表示できる",
     ], "Lesson 5: レート P 制御 + 初フライト")
 
     return prs
@@ -1151,11 +1152,15 @@ def build_lesson_07() -> Presentation:
         image_path=IMAGES_DIR / "step_response.png",
     )
 
-    add_table_slide(prs, "テレメトリ API", [
+    add_content_slide(prs, "WiFi テレメトリ（自動送信）", [
+        "システムが IMU・姿勢・センサデータを 400Hz で自動送信",
+        "sf log wifi で受信 → CSV 保存 → sf log viz で可視化",
+    ])
+
+    add_table_slide(prs, "実験 API", [
         "関数", "説明", "引数",
     ], [
-        ["telemetry_send(name, val)", "テレメトリ送信", "名前, float 値"],
-        ["led_color(r, g, b)", "LED 色設定", "各 0-255"],
+        ["led_color(r, g, b)", "LED 色設定（フェーズ表示用）", "各 0-255"],
     ])
 
     add_content_slide(prs, "実験手順 / Experiment Procedure", [
@@ -1177,13 +1182,10 @@ if (elapsed >= delay && elapsed < delay + dur)
 // Override roll target with step input
 float roll_target = roll_step;
 
-// Send telemetry at 400Hz
-ws::telemetry_send("step_target", roll_step);
-ws::telemetry_send("step_actual", ws::gyro_x());
-
 // LED: red during step, green otherwise
 if (roll_step > 0) ws::led_color(50, 0, 0);
 else               ws::led_color(0, 50, 0);
+// gyro_x = roll rate is auto-sent via WiFi telemetry
 """)
 
     add_checkpoint_slide(prs, [

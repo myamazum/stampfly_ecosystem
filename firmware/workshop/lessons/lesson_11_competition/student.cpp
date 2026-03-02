@@ -142,14 +142,4 @@ void loop_400Hz(float dt)
     // =================================================================
     ws::motor_mixer(throttle, roll_output, pitch_output, yaw_output);
 
-    // =================================================================
-    // Telemetry (10Hz) / テレメトリ送信 (10Hz)
-    // =================================================================
-    if (tick % 40 == 0) {
-        ws::telemetry_send("roll_err", roll_error);
-        ws::telemetry_send("pitch_err", pitch_error);
-        ws::telemetry_send("roll_out", roll_output);
-        ws::telemetry_send("pitch_out", pitch_output);
-        ws::telemetry_send("throttle", throttle);
-    }
 }

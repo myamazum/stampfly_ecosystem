@@ -156,20 +156,6 @@ void loop_400Hz(float dt)
     ws::motor_set_duty(3, m3);
     ws::motor_set_duty(4, m4);
 
-    // =====================================================================
-    // Telemetry (10Hz) / テレメトリ送信 (10Hz)
-    // =====================================================================
-    if (tick % 40 == 0) {
-        ws::telemetry_send("m1_duty", m1);
-        ws::telemetry_send("m2_duty", m2);
-        ws::telemetry_send("m3_duty", m3);
-        ws::telemetry_send("m4_duty", m4);
-        ws::telemetry_send("roll_cmd", roll_cmd);
-        ws::telemetry_send("pitch_cmd", pitch_cmd);
-        ws::telemetry_send("yaw_cmd", yaw_cmd);
-        ws::telemetry_send("throttle", throttle);
-    }
-
     // Debug print (2Hz) / デバッグ出力 (2Hz)
     if (tick % 200 == 0) {
         ws::print("M1:%.2f M2:%.2f M3:%.2f M4:%.2f  T:%.2f R:%.2f P:%.2f Y:%.2f",

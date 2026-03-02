@@ -33,20 +33,26 @@
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{テレメトリ API}
+\begin{frame}{テレメトリと実験 API}
+  \begin{block}{WiFi テレメトリ（自動送信）}
+    システムが IMU・姿勢・センサデータを 400\,Hz で自動送信 \\
+    \code{sf log wifi} で受信 → CSV 保存 → \code{sf log viz} で可視化
+  \end{block}
+
+  \vspace{0.3em}
+
   \begin{table}
     \centering
     \begin{tabular}{lll}
       \hline
       \textbf{関数} & \textbf{説明} & \textbf{引数} \\
       \hline
-      \api{telemetry\_send(name, val)} & テレメトリ送信 & 名前, float 値 \\
-      \api{led\_color(r, g, b)} & LED 色設定 & 各 0--255 \\
+      \api{led\_color(r, g, b)} & LED 色設定（フェーズ表示用） & 各 0--255 \\
       \hline
     \end{tabular}
   \end{table}
 
-  \vspace{0.5em}
+  \vspace{0.3em}
 
   \begin{block}{実験手順}
     \begin{enumerate}
@@ -68,12 +74,10 @@ float roll_step = 0.0f;
 if (elapsed >= delay && elapsed < delay + dur)
     roll_step = step_rate;  // Step ON!
 float roll_target = roll_step;  // Override stick
-// Send telemetry at 400Hz
-ws::telemetry_send("step_target", roll_step);
-ws::telemetry_send("step_actual", ws::gyro_x());
 // LED: red during step, green otherwise
 if (roll_step > 0) ws::led_color(50, 0, 0);
 else               ws::led_color(0, 50, 0);
+// gyro_x = roll rate is auto-sent via WiFi telemetry
   \end{lstlisting}
 \end{frame}
 

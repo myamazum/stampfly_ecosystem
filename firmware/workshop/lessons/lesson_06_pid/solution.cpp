@@ -154,30 +154,6 @@ void loop_400Hz(float dt)
     // =====================================================================
     ws::motor_mixer(throttle, roll_output, pitch_output, yaw_output);
 
-    // --- Telemetry (10Hz) ---
-    // テレメトリ (10Hz)
-    if (tick % 40 == 0) {
-        // Roll axis detail
-        ws::telemetry_send("roll_P", roll_P);
-        ws::telemetry_send("roll_I", roll_I);
-        ws::telemetry_send("roll_D", roll_D);
-        ws::telemetry_send("roll_out", roll_output);
-        ws::telemetry_send("roll_err", roll_error);
-
-        // Pitch axis detail
-        ws::telemetry_send("pitch_P", pitch_P);
-        ws::telemetry_send("pitch_I", pitch_I);
-        ws::telemetry_send("pitch_D", pitch_D);
-        ws::telemetry_send("pitch_out", pitch_output);
-
-        // Yaw axis detail
-        ws::telemetry_send("yaw_P", yaw_P);
-        ws::telemetry_send("yaw_I", yaw_I);
-        ws::telemetry_send("yaw_out", yaw_output);
-
-        ws::telemetry_send("throttle", throttle);
-    }
-
     // --- Debug print (2Hz) ---
     if (tick % 200 == 0) {
         ws::print("R:P%.2f I%.2f D%.3f  P:P%.2f I%.2f  Y:P%.2f I%.2f",
