@@ -8,7 +8,6 @@
 
 # Generated intermediate files (rebuild with `make all`)
 tikz/*.pdf
-images/*.png
 pptx/output/*.pptx
 
 # Beamer PDFs are tracked (committed for distribution)
