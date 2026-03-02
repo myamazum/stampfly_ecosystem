@@ -9,6 +9,10 @@ void setup()
 {
     ws::print("Lesson 3: LED Control - Solution");
 
+    // Disable system LED updates so ws::led_color() takes effect
+    // システムLED更新を無効化して ws::led_color() が反映されるようにする
+    ws::disable_led_task();
+
     // Set WiFi channel (use 1, 6, or 11 to avoid interference)
     // WiFiチャンネルを設定（混信を避けるため1, 6, 11のいずれかを使用）
     ws::set_channel(1);

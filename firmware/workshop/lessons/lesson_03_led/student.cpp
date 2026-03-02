@@ -8,6 +8,7 @@
 // Goal: Display flight state using LED color.
 // 目標: LEDの色で飛行状態を表示する
 //
+// ws::disable_led_task() - Disable system LED updates (call first!)
 // ws::led_color(r, g, b) - Set LED color (0-255)
 // ws::is_armed()         - Check ARM state
 // ws::battery_voltage()  - Get battery voltage (V)
@@ -15,6 +16,10 @@
 void setup()
 {
     ws::print("Lesson 3: LED Control");
+
+    // Disable system LED updates so your led_color() works
+    // システムLED更新を無効化して led_color() が反映されるようにする
+    ws::disable_led_task();
 
     // TODO: Set your WiFi channel (1, 6, or 11)
     // TODO: 自分のWiFiチャンネルを設定する（1, 6, 11のいずれか）
