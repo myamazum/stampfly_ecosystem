@@ -214,6 +214,30 @@ public:
     void onSTAGotIP(void* event_data);
 
     /**
+     * @brief Load AP SSID from NVS
+     * NVSからAP SSIDを読み込み
+     * @param ssid Buffer to store SSID
+     * @param max_len Buffer size
+     * @return ESP_OK on success
+     */
+    static esp_err_t loadAPSSIDFromNVS(char* ssid, size_t max_len);
+
+    /**
+     * @brief Save AP SSID to NVS
+     * AP SSIDをNVSに保存
+     * @param ssid SSID string
+     * @return ESP_OK on success
+     */
+    static esp_err_t saveAPSSIDToNVS(const char* ssid);
+
+    /**
+     * @brief Get current AP SSID
+     * 現在のAP SSIDを取得
+     * @return AP SSID string
+     */
+    const char* getAPSSID() const { return ap_ssid_; }
+
+    /**
      * @brief Send pairing packet (called periodically during pairing mode)
      */
     void sendPairingPacket();
@@ -374,6 +398,7 @@ private:
     uint8_t controller_mac_[6] = {0};
     uint8_t telemetry_sequence_ = 0;
     uint32_t last_recv_time_ = 0;
+    char ap_ssid_[33] = {};
 
     // WiFi STA mode members
     // WiFi STAモードのメンバー変数

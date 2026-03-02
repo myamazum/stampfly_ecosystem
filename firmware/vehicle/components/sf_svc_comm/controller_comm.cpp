@@ -12,6 +12,7 @@
 #include "led_manager.hpp"
 #include "esp_log.h"
 #include "esp_wifi.h"
+#include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_now.h"
 #include "nvs_flash.h"
@@ -32,6 +33,7 @@ static constexpr const char* NVS_KEY_STA_COUNT = "sta_count";      // u8
 static constexpr const char* NVS_KEY_STA_AUTO  = "sta_auto";       // u8
 static constexpr const char* NVS_KEY_STA_SSID_FMT = "sta_%d_ssid"; // string (index 0-4)
 static constexpr const char* NVS_KEY_STA_PASS_FMT = "sta_%d_pass"; // string (index 0-4)
+static constexpr const char* NVS_KEY_AP_SSID = "ap_ssid";
 
 // Global instance pointer for callback access
 static ControllerComm* s_instance = nullptr;
@@ -174,10 +176,21 @@ esp_err_t ControllerComm::init(const Config& config)
         return ret;
     }
 
+    // AP SSID生成（MACベースのユニークSSID）
+    // Generate unique AP SSID based on MAC address
+    char ap_ssid[33] = {};
+    if (loadAPSSIDFromNVS(ap_ssid, sizeof(ap_ssid)) != ESP_OK) {
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        snprintf(ap_ssid, sizeof(ap_ssid), "StampFly_%02X%02X", mac[4], mac[5]);
+        saveAPSSIDToNVS(ap_ssid);
+    }
+    strncpy(ap_ssid_, ap_ssid, sizeof(ap_ssid_));
+
     // AP設定（テレメトリ用）
     wifi_config_t ap_config = {};
-    strcpy((char*)ap_config.ap.ssid, "StampFly");
-    ap_config.ap.ssid_len = 8;
+    strncpy((char*)ap_config.ap.ssid, ap_ssid, sizeof(ap_config.ap.ssid));
+    ap_config.ap.ssid_len = strlen(ap_ssid);
     ap_config.ap.channel = config.wifi_channel;
     ap_config.ap.max_connection = 4;
     ap_config.ap.authmode = WIFI_AUTH_OPEN;
@@ -250,7 +263,11 @@ esp_err_t ControllerComm::init(const Config& config)
 
     initialized_ = true;
     ESP_LOGI(TAG, "ESP-NOW communication initialized");
-    ESP_LOGI(TAG, "WiFi AP 'StampFly' started on channel %d (http://192.168.4.1)", config.wifi_channel);
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "  SSID: %s", ap_ssid_);
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "WiFi AP '%s' started on channel %d (http://192.168.4.1)",
+             ap_ssid_, config.wifi_channel);
 
     return ESP_OK;
 }
@@ -409,6 +426,50 @@ int ControllerComm::loadChannelFromNVS()
     }
 
     return -1;  // Key not found or invalid value
+}
+
+// static
+esp_err_t ControllerComm::loadAPSSIDFromNVS(char* ssid, size_t max_len)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    size_t len = max_len;
+    ret = nvs_get_str(handle, NVS_KEY_AP_SSID, ssid, &len);
+    nvs_close(handle);
+
+    if (ret == ESP_OK && len > 0) {
+        ESP_LOGI(TAG, "Loaded AP SSID '%s' from NVS", ssid);
+    }
+
+    return ret;
+}
+
+// static
+esp_err_t ControllerComm::saveAPSSIDToNVS(const char* ssid)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = nvs_set_str(handle, NVS_KEY_AP_SSID, ssid);
+    if (ret == ESP_OK) {
+        ret = nvs_commit(handle);
+    }
+
+    nvs_close(handle);
+
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "AP SSID '%s' saved to NVS", ssid);
+    }
+
+    return ret;
 }
 
 void ControllerComm::enterPairingMode()

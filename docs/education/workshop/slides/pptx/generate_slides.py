@@ -865,7 +865,7 @@ def build_lesson_04() -> Presentation:
         "• NED 座標系（北-東-下）の理解",
         "• ジャイロスコープで角速度を取得",
         "• 加速度センサで並進加速度を取得",
-        "• WiFi テレメトリでリアルタイム表示",
+        "• WiFi テレメトリでデータ取得・可視化",
     ])
 
     add_content_slide(
@@ -910,10 +910,35 @@ void loop_400Hz(float dt) {
 }
 """)
 
+    add_content_slide(prs, "WiFi テレメトリ受信 / Receiving WiFi Telemetry", [
+        "手順:",
+        "1. シリアルモニタで SSID を確認（StampFly_XXXX）",
+        "2. PC の WiFi で StampFly に接続（IP: 192.168.4.1）",
+        "3. sf log wifi -d 30 でデータ取得（30秒キャプチャ）",
+        "",
+        "主要オプション:",
+        "• -d 30 … キャプチャ時間（秒）",
+        "• -o file.csv … 出力ファイル名",
+        "• --no-save … 統計のみ表示",
+    ])
+
+    add_content_slide(prs, "データの可視化 / Data Visualization", [
+        "sf log viz <file>.csv で全センサデータをグラフ表示",
+        "",
+        "可視化モード:",
+        "• --mode all … 全パネル（デフォルト）",
+        "• --mode sensors … IMU + 高度センサ",
+        "• --mode attitude … 姿勢推定（Roll/Pitch/Yaw）",
+        "",
+        "• --save plot.png でファイル保存可能",
+        "• ドローンを手で傾けながらキャプチャし、ジャイロの変化をグラフで確認しよう",
+    ])
+
     add_checkpoint_slide(prs, [
         "手で傾けるとジャイロ値が変化する",
         "静止時に accel_z ≈ 9.81 を確認",
         "sf log wifi でテレメトリデータを受信できる",
+        "sf log viz でジャイロデータをグラフ表示できる",
     ], "Lesson 5: レート P 制御 + 初フライト")
 
     return prs

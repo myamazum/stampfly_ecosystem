@@ -22,7 +22,7 @@
     \item NED 座標系（北-東-下）の理解
     \item ジャイロスコープで角速度を取得
     \item 加速度センサで並進加速度を取得
-    \item WiFi テレメトリでリアルタイム表示
+    \item WiFi テレメトリでデータ取得・可視化
   \end{itemize}
 \end{frame}
 
@@ -101,12 +101,68 @@ void loop_400Hz(float dt) {
 \end{frame}
 
 % ------------------------------------------------------------------
+\begin{frame}{WiFi テレメトリ受信 / Receiving WiFi Telemetry}
+  \begin{block}{手順}
+    \begin{enumerate}
+      \item シリアルモニタで SSID を確認（\code{StampFly\_XXXX}）
+      \item PC の WiFi で StampFly に接続（IP: \code{192.168.4.1}）
+      \item \code{sf log wifi -d 30} でデータ取得（30秒キャプチャ）
+    \end{enumerate}
+  \end{block}
+
+  \vspace{0.5em}
+
+  \begin{table}
+    \centering\small
+    \begin{tabular}{ll}
+      \hline
+      \textbf{オプション} & \textbf{説明} \\
+      \hline
+      \code{-d 30}       & キャプチャ時間（秒） \\
+      \code{-o file.csv} & 出力ファイル名 \\
+      \code{--no-save}   & 統計のみ表示 \\
+      \hline
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{データの可視化 / Data Visualization}
+  \begin{block}{\code{sf log viz <file>.csv}}
+    全センサデータをグラフ表示
+  \end{block}
+
+  \vspace{0.5em}
+
+  \begin{table}
+    \centering\small
+    \begin{tabular}{ll}
+      \hline
+      \textbf{モード} & \textbf{表示内容} \\
+      \hline
+      \code{--mode all}      & 全パネル（デフォルト） \\
+      \code{--mode sensors}  & IMU + 高度センサ \\
+      \code{--mode attitude} & 姿勢推定（Roll/Pitch/Yaw） \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{0.5em}
+
+  \begin{itemize}
+    \item \code{--save plot.png} でファイル保存可能
+    \item ドローンを手で傾けながらキャプチャし、ジャイロの変化をグラフで確認しよう
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
 \begin{frame}{チェックポイント / Checkpoint}
   \begin{alertblock}{確認事項}
     \begin{itemize}
       \item[$\square$] 手で傾けるとジャイロ値が変化する
       \item[$\square$] 静止時に accel\_z $\approx 9.81$ を確認
       \item[$\square$] \code{sf log wifi} でテレメトリデータを受信できる
+      \item[$\square$] \code{sf log viz} でジャイロデータをグラフ表示できる
     \end{itemize}
   \end{alertblock}
 
