@@ -17,7 +17,9 @@
 % ------------------------------------------------------------------
 \begin{frame}{今日のゴール / Today's Goal}
   \begin{block}{目標}
-    L6 のモデル予測をフライトデータで検証し、パラメータを同定する
+    フライトデータからプラントモデル
+    $G_p(s) = \dfrac{K}{s\,(\tau_m s + 1)}$
+    のパラメータ $K$, $\tau_m$ を同定する
   \end{block}
 
   \vspace{1em}
@@ -25,8 +27,8 @@
   \begin{itemize}
     \item システム同定（SysID）の考え方
     \item WiFi テレメトリでデータ取得
-    \item 2 種類の $K_p$ で飛行し応答を比較
-    \item オーバーシュート比から $\zeta$ を推定
+    \item \code{sf sysid fit} でモデルフィッティング
+    \item 同定値と L6 理論値を比較
   \end{itemize}
 \end{frame}
 
@@ -73,98 +75,108 @@
 \end{frame}
 
 % ------------------------------------------------------------------
-% Slide 5: Experiment Plan
+% Slide 5: Reconstructing Plant I/O
 % ------------------------------------------------------------------
-\begin{frame}{実験計画 / Experiment Plan}
-  \begin{table}
-    \centering
-    \begin{tabular}{lccl}
-      \hline
-      \textbf{モード} & \textbf{$K_p$} & \textbf{理論 $\zeta$} & \textbf{期待される挙動} \\
-      \hline
-      Mode 0 (L5) & 0.5 (全軸同一) & Roll: 0.50 & やや振動的（$\sim$16\% OS） \\
-      Mode 1 (L6) & 軸ごと設計 & Roll: 0.70 & ほぼ振動なし（$\sim$5\% OS） \\
-      \hline
-    \end{tabular}
-  \end{table}
-
-  \vspace{0.8em}
-
-  \begin{block}{実験手順}
-    \begin{enumerate}
-      \item Mode 0 で飛行 → \code{sf log wifi} でデータ取得
-      \item Mode 1 に切替 → 同様にデータ取得
-      \item 両方のオーバーシュートを比較 → $\zeta$ を推定
-    \end{enumerate}
-  \end{block}
-\end{frame}
-
-% ------------------------------------------------------------------
-% Slide 6: Hands-on Code
-% ------------------------------------------------------------------
-\begin{frame}[fragile]{実習: Kp モード切替 / Hands-on}
-  \begin{lstlisting}[style=sfcpp, title={user\_code.cpp (excerpt)}]
-static int kp_mode = 0;  // 0=L5, 1=L6(model-based)
-
-// In loop_400Hz:
-float Kp_roll, Kp_pitch, Kp_yaw;
-if (kp_mode == 0) {
-    Kp_roll = Kp_pitch = 0.5f;  // L5 uniform
-    Kp_yaw = 2.0f;
-} else {
-    float zeta = 0.7f, tau_m = 0.02f;
-    Kp_roll  = 1.0f/(4*zeta*zeta*102.0f*tau_m);
-    Kp_pitch = 1.0f/(4*zeta*zeta* 70.0f*tau_m);
-    Kp_yaw   = 1.0f/(4*zeta*zeta* 19.0f*tau_m);
-}
-// gyro data is auto-sent via WiFi telemetry
-  \end{lstlisting}
-\end{frame}
-
-% ------------------------------------------------------------------
-% Slide 7: Data Analysis
-% ------------------------------------------------------------------
-\begin{frame}{データ分析 / Data Analysis}
+\begin{frame}{プラント入出力の復元 / Reconstructing Plant I/O}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \begin{block}{オーバーシュート比 → $\zeta$}
-        \vspace{-0.5em}
-        \[
-          \text{OS} \approx e^{-\pi\zeta/\sqrt{1-\zeta^2}}
-        \]
-        \vspace{-1.5em}
+      \begin{block}{テレメトリの記録内容}
+        \begin{tabular}{ll}
+          \code{ctrl\_roll} & スティック入力 \\
+          \code{gyro\_x} & 角速度（計測値） \\
+        \end{tabular}
       \end{block}
 
-      \vspace{0.3em}
+      \vspace{0.5em}
 
-      {\small
-      \begin{tabular}{cc}
-        \hline
-        \textbf{OS} & \textbf{$\zeta$} \\
-        \hline
-        16\% & 0.50 \\
-        5\% & 0.70 \\
-        0\% & $\geq 1.0$ \\
-        \hline
-      \end{tabular}}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \begin{block}{分析コマンド}
-        \code{sf log analyze data\_mode0.csv}\\
-        \code{sf log analyze data\_mode1.csv}
-      \end{block}
-
-      \vspace{0.3em}
-
-      \begin{exampleblock}{確認ポイント}
-        \begin{itemize}
-          \item Mode 0: OS $\approx$ 16\%?
-          \item Mode 1: OS $\approx$ 5\%?
-          \item 理論値と一致するか?
-        \end{itemize}
+      \begin{exampleblock}{復元手順（$K_p$ 既知）}
+        {\footnotesize
+        \begin{enumerate}
+          \item $\text{target} = \text{ctrl} \times \text{rate\_max}$
+          \item $u(t) = K_p \!\times\! (\text{target} - \text{gyro})$
+          \item $y(t) = \text{gyro}$
+        \end{enumerate}
+        }
       \end{exampleblock}
     \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{なぜ開ループ同定が可能?}
+        {\small
+        $K_p$ が既知なら、プラントへの入力 $u(t)$ を計算できる。
+        閉ループデータでも、開ループモデルを直接フィッティングできる。
+        }
+      \end{alertblock}
+
+      \vspace{0.5em}
+
+      {\footnotesize
+      \begin{tabular}{ll}
+        \textbf{パラメータ} & \textbf{値} \\
+        \hline
+        $K_p$ & L5 の値（例: 0.5） \\
+        \code{rate\_max} & 1.0\,rad/s \\
+      \end{tabular}
+      }
+    \end{column}
   \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+% Slide 6: Hands-on: Data Acquisition
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{実習: データ取得 / Hands-on: Data Acquisition}
+  \begin{block}{L5 の P 制御で飛行し、テレメトリデータを取得する}
+    {\footnotesize 同定には $K_p$ と \code{rate\_max} の値を記録しておくこと}
+  \end{block}
+
+  \vspace{0.5em}
+
+  \begin{enumerate}
+    \item \code{student.cpp} に $K_p$（例: 0.5）をセット
+    \item ビルド \& 書き込み: \code{sf build workshop} → \code{sf flash vehicle}
+    \item 離陸し、スティック操作でロール・ピッチ入力を入れる
+    \item PC でデータ受信:
+  \end{enumerate}
+
+  \begin{lstlisting}[style=sfcpp, title={ターミナル}]
+sf log wifi -o flight.csv
+  \end{lstlisting}
+
+  \vspace{0.5em}
+
+  {\small \textbf{ポイント:} 2〜3回のスティック操作で十分。ホバリング中に行うこと。}
+\end{frame}
+
+% ------------------------------------------------------------------
+% Slide 7: sf sysid fit
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{sf sysid fit / Model Fitting Tool}
+  \begin{block}{コマンド}
+    \code{sf sysid fit flight.csv -{}-kp 0.5 -{}-plot}
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, title={出力例}]
+=== Plant Model Identification ===
+  Model: G_p(s) = K / (s * (tau_m * s + 1))
+
+  Roll   K =  98.5 (ref: 102.0, err: 3.4%)
+         tau_m = 0.019 (ref: 0.020, err: 5.0%)  R2 = 0.94
+  Pitch  K =  72.1 (ref:  70.0, err: 3.0%)
+         tau_m = 0.021 (ref: 0.020, err: 5.0%)  R2 = 0.91
+  \end{lstlisting}
+
+  \vspace{0.3em}
+
+  {\small
+  \begin{tabular}{ll}
+    \code{-{}-kp 0.5} & 飛行時の $K_p$（\textbf{必須}） \\
+    \code{-{}-axis roll} & 特定軸のみ分析 \\
+    \code{-{}-rate-max 1.0} & \code{rate\_max}（roll/pitch 既定=1.0, yaw=5.0） \\
+    \code{-o result.yaml} & 結果をファイルに保存 \\
+  \end{tabular}
+  }
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -173,28 +185,36 @@ if (kp_mode == 0) {
 \begin{frame}{モデル検証 / Model Verification}
   \begin{table}
     \centering
-    \begin{tabular}{lcccc}
+    \begin{tabular}{lccccc}
       \hline
-      & \multicolumn{2}{c}{\textbf{Mode 0 ($K_p$=0.5)}}
-      & \multicolumn{2}{c}{\textbf{Mode 1 (モデルベース)}} \\
-      & 理論 & 実測 & 理論 & 実測 \\
+      \textbf{軸} & \textbf{$K$ (同定)} & \textbf{$K$ (L6理論)} & \textbf{$\tau_m$ (同定)} & \textbf{$\tau_m$ (理論)} & \textbf{$R^2$} \\
       \hline
-      $\zeta$ (Roll)  & 0.50 & ? & 0.70 & ? \\
-      OS (Roll)       & 16\% & ? & 5\%  & ? \\
-      $\zeta$ (Pitch) & 0.60 & ? & 0.70 & ? \\
-      $\zeta$ (Yaw)   & 1.15 & ? & 0.70 & ? \\
+      Roll  & ? & 102.0 & ? & 0.020 & ? \\
+      Pitch & ? &  70.0 & ? & 0.020 & ? \\
+      Yaw   & ? &  19.0 & ? & 0.020 & ? \\
       \hline
     \end{tabular}
   \end{table}
 
   \vspace{0.5em}
 
+  \begin{block}{設計 $K_p$ の計算（$\zeta = 0.7$）}
+    \vspace{-0.5em}
+    \[
+      K_p = \frac{1}{4\,\zeta^2\,K\,\tau_m}
+    \]
+    \vspace{-1em}
+  \end{block}
+
+  \vspace{0.3em}
+
   \begin{exampleblock}{考察}
+    {\small
     \begin{itemize}
-      \item 理論と実測のずれ → 無駄時間・モデル誤差が原因
-      \item Yaw の Mode 0: 過減衰 → 応答遅い（振動なし）
-      \item 軸ごとの $K_p$ 設計がなぜ重要かをデータで実感
+      \item 同定値と理論値のずれ → モデル誤差・無駄時間が原因
+      \item 同定 $K$, $\tau_m$ で設計した $K_p$ は L6 の理論値と近いか?
     \end{itemize}
+    }
   \end{exampleblock}
 \end{frame}
 
@@ -204,9 +224,9 @@ if (kp_mode == 0) {
 \begin{frame}{チェックポイント / Checkpoint}
   \begin{alertblock}{確認事項}
     \begin{itemize}
-      \item[$\square$] \code{sf log wifi} で 2 種類のデータを取得できた
-      \item[$\square$] オーバーシュート比から $\zeta$ を推定した
-      \item[$\square$] 理論値と実測値を比較し、モデルの妥当性を確認した
+      \item[$\square$] \code{sf log wifi} でフライトデータを取得できた
+      \item[$\square$] \code{sf sysid fit} で $K$, $\tau_m$ を同定した
+      \item[$\square$] 同定値と L6 理論値を比較した
     \end{itemize}
   \end{alertblock}
 
