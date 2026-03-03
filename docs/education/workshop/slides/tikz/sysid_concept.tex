@@ -1,0 +1,60 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+
+\begin{document}
+
+\definecolor{blockcolor}{RGB}{0, 120, 200}
+\definecolor{arrowcolor}{RGB}{80, 80, 80}
+\definecolor{plantcolor}{RGB}{40, 160, 40}
+\definecolor{estcolor}{RGB}{200, 100, 0}
+\begin{tikzpicture}[
+    block/.style={
+      rectangle, draw=#1, line width=1.5pt,
+      fill=#1!8, rounded corners=3pt,
+      minimum width=38mm, minimum height=16mm,
+      font=\bfseries, text=#1, align=center
+    },
+    arrow/.style={-{Stealth[length=3mm]}, line width=1.2pt, arrowcolor},
+    lbl/.style={font=\small, above, text=arrowcolor},
+  ]
+
+  % Input
+  \node[font=\bfseries, arrowcolor] (input) at (-1.5, 0) {$u(t)$};
+
+  % Plant block (unknown parameters)
+  \node[block=plantcolor] (plant) at (4, 0)
+    {Plant $G_p(s)$\\[2pt]{\small (unknown $K$, $\tau_m$)}};
+
+  % Output
+  \node[font=\bfseries, arrowcolor] (output) at (9.5, 0) {$y(t)$};
+
+  % Estimation block
+  \node[block=estcolor] (est) at (6.75, -3.5)
+    {Parameter\\Estimation};
+
+  % Arrows
+  \draw[arrow] (input) -- (plant);
+  \draw[arrow] (plant) -- (output);
+
+  % Input to estimation
+  \draw[arrow] ($(input.east)+(0.5,0)$) |- (est.west);
+
+  % Output to estimation
+  \draw[arrow] ($(output.west)+(-0.5,0)$) |- (est.east);
+
+  % Estimation output
+  \node[font=\bfseries, estcolor] (params) at (6.75, -5.5) {$\hat{K}$, $\hat{\tau}_m$};
+  \draw[arrow] (est) -- (params);
+
+  % Labels
+  \node[font=\scriptsize, arrowcolor, above=1mm] at (input.north)
+    {control input};
+  \node[font=\scriptsize, arrowcolor, above=1mm] at (output.north)
+    {measured output};
+  \node[font=\scriptsize, estcolor, below=2mm] at (params.south)
+    {compare with L6 theory};
+
+\end{tikzpicture}
+\end{document}

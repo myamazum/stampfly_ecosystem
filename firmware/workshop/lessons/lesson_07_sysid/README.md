@@ -1,144 +1,205 @@
-# Lesson 7: Telemetry + Step Response
+# Lesson 7: システム同定 / System Identification
 
-## Goal / 目標
-Use WiFi telemetry to capture step response data and analyze PID controller performance.
+> **Note:** [English version follows after the Japanese section.](#english) / 日本語の後に英語版があります。
 
-WiFiテレメトリを使ってステップ応答データをキャプチャし、PIDコントローラの性能を分析する。
+## 1. 概要
 
-## Prerequisites / 前提条件
-- Lesson 6 completed (PID control working)
-- WiFi connection to StampFly AP (see setup below)
-- `sf log wifi` command available
+### このレッスンについて
 
-## Key Concept: Step Response / ステップ応答
+L6 で導出したプラントモデルの予測をフライトデータで検証する。
+2 種類の Kp 設定（L5 の一律 Kp=0.5 と L6 のモデルベース Kp）で飛行し、
+オーバーシュート比から減衰比 ζ を推定してモデルの妥当性を確認する。
 
-A step response test applies a sudden change (step) to the target and measures how the system responds. This reveals key performance characteristics.
+### 前提知識
 
-ステップ応答テストは目標に突然の変化（ステップ）を加え、システムの応答を計測する。これにより主要な性能特性がわかる。
+- L05: レート P 制御と初フライト
+- L06: システムモデリング（伝達関数、設計式 Kp = 1/(4ζ²Kτm)）
 
-### Experiment Timeline / 実験タイムライン
+## 2. システム同定とは
 
-```
-Roll Rate
-[rad/s]
-  ^
-  |
-0.5|              +-----------+
-  |              |           |
-  |              |           |
-0.0|------+------+           +---------->  time [s]
-  |      |                   |
-  |   baseline    step       recovery
-  |    (2s)       (1s)        (1s)
-  0      2        3          4
-```
+### 概念
 
-### What to Measure / 計測項目
-
-| Metric | Description | 説明 |
-|--------|-------------|------|
-| Rise time | Time to reach 90% of target | 目標の90%に達する時間 |
-| Overshoot | Peak value above target | 目標を超えるピーク値 |
-| Settling time | Time to stay within 5% of target | 目標の5%以内に安定する時間 |
-| Steady-state error | Final offset from target | 最終的な目標からのずれ |
+入出力データからプラントのパラメータ（K, τm）を推定する手法。
 
 ```
-Roll Rate
-  ^
-  |   overshoot
-  |      /\
-0.5|----/--\-----------  <-- target
-  |  /    \  settling
-  | /      --------->
-  |/
-0.0+--|----|-->
-     rise  settling
-     time  time
+u(t) → [Plant G_p(s)] → y(t) → [Parameter Estimation] → K̂, τ̂m
 ```
 
-## WiFi Telemetry Setup / WiFiテレメトリ設定
+### なぜ重要か
 
-### Step 1: Connect to StampFly WiFi / StampFly WiFiに接続
+- L6 のモデルは理論値（データシートや CAD）に基づく
+- 実機には製造ばらつき・組立誤差がある
+- データで検証することでモデルの信頼度が上がる
 
-| Setting | Value |
-|---------|-------|
-| SSID | `StampFly_XXXX` |
-| Password | (none / open) |
-| IP | `192.168.4.1` |
+## 3. 実験計画
 
-### Step 2: Capture Data / データキャプチャ
+### 2 つの Kp モード
+
+| モード | Kp 設定 | 理論 ζ (Roll) | 期待される挙動 |
+|--------|---------|--------------|----------------|
+| Mode 0 (L5) | 0.5（全軸同一） | 0.50 | やや振動的（~16% OS） |
+| Mode 1 (L6) | 軸ごと設計 | 0.70 | ほぼ振動なし（~5% OS） |
+
+### 手順
+
+1. `sf lesson switch 7`
+2. `student.cpp` の TODO を実装
+3. `kp_mode = 0` でビルド・フラッシュ → 飛行 → `sf log wifi` でデータ取得
+4. `kp_mode = 1` に変更 → 再ビルド → 飛行 → データ取得
+5. 2 つのデータを比較分析
+
+## 4. データ分析
+
+### オーバーシュート比 → ζ
+
+```
+OS ≈ e^(-πζ/√(1-ζ²))
+```
+
+| OS | ζ |
+|----|-----|
+| 16% | 0.50 |
+| 5% | 0.70 |
+| 0% | ≥ 1.0 |
+
+### 分析コマンド
 
 ```bash
-# Start WiFi telemetry capture
-# WiFiテレメトリキャプチャを開始
-sf log wifi
-
-# Capture to a specific file
-# 特定ファイルに保存
-sf log wifi -o step_response_01.csv
+sf log analyze data_mode0.csv
+sf log analyze data_mode1.csv
+sf log viz data_mode0.csv
 ```
 
-### Step 3: Run Experiment / 実験実行
+## 5. モデル検証表
 
-1. ARM the drone
-2. Raise throttle above 30% to trigger the step experiment
-3. Hold the drone firmly (or fly if confident)
-4. Wait for "experiment complete" message
-5. Stop `sf log wifi` capture (Ctrl+C)
+| 項目 | Mode 0 理論 | Mode 0 実測 | Mode 1 理論 | Mode 1 実測 |
+|------|------------|------------|------------|------------|
+| ζ (Roll) | 0.50 | ? | 0.70 | ? |
+| OS (Roll) | 16% | ? | 5% | ? |
+| ζ (Pitch) | 0.60 | ? | 0.70 | ? |
+| ζ (Yaw) | 1.15 | ? | 0.70 | ? |
 
-### Step 4: Analyze / 分析
+### 考察ポイント
+
+- 理論と実測のずれ → 無駄時間・モデル誤差が原因
+- Yaw の Mode 0: 過減衰 → 応答遅い
+- 軸ごとの Kp 設計がなぜ重要かをデータで実感
+
+## 6. API
+
+| 関数 | 説明 |
+|------|------|
+| `ws::gyro_x/y/z()` | 角速度 [rad/s] |
+| `ws::rc_roll/pitch/yaw()` | スティック入力 [-1, +1] |
+| `ws::rc_throttle()` | スロットル [0, 1] |
+| `ws::motor_mixer(T,R,P,Y)` | モーターミキサー |
+| `ws::led_color(r,g,b)` | LED 色設定 |
+
+## 7. チャレンジ
+
+- `sf log wifi` でロール軸の過渡応答を記録し、立ち上がり時間を計測する
+- 理論的なステップ応答波形と実測を重ねてプロットする
+- τm を変えてモデル予測がどう変わるか試す
+
+---
+
+<a id="english"></a>
+
+## 1. Overview
+
+### About This Lesson
+
+Verify the L6 plant model predictions using flight data.
+Fly with two Kp configurations (L5 uniform Kp=0.5 and L6 model-based Kp),
+estimate damping ratio ζ from overshoot, and validate the model.
+
+### Prerequisites
+
+- L05: Rate P control and first flight
+- L06: System Modeling (transfer function, design formula Kp = 1/(4ζ²Kτm))
+
+## 2. What is System Identification?
+
+### Concept
+
+Estimate plant parameters (K, τm) from input-output data.
+
+```
+u(t) → [Plant G_p(s)] → y(t) → [Parameter Estimation] → K̂, τ̂m
+```
+
+### Why It Matters
+
+- L6 model is based on theoretical values (datasheets, CAD)
+- Real hardware has manufacturing variations and assembly errors
+- Data verification increases model confidence
+
+## 3. Experiment Plan
+
+### Two Kp Modes
+
+| Mode | Kp Setting | Theoretical ζ (Roll) | Expected Behavior |
+|------|-----------|---------------------|-------------------|
+| Mode 0 (L5) | 0.5 (uniform) | 0.50 | Slightly oscillatory (~16% OS) |
+| Mode 1 (L6) | Per-axis design | 0.70 | Nearly no oscillation (~5% OS) |
+
+### Procedure
+
+1. `sf lesson switch 7`
+2. Implement TODOs in `student.cpp`
+3. Build with `kp_mode = 0` → fly → capture with `sf log wifi`
+4. Change to `kp_mode = 1` → rebuild → fly → capture
+5. Compare both datasets
+
+## 4. Data Analysis
+
+### Overshoot Ratio → ζ
+
+```
+OS ≈ e^(-πζ/√(1-ζ²))
+```
+
+| OS | ζ |
+|----|-----|
+| 16% | 0.50 |
+| 5% | 0.70 |
+| 0% | ≥ 1.0 |
+
+### Analysis Commands
 
 ```bash
-# View captured data
-# キャプチャデータを表示
-sf log analyze step_response_01.csv
-
-# Visualize step response
-# ステップ応答を可視化
-sf log viz step_response_01.csv
+sf log analyze data_mode0.csv
+sf log analyze data_mode1.csv
+sf log viz data_mode0.csv
 ```
 
-## Telemetry API / テレメトリAPI
+## 5. Model Verification Table
+
+| Metric | Mode 0 Theory | Mode 0 Measured | Mode 1 Theory | Mode 1 Measured |
+|--------|--------------|-----------------|--------------|-----------------|
+| ζ (Roll) | 0.50 | ? | 0.70 | ? |
+| OS (Roll) | 16% | ? | 5% | ? |
+| ζ (Pitch) | 0.60 | ? | 0.70 | ? |
+| ζ (Yaw) | 1.15 | ? | 0.70 | ? |
+
+### Discussion Points
+
+- Gap between theory and measurement → dead time, model error
+- Yaw Mode 0: overdamped → sluggish response
+- Data demonstrates why per-axis Kp design matters
+
+## 6. API
 
 | Function | Description |
 |----------|-------------|
-| `ws::telemetry_send(name, val)` | Send named float value via WiFi |
+| `ws::gyro_x/y/z()` | Angular rate [rad/s] |
+| `ws::rc_roll/pitch/yaw()` | Stick inputs [-1, +1] |
+| `ws::rc_throttle()` | Throttle [0, 1] |
+| `ws::motor_mixer(T,R,P,Y)` | Motor mixer |
+| `ws::led_color(r,g,b)` | LED color |
 
-### Sending Data / データ送信
+## 7. Challenge
 
-```cpp
-// Send at any rate - typically 400Hz during experiments
-// 任意のレートで送信 - 実験中は通常400Hz
-ws::telemetry_send("step_target", target_value);
-ws::telemetry_send("step_actual", gyro_value);
-ws::telemetry_send("step_error",  error_value);
-```
-
-### Data Format / データ形式
-
-The telemetry data is sent as CSV with columns:
-
-テレメトリデータはCSV形式で送信される:
-
-```
-timestamp_ms, step_target, step_actual, step_error, step_output, step_P, step_I, step_D
-0,            0.000,       0.001,      -0.001,      0.000,       ...
-2000,         0.500,       0.012,       0.488,       0.312,       ...
-```
-
-## Steps / 手順
-1. `sf lesson switch 7`
-2. Fill in the TODO sections:
-   - Set `roll_step` based on experiment phase
-   - Send telemetry data with `ws::telemetry_send()`
-3. Build and flash: `sf lesson build && sf lesson flash`
-4. Connect to StampFly WiFi on your PC
-5. Start capture: `sf log wifi -o step_test.csv`
-6. ARM, raise throttle > 30%, wait for experiment to complete
-7. Analyze the captured data
-
-## Challenge / チャレンジ
-- Capture step responses with different Kp values (0.3, 0.5, 1.0) and compare
-- Measure rise time and overshoot for each Kp setting
-- Try step response on pitch axis instead of roll
-- Plot the P, I, D terms separately to see each contribution
+- Record roll transient response with `sf log wifi` and measure rise time
+- Overlay theoretical step response with measured data
+- Try changing τm and observe how model predictions change

@@ -1,26 +1,26 @@
 #include "workshop_api.hpp"
 
 // =========================================================================
-// Lesson 7: Telemetry + Step Response - Solution
-// レッスン 7: テレメトリ + ステップ応答 - 解答
+// Lesson 7: System Identification - Solution
+// レッスン 7: システム同定 - 解答
 // =========================================================================
 
-// PID gains from Lesson 6
-// Lesson 6 の PID ゲイン
-static const float Kp_roll = 0.5f, Ki_roll = 0.3f, Kd_roll = 0.005f;
-static const float Kp_pitch = 0.5f, Ki_pitch = 0.3f, Kd_pitch = 0.005f;
-static const float Kp_yaw = 2.0f, Ki_yaw = 0.5f, Kd_yaw = 0.01f;
+static uint32_t tick = 0;
 
-static const float integral_limit = 0.5f;
-static const float output_limit = 1.0f;
-static const float rate_max_rp = 1.0f;
+// --- Kp mode ---
+// 0 = L5 uniform, 1 = L6 model-based
+static int kp_mode = 0;
+
+// Physical parameters from L6
+// L6 の物理パラメータ
+static const float tau_m = 0.02f;
+static const float K_roll  = 102.0f;
+static const float K_pitch =  70.0f;
+static const float K_yaw   =  19.0f;
+
+// Rate limits / レート制限
+static const float rate_max_rp  = 1.0f;
 static const float rate_max_yaw = 5.0f;
-
-// PID state
-// PID状態変数
-static float roll_integral = 0.0f, roll_prev_error = 0.0f;
-static float pitch_integral = 0.0f, pitch_prev_error = 0.0f;
-static float yaw_integral = 0.0f, yaw_prev_error = 0.0f;
 
 static float clamp(float val, float lim)
 {
@@ -29,23 +29,9 @@ static float clamp(float val, float lim)
     return val;
 }
 
-// --- Step response experiment ---
-// ステップ応答実験
-static uint32_t tick = 0;
-static bool step_active = false;
-static uint32_t step_start_tick = 0;
-
-// Step parameters
-// ステップパラメータ
-static const float step_rate      = 0.5f;   // Step amplitude [rad/s] / ステップ振幅
-static const uint32_t step_delay  = 800;    // Wait 2s before step / ステップ前の待機2秒
-static const uint32_t step_duration = 400;  // Step for 1s / ステップ1秒間
-static const uint32_t total_duration = 1600; // Total 4s / 合計4秒
-
 void setup()
 {
-    ws::print("Lesson 7: Telemetry + Step Response - Solution");
-    ws::print("ARM and raise throttle > 30%% to start experiment");
+    ws::print("Lesson 7: System Identification - Solution");
 
     // Set WiFi channel (use 1, 6, or 11 to avoid interference)
     // WiFiチャンネルを設定（混信を避けるため1, 6, 11のいずれかを使用）
@@ -58,137 +44,58 @@ void loop_400Hz(float dt)
 
     if (!ws::is_armed()) {
         ws::motor_stop_all();
-        roll_integral = 0.0f; roll_prev_error = 0.0f;
-        pitch_integral = 0.0f; pitch_prev_error = 0.0f;
-        yaw_integral = 0.0f; yaw_prev_error = 0.0f;
-        step_active = false;
-        step_start_tick = 0;
-        ws::led_color(0, 0, 50);  // Blue = disarmed / 青 = 非ARM
+        ws::led_color(0, 0, 50);
         return;
     }
 
     float throttle = ws::rc_throttle();
 
     // =====================================================================
-    // Step response experiment
+    // Kp mode selection
+    // Kp モード選択
     // =====================================================================
+    float Kp_roll_val, Kp_pitch_val, Kp_yaw_val;
 
-    // Start experiment when throttle > 30%
-    // スロットル30%超で実験開始
-    if (!step_active && throttle > 0.3f) {
-        step_active = true;
-        step_start_tick = tick;
-        ws::print(">>> Step experiment started! Hold drone steady.");
+    if (kp_mode == 0) {
+        // Mode 0: L5 uniform Kp
+        // モード 0: L5 の一律 Kp
+        Kp_roll_val  = 0.5f;
+        Kp_pitch_val = 0.5f;
+        Kp_yaw_val   = 2.0f;
+        ws::led_color(0, 50, 0);   // Green = Mode 0 / 緑 = モード0
+    } else {
+        // Mode 1: L6 model-based Kp (zeta = 0.7)
+        // モード 1: L6 のモデルベース Kp (zeta = 0.7)
+        float zeta = 0.7f;
+        Kp_roll_val  = 1.0f / (4.0f * zeta * zeta * K_roll  * tau_m);
+        Kp_pitch_val = 1.0f / (4.0f * zeta * zeta * K_pitch * tau_m);
+        Kp_yaw_val   = 1.0f / (4.0f * zeta * zeta * K_yaw   * tau_m);
+        ws::led_color(0, 0, 50);   // Blue = Mode 1 / 青 = モード1
     }
 
-    uint32_t elapsed = step_active ? (tick - step_start_tick) : 0;
+    // =====================================================================
+    // P control (same structure as L5/L6)
+    // P 制御（L5/L6 と同じ構造）
+    // =====================================================================
+    float roll_target  = ws::rc_roll()  * rate_max_rp;
+    float pitch_target = ws::rc_pitch() * rate_max_rp;
+    float yaw_target   = ws::rc_yaw()   * rate_max_yaw;
 
-    // Determine step target based on phase
-    // フェーズに応じたステップ目標の決定
-    float roll_step = 0.0f;
-    if (step_active) {
-        if (elapsed >= step_delay && elapsed < step_delay + step_duration) {
-            roll_step = step_rate;  // Apply step / ステップ入力
-        }
-        // else: 0 (baseline or recovery) / ベースラインまたは回復
+    float roll_cmd  = Kp_roll_val  * (roll_target  - ws::gyro_x());
+    float pitch_cmd = Kp_pitch_val * (pitch_target - ws::gyro_y());
+    float yaw_cmd   = Kp_yaw_val   * (yaw_target   - ws::gyro_z());
+
+    ws::motor_mixer(throttle,
+                    clamp(roll_cmd,  1.0f),
+                    clamp(pitch_cmd, 1.0f),
+                    clamp(yaw_cmd,   1.0f));
+
+    // =====================================================================
+    // Debug print (2Hz)
+    // デバッグ出力 (2Hz)
+    // =====================================================================
+    if (tick % 200 == 0) {
+        ws::print("Mode=%d Kp_r=%.3f Kp_p=%.3f Kp_y=%.3f",
+                  kp_mode, Kp_roll_val, Kp_pitch_val, Kp_yaw_val);
     }
-
-    // Override roll target with step input during experiment
-    // 実験中はステップ入力でロール目標を上書き
-    float roll_target = step_active ? roll_step : ws::rc_roll() * rate_max_rp;
-    float pitch_target = step_active ? 0.0f : ws::rc_pitch() * rate_max_rp;
-    float yaw_target = step_active ? 0.0f : ws::rc_yaw() * rate_max_yaw;
-
-    // =====================================================================
-    // Roll PID / ロール軸 PID
-    // =====================================================================
-    float roll_actual = ws::gyro_x();
-    float roll_error  = roll_target - roll_actual;
-
-    float roll_P = Kp_roll * roll_error;
-
-    roll_integral += roll_error * dt;
-    roll_integral = clamp(roll_integral, integral_limit);
-    float roll_I = Ki_roll * roll_integral;
-
-    float roll_D = Kd_roll * (roll_error - roll_prev_error) / dt;
-    roll_prev_error = roll_error;
-
-    float roll_output = clamp(roll_P + roll_I + roll_D, output_limit);
-
-    // =====================================================================
-    // Pitch PID / ピッチ軸 PID
-    // =====================================================================
-    float pitch_actual = ws::gyro_y();
-    float pitch_error  = pitch_target - pitch_actual;
-
-    float pitch_P = Kp_pitch * pitch_error;
-
-    pitch_integral += pitch_error * dt;
-    pitch_integral = clamp(pitch_integral, integral_limit);
-    float pitch_I = Ki_pitch * pitch_integral;
-
-    float pitch_D = Kd_pitch * (pitch_error - pitch_prev_error) / dt;
-    pitch_prev_error = pitch_error;
-
-    float pitch_output = clamp(pitch_P + pitch_I + pitch_D, output_limit);
-
-    // =====================================================================
-    // Yaw PID / ヨー軸 PID
-    // =====================================================================
-    float yaw_actual = ws::gyro_z();
-    float yaw_error  = yaw_target - yaw_actual;
-
-    float yaw_P = Kp_yaw * yaw_error;
-
-    yaw_integral += yaw_error * dt;
-    yaw_integral = clamp(yaw_integral, integral_limit);
-    float yaw_I = Ki_yaw * yaw_integral;
-
-    float yaw_D = Kd_yaw * (yaw_error - yaw_prev_error) / dt;
-    yaw_prev_error = yaw_error;
-
-    float yaw_output = clamp(yaw_P + yaw_I + yaw_D, output_limit);
-
-    // =====================================================================
-    // Apply to motors / モータに適用
-    // =====================================================================
-    ws::motor_mixer(throttle, roll_output, pitch_output, yaw_output);
-
-    // =====================================================================
-    // LED + phase display during experiment
-    // 実験中のLED表示 + フェーズ表示
-    // =====================================================================
-    if (step_active && elapsed < total_duration) {
-        // LED feedback / LED表示
-        if (elapsed < step_delay) {
-            ws::led_color(50, 50, 0);    // Yellow = waiting / 黄 = 待機中
-        } else if (elapsed < step_delay + step_duration) {
-            ws::led_color(50, 0, 0);     // Red = step active / 赤 = ステップ中
-        } else {
-            ws::led_color(0, 50, 0);     // Green = recovery / 緑 = 回復中
-        }
-
-        // Phase progress print (2Hz)
-        // フェーズ進捗表示 (2Hz)
-        if (tick % 200 == 0) {
-            if (elapsed < step_delay) {
-                ws::print("Phase: BASELINE  t=%.1fs", elapsed / 400.0f);
-            } else if (elapsed < step_delay + step_duration) {
-                ws::print("Phase: STEP      t=%.1fs  actual=%.3f",
-                          elapsed / 400.0f, roll_actual);
-            } else {
-                ws::print("Phase: RECOVERY  t=%.1fs  actual=%.3f",
-                          elapsed / 400.0f, roll_actual);
-            }
-        }
-    }
-
-    // End experiment / 実験終了
-    if (step_active && elapsed >= total_duration) {
-        ws::print(">>> Step experiment complete! Use 'sf log wifi' to analyze.");
-        step_active = false;
-        ws::led_color(0, 0, 50);  // Blue = done / 青 = 完了
-    }
-
 }
