@@ -1,157 +1,230 @@
-# Lesson 8: Modeling - Quadrotor Dynamics
+# Lesson 8: システムモデリング / System Modeling
 
-## Goal / 目標
-Understand quadrotor dynamics and implement the motor mixer from first principles.
+> **Note:** [English version follows after the Japanese section.](#english) / 日本語の後に英語版があります。
 
-クアッドロータの力学を理解し、第一原理からモーターミキサーを実装する。
+## 1. 概要
 
-## Prerequisites / 前提条件
-- Lesson 6 completed (PID control working)
-- Basic understanding of forces and torques
+### このレッスンについて
 
-## Key Concept: Quadrotor Dynamics / クアッドロータの力学
+StampFly の1軸角速度制御系を伝達関数でモデル化し、2次系理論に基づいて P ゲインを設計する。
+L05 で経験的に選んだ `Kp=0.5` がモデル上どのような減衰比 ζ を与えるかを確認し、
+目標 ζ から逆算して各軸に最適な Kp を求める。
 
-### Motor Layout / モーター配置
+### 前提知識
 
-```
-              Front
-         FL (M4)    FR (M1)
-         CCW  \  ^  /  CW
-               \ | /
-                \|/
-                 X          <- Center of mass
-                /|\
-               / | \
-         CW  /  |  \  CCW
-         RL (M3)   RR (M2)
-              Rear
+- L05: レート P 制御と初フライト
+- L06: PID 制御
+- L07: ステップ応答実験
 
-  CW  = Clockwise (generates negative yaw torque)
-  CCW = Counter-clockwise (generates positive yaw torque)
-  L = 0.023 m (arm length from center to motor)
-```
+## 2. プラント伝達関数
 
-### Forces and Torques / 力とトルク
-
-Each motor produces a thrust force (F) and a reaction torque (Q):
-
-各モーターは推力(F)と反力トルク(Q)を生成する:
+### ブロック図
 
 ```
-F = kt * omega^2    (thrust proportional to RPM squared)
-Q = kq * F          (reaction torque proportional to thrust)
+u ──▶ [Mixer + Motor: Km/(τm·s+1)] ──τ──▶ [Body: 1/(I·s)] ──▶ ω
 ```
 
-### Equations of Motion / 運動方程式
-
-From Newton-Euler equations for a rigid body:
-
-剛体のニュートン・オイラー方程式から:
-
-| Equation | Formula | 説明 |
-|----------|---------|------|
-| Total thrust | `T = F1 + F2 + F3 + F4` | 全推力 |
-| Roll torque | `tau_roll = (F1 + F2 - F3 - F4) * L` | ロールトルク |
-| Pitch torque | `tau_pitch = (-F1 + F2 + F3 - F4) * L` | ピッチトルク |
-| Yaw torque | `tau_yaw = (-Q1 + Q2 - Q3 + Q4)` | ヨートルク |
-
-In matrix form:
-
-行列形式:
+### 統合伝達関数
 
 ```
-[ T          ]   [ 1     1     1     1    ] [ F1 ]
-[ tau_roll   ] = [ L     L    -L    -L    ] [ F2 ]
-[ tau_pitch  ]   [-L     L     L    -L    ] [ F3 ]
-[ tau_yaw    ]   [-kq    kq   -kq    kq   ] [ F4 ]
+G_p(s) = K / (s * (τ_m * s + 1)),    K = K_m / I
 ```
 
-### Mixer: Inverse Mapping / ミキサー: 逆変換
+| ブロック | 物理的意味 | 伝達関数 |
+|---------|----------|---------|
+| Mixer + Motor | duty → トルク（1次遅れ） | Km / (τm·s + 1) |
+| Body | トルク → 角速度（積分器） | 1 / (I·s) |
 
-To compute motor forces from desired thrust and torques, invert the matrix:
+## 3. P 制御の閉ループ
 
-推力とトルクからモーター出力を計算するため、行列を逆変換する:
+### 閉ループ伝達関数
 
 ```
-[ F1 ]   [ 1/4    1/(4L)   -1/(4L)   -1/(4kq) ] [ T          ]
-[ F2 ] = [ 1/4    1/(4L)    1/(4L)    1/(4kq)  ] [ tau_roll   ]
-[ F3 ]   [ 1/4   -1/(4L)    1/(4L)   -1/(4kq)  ] [ tau_pitch  ]
-[ F4 ]   [ 1/4   -1/(4L)   -1/(4L)    1/(4kq)  ] [ tau_yaw    ]
+G_cl(s) = Kp·K / (τ_m·s² + s + Kp·K)
 ```
 
-### Implementation / 実装
+### 2次系パラメータ
+
+```
+ωn = √(Kp·K / τ_m)
+ζ  = 1 / (2·√(Kp·K·τ_m))
+```
+
+### 設計式
+
+```
+Kp = 1 / (4·ζ²·K·τ_m)
+```
+
+## 4. StampFly のパラメータ
+
+| パラメータ | 記号 | Roll | Pitch | Yaw | 単位 |
+|-----------|------|------|-------|-----|------|
+| 慣性モーメント | I | 9.16e-6 | 13.3e-6 | 20.4e-6 | kg·m² |
+| モータ時定数 | τ_m | 0.02 | 0.02 | 0.02 | s |
+| 実効プラントゲイン | K | ~102 | ~70 | ~19 | rad/s² |
+
+### ゲイン設計表
+
+| 軸 | K | Kp=0.5 の ζ | ζ=0.7 の Kp | ζ=1.0 の Kp |
+|---|---|-----------|-----------|-----------|
+| Roll | 102 | 0.50 | 0.25 | 0.12 |
+| Pitch | 70 | 0.60 | 0.36 | 0.18 |
+| Yaw | 19 | 1.15 | 1.34 | 0.66 |
+
+### なぜ軸ごとに Kp を変えるべきか
+
+- Roll: `Kp=0.5` → `ζ=0.50`（やや振動的、~16% オーバーシュート）
+- Pitch: `Kp=0.5` → `ζ=0.60`（適度なオーバーシュート）
+- Yaw: `Kp=0.5` → `ζ=1.15`（過減衰、応答が遅い）
+
+全軸同じ Kp では最適な応答が得られない。モデルベースの設計で軸ごとに調整する。
+
+## 5. 実習手順
+
+### ステップ 1: 設計式を実装
+
+`user_code.cpp` に設計式を書く:
 
 ```cpp
-// Motor 1 (FR, CW):  +roll, -pitch, -yaw
-M1 = T/4 + tau_roll/(4*L) - tau_pitch/(4*L) - tau_yaw/(4*kq)
-
-// Motor 2 (RR, CCW): +roll, +pitch, +yaw
-M2 = T/4 + tau_roll/(4*L) + tau_pitch/(4*L) + tau_yaw/(4*kq)
-
-// Motor 3 (RL, CW):  -roll, +pitch, -yaw
-M3 = T/4 - tau_roll/(4*L) + tau_pitch/(4*L) - tau_yaw/(4*kq)
-
-// Motor 4 (FL, CCW): -roll, -pitch, +yaw
-M4 = T/4 - tau_roll/(4*L) - tau_pitch/(4*L) + tau_yaw/(4*kq)
+float zeta = 0.7f;
+float Kp_roll  = 1.0f / (4.0f * zeta * zeta * K_roll  * tau_m);
+float Kp_pitch = 1.0f / (4.0f * zeta * zeta * K_pitch * tau_m);
+float Kp_yaw   = 1.0f / (4.0f * zeta * zeta * K_yaw   * tau_m);
 ```
 
-### Physical Parameters / 物理パラメータ
+### ステップ 2: 比較飛行
 
-| Parameter | Value | Description | 説明 |
-|-----------|-------|-------------|------|
-| L | 0.023 m | Arm length (center to motor) | アーム長（中心からモーター） |
-| kq | 0.01 | Torque-to-thrust ratio | トルク対推力比 |
-| Mass | ~0.025 kg | Total vehicle mass | 機体総質量 |
-| 1/(4L) | ~10.87 | Roll/pitch mixing gain | ロール/ピッチ混合ゲイン |
-| 1/(4kq) | 25.0 | Yaw mixing gain | ヨー混合ゲイン |
+1. まず `zeta = 0.7` で飛行
+2. `zeta = 0.5` に変更して飛行（L05 の Kp=0.5 相当）
+3. `zeta = 1.0` に変更して飛行（臨界減衰）
+4. 違いを体感する
 
-## Why Build a Custom Mixer? / なぜカスタムミキサーを作るのか
+### チャレンジ
 
-In Lessons 5-6, `ws::motor_mixer()` handled the mixing internally. By implementing it yourself, you:
+- `sf log wifi` でステップ応答を記録し、理論値と比較する
+- Roll と Yaw の応答の違いを ζ の差で説明する
 
-レッスン5-6では `ws::motor_mixer()` が内部でミキシングを処理していた。自分で実装することで:
+## 6. 参考資料
 
-1. **Understand the physics** connecting control commands to motor outputs
-2. **Can modify the mixer** for different frame geometries
-3. **Prepare for advanced control** (MPC, adaptive control) that needs the plant model
-4. **Debug better** when you know exactly what each motor should be doing
+| リソース | 説明 |
+|---------|------|
+| `tools/sysid/defaults.py` | デフォルト物理パラメータ |
+| `sf sim run loop_shaping` | インタラクティブ PID チューニング |
+| `sf log wifi` | リアルタイムテレメトリ取得 |
 
-## Comparison: motor_mixer vs Custom / 比較
+---
+
+<a id="english"></a>
+
+## 1. Overview
+
+### About This Lesson
+
+Model the single-axis angular rate control of StampFly using transfer functions,
+then design P gains based on second-order system theory.
+Verify what damping ratio ζ the empirical `Kp=0.5` from L05 actually provides,
+and compute optimal per-axis Kp from a target ζ.
+
+### Prerequisites
+
+- L05: Rate P control and first flight
+- L06: PID control
+- L07: Step response experiment
+
+## 2. Plant Transfer Function
+
+### Block Diagram
+
+```
+u ──▶ [Mixer + Motor: Km/(τm·s+1)] ──τ──▶ [Body: 1/(I·s)] ──▶ ω
+```
+
+### Combined Transfer Function
+
+```
+G_p(s) = K / (s * (τ_m * s + 1)),    K = K_m / I
+```
+
+| Block | Physical Meaning | Transfer Function |
+|-------|-----------------|-------------------|
+| Mixer + Motor | duty → torque (1st-order lag) | Km / (τm·s + 1) |
+| Body | torque → angular rate (integrator) | 1 / (I·s) |
+
+## 3. Closed-Loop with P Control
+
+### Closed-Loop Transfer Function
+
+```
+G_cl(s) = Kp·K / (τ_m·s² + s + Kp·K)
+```
+
+### Second-Order Parameters
+
+```
+ωn = √(Kp·K / τ_m)
+ζ  = 1 / (2·√(Kp·K·τ_m))
+```
+
+### Design Formula
+
+```
+Kp = 1 / (4·ζ²·K·τ_m)
+```
+
+## 4. StampFly Parameters
+
+| Parameter | Symbol | Roll | Pitch | Yaw | Unit |
+|-----------|--------|------|-------|-----|------|
+| Moment of inertia | I | 9.16e-6 | 13.3e-6 | 20.4e-6 | kg·m² |
+| Motor time constant | τ_m | 0.02 | 0.02 | 0.02 | s |
+| Effective plant gain | K | ~102 | ~70 | ~19 | rad/s² |
+
+### Gain Design Table
+
+| Axis | K | ζ at Kp=0.5 | Kp for ζ=0.7 | Kp for ζ=1.0 |
+|------|---|-------------|-------------|-------------|
+| Roll | 102 | 0.50 | 0.25 | 0.12 |
+| Pitch | 70 | 0.60 | 0.36 | 0.18 |
+| Yaw | 19 | 1.15 | 1.34 | 0.66 |
+
+### Why Per-Axis Kp Matters
+
+- Roll: `Kp=0.5` → `ζ=0.50` (slightly oscillatory, ~16% overshoot)
+- Pitch: `Kp=0.5` → `ζ=0.60` (moderate overshoot)
+- Yaw: `Kp=0.5` → `ζ=1.15` (overdamped, sluggish response)
+
+A single Kp for all axes cannot achieve optimal response. Model-based design enables per-axis tuning.
+
+## 5. Hands-on Procedure
+
+### Step 1: Implement the Design Formula
+
+Write the design formula in `user_code.cpp`:
 
 ```cpp
-// Before (black box):
-ws::motor_mixer(throttle, roll_out, pitch_out, yaw_out);
-
-// After (transparent):
-float m1 = T/4 + roll/(4*L) - pitch/(4*L) - yaw/(4*kq);
-float m2 = T/4 + roll/(4*L) + pitch/(4*L) + yaw/(4*kq);
-float m3 = T/4 - roll/(4*L) + pitch/(4*L) - yaw/(4*kq);
-float m4 = T/4 - roll/(4*L) - pitch/(4*L) + yaw/(4*kq);
-ws::motor_set_duty(1, clamp(m1));
-ws::motor_set_duty(2, clamp(m2));
-ws::motor_set_duty(3, clamp(m3));
-ws::motor_set_duty(4, clamp(m4));
+float zeta = 0.7f;
+float Kp_roll  = 1.0f / (4.0f * zeta * zeta * K_roll  * tau_m);
+float Kp_pitch = 1.0f / (4.0f * zeta * zeta * K_pitch * tau_m);
+float Kp_yaw   = 1.0f / (4.0f * zeta * zeta * K_yaw   * tau_m);
 ```
 
-## Steps / 手順
-1. `sf lesson switch 8`
-2. Implement the mixer equations in `student.cpp`
-3. Use `ws::motor_set_duty()` for each motor individually
-4. Clamp all motor values to [0.0, 1.0]
-5. Build and flash: `sf lesson build && sf lesson flash`
-6. Compare behavior with Lesson 6 (should be identical!)
-7. Try changing L and observe the effect
+### Step 2: Comparison Flights
 
-## Further Reading / 参考資料
+1. Fly with `zeta = 0.7` first
+2. Change to `zeta = 0.5` (equivalent to L05's Kp=0.5 for roll)
+3. Change to `zeta = 1.0` (critically damped)
+4. Feel the difference
+
+### Challenge
+
+- Record step responses with `sf log wifi` and compare with theoretical values
+- Explain the difference between Roll and Yaw responses using ζ
+
+## 6. References
 
 | Resource | Description |
 |----------|-------------|
-| Loop Shaping Tool (`sf sim run loop_shaping`) | Interactive PID tuning with plant model |
 | `tools/sysid/defaults.py` | Default physical parameters |
-| `simulator/vpython/` | 3D visualization of quadrotor dynamics |
-
-## Challenge / チャレンジ
-- What happens if you double L in the code? (Hint: roll/pitch response changes)
-- What happens if you set kq to 0? (Hint: yaw gain goes to infinity - do NOT fly!)
-- Add telemetry to compare your mixer output vs `ws::motor_mixer()` output
-- Can you derive the mixer for a "+" configuration instead of "X"?
+| `sf sim run loop_shaping` | Interactive PID tuning |
+| `sf log wifi` | Real-time telemetry capture |

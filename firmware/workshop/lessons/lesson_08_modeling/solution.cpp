@@ -1,25 +1,21 @@
 #include "workshop_api.hpp"
 
 // =========================================================================
-// Lesson 8: Modeling - Custom Motor Mixer - Solution
-// レッスン 8: モデリング - カスタムモーターミキサー - 解答
+// Lesson 8: System Modeling - Model-Based Gain Design - Solution
+// レッスン 8: システムモデリング - モデルベースゲイン設計 - 解答
 // =========================================================================
 
-// Physical parameters / 物理パラメータ
-static const float L = 0.023f;      // Arm length [m] / アーム長
-static const float kq = 0.01f;      // Torque-to-thrust ratio / トルク対推力比
+// Physical parameters from system identification
+// システム同定による物理パラメータ
+static const float tau_m = 0.02f;    // Motor time constant [s] / モータ時定数
+static const float K_roll  = 102.0f; // Effective plant gain (roll) / 実効プラントゲイン
+static const float K_pitch =  70.0f; // Effective plant gain (pitch)
+static const float K_yaw   =  19.0f; // Effective plant gain (yaw)
 
-// PID gains / PIDゲイン
-static const float Kp_roll = 0.5f, Ki_roll = 0.3f, Kd_roll = 0.005f;
-static const float Kp_pitch = 0.5f, Ki_pitch = 0.3f, Kd_pitch = 0.005f;
-static const float Kp_yaw = 2.0f, Ki_yaw = 0.5f, Kd_yaw = 0.01f;
-static const float integral_limit = 0.5f;
-static const float rate_max_rp = 1.0f, rate_max_yaw = 5.0f;
+// Rate limits / レート制限
+static const float rate_max_rp  = 1.0f;   // [rad/s]
+static const float rate_max_yaw = 5.0f;   // [rad/s]
 
-// PID state / PID状態変数
-static float roll_integral = 0.0f, roll_prev_error = 0.0f;
-static float pitch_integral = 0.0f, pitch_prev_error = 0.0f;
-static float yaw_integral = 0.0f, yaw_prev_error = 0.0f;
 static uint32_t tick = 0;
 
 static float clamp(float val, float lim)
@@ -29,19 +25,9 @@ static float clamp(float val, float lim)
     return val;
 }
 
-// Clamp motor duty to valid range [0.0, 1.0]
-// モーターデューティを有効範囲 [0.0, 1.0] にクランプ
-static float clamp_duty(float duty)
-{
-    if (duty < 0.0f) return 0.0f;
-    if (duty > 1.0f) return 1.0f;
-    return duty;
-}
-
 void setup()
 {
-    ws::print("Lesson 8: Modeling - Custom Mixer - Solution");
-    ws::print("L=%.3f m, kq=%.3f", L, kq);
+    ws::print("Lesson 8: System Modeling - Solution");
 
     // Set WiFi channel (use 1, 6, or 11 to avoid interference)
     // WiFiチャンネルを設定（混信を避けるため1, 6, 11のいずれかを使用）
@@ -54,9 +40,6 @@ void loop_400Hz(float dt)
 
     if (!ws::is_armed()) {
         ws::motor_stop_all();
-        roll_integral = 0.0f; roll_prev_error = 0.0f;
-        pitch_integral = 0.0f; pitch_prev_error = 0.0f;
-        yaw_integral = 0.0f; yaw_prev_error = 0.0f;
         ws::led_color(0, 0, 50);
         return;
     }
@@ -65,100 +48,51 @@ void loop_400Hz(float dt)
     float throttle = ws::rc_throttle();
 
     // =====================================================================
-    // PID control (same as Lesson 6)
-    // PID制御（レッスン6と同じ）
+    // Model-based Kp design
+    // モデルベース Kp 設計
     // =====================================================================
+    //
+    // Plant:      G_p(s) = K / (s * (tau_m * s + 1))
+    // Closed-loop: G_cl(s) = Kp*K / (tau_m*s^2 + s + Kp*K)
+    //
+    // Design formula: Kp = 1 / (4 * zeta^2 * K * tau_m)
+    //
+    // zeta = 0.7 gives fast response with small overshoot (~5%)
 
-    // Roll PID / ロール軸PID
-    float roll_target = ws::rc_roll() * rate_max_rp;
-    float roll_error = roll_target - ws::gyro_x();
-    float roll_P = Kp_roll * roll_error;
-    roll_integral += roll_error * dt;
-    roll_integral = clamp(roll_integral, integral_limit);
-    float roll_I = Ki_roll * roll_integral;
-    float roll_D = Kd_roll * (roll_error - roll_prev_error) / dt;
-    roll_prev_error = roll_error;
-    float roll_cmd = clamp(roll_P + roll_I + roll_D, 1.0f);
+    float zeta = 0.7f;
 
-    // Pitch PID / ピッチ軸PID
+    // Per-axis Kp from design formula
+    // 軸ごとの Kp を設計式から計算
+    float Kp_roll  = 1.0f / (4.0f * zeta * zeta * K_roll  * tau_m);
+    float Kp_pitch = 1.0f / (4.0f * zeta * zeta * K_pitch * tau_m);
+    float Kp_yaw   = 1.0f / (4.0f * zeta * zeta * K_yaw   * tau_m);
+
+    // Expected values for zeta = 0.7:
+    // 期待値 (zeta = 0.7):
+    //   Kp_roll  = 1/(4*0.49*102*0.02) = 0.25
+    //   Kp_pitch = 1/(4*0.49*70*0.02)  = 0.36
+    //   Kp_yaw   = 1/(4*0.49*19*0.02)  = 1.34
+
+    // P control with per-axis gains
+    // 軸ごとのゲインで P 制御
+    float roll_target  = ws::rc_roll()  * rate_max_rp;
     float pitch_target = ws::rc_pitch() * rate_max_rp;
-    float pitch_error = pitch_target - ws::gyro_y();
-    float pitch_P = Kp_pitch * pitch_error;
-    pitch_integral += pitch_error * dt;
-    pitch_integral = clamp(pitch_integral, integral_limit);
-    float pitch_I = Ki_pitch * pitch_integral;
-    float pitch_D = Kd_pitch * (pitch_error - pitch_prev_error) / dt;
-    pitch_prev_error = pitch_error;
-    float pitch_cmd = clamp(pitch_P + pitch_I + pitch_D, 1.0f);
+    float yaw_target   = ws::rc_yaw()   * rate_max_yaw;
 
-    // Yaw PID / ヨー軸PID
-    float yaw_target = ws::rc_yaw() * rate_max_yaw;
-    float yaw_error = yaw_target - ws::gyro_z();
-    float yaw_P = Kp_yaw * yaw_error;
-    yaw_integral += yaw_error * dt;
-    yaw_integral = clamp(yaw_integral, integral_limit);
-    float yaw_I = Ki_yaw * yaw_integral;
-    float yaw_D = Kd_yaw * (yaw_error - yaw_prev_error) / dt;
-    yaw_prev_error = yaw_error;
-    float yaw_cmd = clamp(yaw_P + yaw_I + yaw_D, 1.0f);
+    float roll_cmd  = Kp_roll  * (roll_target  - ws::gyro_x());
+    float pitch_cmd = Kp_pitch * (pitch_target - ws::gyro_y());
+    float yaw_cmd   = Kp_yaw   * (yaw_target   - ws::gyro_z());
 
-    // =====================================================================
-    // Custom motor mixer from first principles
-    // 第一原理からのカスタムモーターミキサー
-    // =====================================================================
-    //
-    // X-quad motor mixer derivation:
-    // X配置クアッドミキサーの導出:
-    //
-    //   Total thrust:  T = F1 + F2 + F3 + F4
-    //   Roll torque:   tau_roll  = (F1 + F2 - F3 - F4) * L
-    //   Pitch torque:  tau_pitch = (-F1 + F2 + F3 - F4) * L
-    //   Yaw torque:    tau_yaw   = (-F1 + F2 - F3 + F4) * kq
-    //
-    // Solving for individual motor forces:
-    //   F1 = T/4 + tau_roll/(4*L) - tau_pitch/(4*L) - tau_yaw/(4*kq)
-    //   F2 = T/4 + tau_roll/(4*L) + tau_pitch/(4*L) + tau_yaw/(4*kq)
-    //   F3 = T/4 - tau_roll/(4*L) + tau_pitch/(4*L) - tau_yaw/(4*kq)
-    //   F4 = T/4 - tau_roll/(4*L) - tau_pitch/(4*L) + tau_yaw/(4*kq)
-
-    float T = throttle;        // Total thrust command / 推力指令
-    float tau_r = roll_cmd;    // Roll torque command / ロールトルク指令
-    float tau_p = pitch_cmd;   // Pitch torque command / ピッチトルク指令
-    float tau_y = yaw_cmd;     // Yaw torque command / ヨートルク指令
-
-    // Pre-compute divisors / 除算の事前計算
-    float inv_4L  = 1.0f / (4.0f * L);   // = 1/(4*0.023) ~ 10.87
-    float inv_4kq = 1.0f / (4.0f * kq);  // = 1/(4*0.01)  = 25.0
-
-    // Motor 1 (FR): +roll, -pitch, -yaw (CW)
-    float m1 = T / 4.0f + tau_r * inv_4L - tau_p * inv_4L - tau_y * inv_4kq;
-
-    // Motor 2 (RR): +roll, +pitch, +yaw (CCW)
-    float m2 = T / 4.0f + tau_r * inv_4L + tau_p * inv_4L + tau_y * inv_4kq;
-
-    // Motor 3 (RL): -roll, +pitch, -yaw (CW)
-    float m3 = T / 4.0f - tau_r * inv_4L + tau_p * inv_4L - tau_y * inv_4kq;
-
-    // Motor 4 (FL): -roll, -pitch, +yaw (CCW)
-    float m4 = T / 4.0f - tau_r * inv_4L - tau_p * inv_4L + tau_y * inv_4kq;
-
-    // Clamp to valid duty range
-    // デューティ有効範囲にクランプ
-    m1 = clamp_duty(m1);
-    m2 = clamp_duty(m2);
-    m3 = clamp_duty(m3);
-    m4 = clamp_duty(m4);
-
-    // Apply directly to individual motors
-    // 個別モーターに直接適用
-    ws::motor_set_duty(1, m1);
-    ws::motor_set_duty(2, m2);
-    ws::motor_set_duty(3, m3);
-    ws::motor_set_duty(4, m4);
+    // Apply through mixer
+    // ミキサー経由で適用
+    ws::motor_mixer(throttle,
+                    clamp(roll_cmd,  1.0f),
+                    clamp(pitch_cmd, 1.0f),
+                    clamp(yaw_cmd,   1.0f));
 
     // Debug print (2Hz) / デバッグ出力 (2Hz)
     if (tick % 200 == 0) {
-        ws::print("M1:%.2f M2:%.2f M3:%.2f M4:%.2f  T:%.2f R:%.2f P:%.2f Y:%.2f",
-                  m1, m2, m3, m4, throttle, roll_cmd, pitch_cmd, yaw_cmd);
+        ws::print("zeta=%.2f Kp_r=%.3f Kp_p=%.3f Kp_y=%.3f",
+                  zeta, Kp_roll, Kp_pitch, Kp_yaw);
     }
 }

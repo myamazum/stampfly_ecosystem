@@ -1,0 +1,72 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+
+\begin{document}
+
+\definecolor{blockcolor}{RGB}{0, 120, 200}
+\definecolor{arrowcolor}{RGB}{80, 80, 80}
+\definecolor{plantcolor}{RGB}{40, 160, 40}
+\definecolor{fbcolor}{RGB}{220, 50, 30}
+\definecolor{sumcolor}{RGB}{40, 160, 40}
+\begin{tikzpicture}[
+    block/.style={
+      rectangle, draw=#1, line width=1.5pt,
+      fill=#1!8, rounded corners=3pt,
+      minimum width=30mm, minimum height=14mm,
+      font=\bfseries, text=#1, align=center
+    },
+    sum/.style={
+      circle, draw=sumcolor, line width=1.5pt,
+      fill=sumcolor!8, minimum size=10mm,
+      font=\large\bfseries, text=sumcolor
+    },
+    arrow/.style={-{Stealth[length=3mm]}, line width=1.2pt, arrowcolor},
+    lbl/.style={font=\small, above, text=arrowcolor},
+  ]
+
+  % Input
+  \node[font=\bfseries, arrowcolor] (input) at (-1.5, 0) {$r(t)$};
+
+  % Sum
+  \node[sum] (sum) at (1.5, 0) {$\Sigma$};
+
+  % Controller
+  \node[block=blockcolor] (kp) at (5.5, 0) {Controller\\$K_p$};
+
+  % Plant
+  \node[block=plantcolor] (plant) at (10, 0)
+    {Plant\\$G_p(s)$};
+
+  % Output
+  \coordinate (out_end) at (14.5, 0);
+  \node[font=\bfseries, arrowcolor] (output) at (14.5, 0) {};
+  \node[font=\bfseries, arrowcolor, above=1mm] at (out_end) {$\omega(t)$};
+
+  % Forward path
+  \draw[arrow] (input) -- (sum);
+  \draw[arrow] (sum) -- node[lbl] {$e(t)$} (kp);
+  \draw[arrow] (kp) -- node[lbl] {$u$} (plant);
+  \draw[arrow] (plant.east) -- ++(2.5, 0);
+
+  % Feedback tap point
+  \coordinate (fb_tap) at ($(plant.east)+(1.2, 0)$);
+  \fill[arrowcolor] (fb_tap) circle (2.5pt);
+
+  % Feedback path (T10 compliant: route below, connect to sum.south)
+  \draw[arrow, fbcolor] (fb_tap) -- ++(0, -2.5)
+    -| ($(sum.south) + (0, -0.5)$) -- (sum.south);
+
+  % Sum signs
+  \node[font=\scriptsize, sumcolor, anchor=south east]
+    at ($(sum.north)+(150:0.4)$) {$+$};
+  \node[font=\scriptsize, fbcolor, anchor=north east]
+    at ($(sum.south)+(210:0.4)$) {$-$};
+
+  % Closed-loop transfer function
+  \node[font=\normalsize, arrowcolor, anchor=north] at (6.75, -3.8) {%
+    $G_{cl}(s) = \dfrac{K_p K}{\tau_m s^2 + s + K_p K}$};
+
+\end{tikzpicture}
+\end{document}

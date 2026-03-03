@@ -1,0 +1,57 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+
+\begin{document}
+
+\definecolor{blockcolor}{RGB}{0, 120, 200}
+\definecolor{arrowcolor}{RGB}{80, 80, 80}
+\definecolor{plantcolor}{RGB}{40, 160, 40}
+\definecolor{sumcolor}{RGB}{120, 80, 150}
+\begin{tikzpicture}[
+    block/.style={
+      rectangle, draw=#1, line width=1.5pt,
+      fill=#1!8, rounded corners=3pt,
+      minimum width=38mm, minimum height=16mm,
+      font=\bfseries, text=#1, align=center
+    },
+    arrow/.style={-{Stealth[length=3mm]}, line width=1.2pt, arrowcolor},
+    lbl/.style={font=\small, above, text=arrowcolor},
+  ]
+
+  % Input
+  \node[font=\bfseries, arrowcolor] (input) at (-1.5, 0) {$u$};
+
+  % Motor block (actuator + 1st-order lag)
+  \node[block=blockcolor] (motor) at (3.5, 0)
+    {Mixer + Motor\\[2pt]$\dfrac{K_m}{\tau_m s + 1}$};
+
+  % Body block (rigid-body integrator)
+  \node[block=plantcolor] (body) at (10, 0)
+    {Body\\[2pt]$\dfrac{1}{I \cdot s}$};
+
+  % Output
+  \node[font=\bfseries, arrowcolor] (output) at (14.5, 0) {$\omega$};
+
+  % Arrows
+  \draw[arrow] (input) -- (motor);
+  \draw[arrow] (motor) -- node[lbl] {$\tau$} (body);
+  \draw[arrow] (body)  -- (output);
+
+  % Labels
+  \node[font=\scriptsize, blockcolor, below=2mm] at (motor.south)
+    {actuator dynamics};
+  \node[font=\scriptsize, plantcolor, below=2mm] at (body.south)
+    {rigid-body rotation};
+  \node[font=\scriptsize, arrowcolor, above=1mm] at (input.north)
+    {control input};
+  \node[font=\scriptsize, arrowcolor, above=1mm] at (output.north)
+    {angular rate};
+
+  % Collapsed transfer function
+  \node[font=\normalsize, arrowcolor, anchor=north] at (6.75, -2.8) {%
+    $G_p(s) = \dfrac{K}{s(\tau_m s + 1)},\qquad K = \dfrac{K_m}{I}$};
+
+\end{tikzpicture}
+\end{document}

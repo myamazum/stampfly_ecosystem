@@ -1,7 +1,7 @@
 \documentclass[aspectratio=169, 14pt]{beamer}
 \usepackage{stampfly_slides}
 
-\lesson{8}{モデリング}{Quadrotor Dynamics}
+\lesson{8}{システムモデリング}{System Modeling}
 
 \begin{document}
 
@@ -13,79 +13,153 @@
 % ------------------------------------------------------------------
 \begin{frame}{今日のゴール / Today's Goal}
   \begin{block}{目標}
-    運動方程式から第一原理でモーターミキサーを自力導出する
+    プラント伝達関数を導出し、モデルに基づいて P ゲインを設計する
   \end{block}
 
   \vspace{1em}
 
-  \begin{itemize}
-    \item クアッドロータの力学モデル
-    \item 推力 $T$、ロール $\tau_\phi$、ピッチ $\tau_\theta$、ヨー $\tau_\psi$
-    \item \api{motor\_mixer()} を使わず個別モータ制御
-  \end{itemize}
+  \begin{enumerate}
+    \item モータ+機体のプラント伝達関数 $G_p(s)$ を理解
+    \item P 制御の閉ループ特性（$\omega_n$, $\zeta$）を導出
+    \item $\zeta$ から $K_p$ を設計 --- L05/L07 の経験をモデルで裏付け
+  \end{enumerate}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{ミキサー行列 / Motor Mixer Matrix}
-  \begin{columns}[c]
-    \begin{column}{0.35\textwidth}
-      \centering
-      \resizebox{!}{0.7\textheight}{\input{../tikz/motor_layout}}
-    \end{column}
-    \begin{column}{0.65\textwidth}
-      \centering
-      \resizebox{!}{0.7\textheight}{\input{../tikz/mixer_matrix}}
-    \end{column}
-  \end{columns}
+\begin{frame}{プラントモデル / Plant Model}
+  \begin{center}
+    \vspace{-2mm}
+    \resizebox{0.85\textwidth}{!}{\input{../tikz/plant_model}}
+  \end{center}
+
+  \vspace{-0.5em}
+
+  \begin{exampleblock}{2つのブロック}
+    \begin{itemize}
+      \item \textbf{Mixer + Motor}: duty 入力 $\to$ トルク
+            --- 1次遅れ $\tau_m \approx 20$\,ms
+      \item \textbf{Body}: トルク $\to$ 角速度
+            --- 剛体回転の積分器 $1/(I \cdot s)$
+    \end{itemize}
+  \end{exampleblock}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{物理パラメータ / Physical Parameters}
+\begin{frame}{線形化とパラメータ / Linearization \& Parameters}
+  \begin{block}{ホバー近傍の小信号仮定}
+    推力変動が小さいとき、モータ応答は 1 次遅れで近似できる
+  \end{block}
+
+  \vspace{0.5em}
+
   \begin{table}
-    \centering
-    \begin{tabular}{lll}
+    \centering\small
+    \begin{tabular}{lllll}
       \hline
-      \textbf{パラメータ} & \textbf{値} & \textbf{説明} \\
+      \textbf{パラメータ} & \textbf{記号} & \textbf{Roll} & \textbf{Pitch} & \textbf{Yaw} \\
       \hline
-      $L$ & 0.023\,m & アーム長（中心$\to$モータ）\\
-      $k_q$ & 0.01 & トルク対推力比 \\
+      慣性モーメント & $I$ & 9.16e-6 & 13.3e-6 & 20.4e-6\,kg\,$\cdot$\,m$^2$ \\
+      モータ時定数 & $\tau_m$ & \multicolumn{3}{c}{0.02\,s（共通）} \\
+      実効プラントゲイン & $K$ & $\sim$102 & $\sim$70 & $\sim$19\,rad/s$^2$ \\
       \hline
     \end{tabular}
   \end{table}
 
   \vspace{0.5em}
 
-  \begin{block}{ミキサー方程式}
-    \begin{itemize}
-      \item $M_1 = T/4 + \tau_\phi/(4L) - \tau_\theta/(4L) - \tau_\psi/(4k_q)$
-      \item $M_2 = T/4 + \tau_\phi/(4L) + \tau_\theta/(4L) + \tau_\psi/(4k_q)$
-      \item $M_3 = T/4 - \tau_\phi/(4L) + \tau_\theta/(4L) - \tau_\psi/(4k_q)$
-      \item $M_4 = T/4 - \tau_\phi/(4L) - \tau_\theta/(4L) + \tau_\psi/(4k_q)$
-    \end{itemize}
+  \begin{exampleblock}{なぜ軸ごとに $K$ が違う？}
+    $K = K_m / I$ --- 慣性が大きい軸は応答が遅い。\\
+    Yaw は反トルクで駆動するため $K_m$ 自体も小さい。
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{P 制御の閉ループ / P Control Closed Loop}
+  \begin{center}
+    \vspace{-2mm}
+    \resizebox{0.85\textwidth}{!}{\input{../tikz/closed_loop_model}}
+  \end{center}
+
+  \vspace{-0.5em}
+
+  \begin{block}{閉ループ伝達関数}
+    $G_{cl}(s) = \dfrac{K_p K}{\tau_m s^2 + s + K_p K}$
+    \hfill $\longleftarrow$ \textbf{2 次系！}
   \end{block}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{実習: カスタムミキサー / Hands-on}
-  \begin{lstlisting}[style=sfcpp, title={student.cpp (excerpt)}]
-// Custom mixer from first principles
-float L = 0.023f, kq = 0.01f;
-float T = throttle;
-float R = roll_cmd, P = pitch_cmd, Y = yaw_cmd;
+\begin{frame}{2次系の特性 / Second-Order Characteristics}
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+      \begin{block}{固有振動数と減衰比}
+        \begin{align*}
+          \omega_n &= \sqrt{\frac{K_p K}{\tau_m}} \\[6pt]
+          \zeta &= \frac{1}{2\sqrt{K_p K \tau_m}}
+        \end{align*}
+      \end{block}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{block}{設計式: $\zeta$ から $K_p$ を逆算}
+        \[
+          K_p = \frac{1}{4\zeta^2 K \tau_m}
+        \]
+      \end{block}
 
-float m1 = T/4 + R/(4*L) - P/(4*L) - Y/(4*kq);
-float m2 = T/4 + R/(4*L) + P/(4*L) + Y/(4*kq);
-float m3 = T/4 - R/(4*L) + P/(4*L) - Y/(4*kq);
-float m4 = T/4 - R/(4*L) - P/(4*L) + Y/(4*kq);
+      \vspace{0.5em}
 
-// Clamp [0.0, 1.0]
-if (m1 < 0) m1 = 0; if (m1 > 1) m1 = 1;
-if (m2 < 0) m2 = 0; if (m2 > 1) m2 = 1;
-if (m3 < 0) m3 = 0; if (m3 > 1) m3 = 1;
-if (m4 < 0) m4 = 0; if (m4 > 1) m4 = 1;
+      \begin{exampleblock}{L07 との接続}
+        ステップ応答の\\オーバーシュート量 $\approx e^{-\pi\zeta/\sqrt{1-\zeta^2}}$
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+\end{frame}
 
-ws::motor_set_duty(1, m1); ws::motor_set_duty(2, m2);
-ws::motor_set_duty(3, m3); ws::motor_set_duty(4, m4);
+% ------------------------------------------------------------------
+\begin{frame}{ゲイン設計表 / Gain Design Table}
+  \begin{table}
+    \centering
+    \begin{tabular}{lcccc}
+      \hline
+      & \textbf{$K$} & \textbf{$K_p=0.5$ の $\zeta$}
+      & \textbf{$\zeta=0.7$ の $K_p$} & \textbf{$\zeta=1.0$ の $K_p$} \\
+      \hline
+      Roll  & 102 & 0.50 & 0.25 & 0.12 \\
+      Pitch &  70 & 0.60 & 0.36 & 0.18 \\
+      Yaw   &  19 & 1.15 & 1.34 & 0.66 \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{0.5em}
+
+  \begin{exampleblock}{読み取り}
+    \begin{itemize}
+      \item L05 の $K_p=0.5$ は Roll で $\zeta=0.50$（やや振動的）
+      \item Yaw は $\zeta > 1$（過減衰 = 応答が遅い）--- 軸ごとに
+            $K_p$ を変えるべき理由！
+    \end{itemize}
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{実習: モデルベースゲイン設計 / Hands-on}
+  \begin{lstlisting}[style=sfcpp, title={user\_code.cpp (excerpt)}]
+// Model-based Kp design (target zeta = 0.7)
+const float tau_m = 0.02f;
+const float K_roll  = 102.0f;
+const float K_pitch =  70.0f;
+const float K_yaw   =  19.0f;
+float zeta = 0.7f;
+
+float Kp_roll  = 1.0f/(4*zeta*zeta*K_roll *tau_m);
+float Kp_pitch = 1.0f/(4*zeta*zeta*K_pitch*tau_m);
+float Kp_yaw   = 1.0f/(4*zeta*zeta*K_yaw  *tau_m);
+
+// Apply per-axis Kp in control loop
+float roll_cmd  = Kp_roll  * (target_roll  - ws::gyro_x());
+float pitch_cmd = Kp_pitch * (target_pitch - ws::gyro_y());
+float yaw_cmd   = Kp_yaw   * (target_yaw   - ws::gyro_z());
   \end{lstlisting}
 \end{frame}
 
@@ -93,9 +167,9 @@ ws::motor_set_duty(3, m3); ws::motor_set_duty(4, m4);
 \begin{frame}{チェックポイント / Checkpoint}
   \begin{alertblock}{確認事項}
     \begin{itemize}
-      \item[$\square$] \api{motor\_mixer()} なしで飛行できた
-      \item[$\square$] \api{motor\_mixer()} 使用時と同等の飛行性能
-      \item[$\square$] $L$ や $k_q$ を変えて挙動の変化を確認
+      \item[$\square$] $G_p(s) = K / (s(\tau_m s + 1))$ を説明できる
+      \item[$\square$] モデルベース $K_p$ と L05 の $K_p=0.5$ を比較飛行
+      \item[$\square$] Roll/Pitch/Yaw の $\zeta$ 差を体感で理解
     \end{itemize}
   \end{alertblock}
 
