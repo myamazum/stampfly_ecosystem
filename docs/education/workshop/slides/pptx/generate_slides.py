@@ -361,7 +361,7 @@ def build_lesson_00() -> Presentation:
     ], [
         ["Day 1", "0 - 2", "環境セットアップ + モータ + コントローラ"],
         ["Day 2", "3 - 5", "LED + IMU + 初フライト"],
-        ["Day 3", "6 - 8", "PID制御 + テレメトリ + モデリング"],
+        ["Day 3", "6 - 8", "モデリング + システム同定 + PID制御"],
         ["Day 4", "9 - 11", "姿勢推定 + Python SDK + 競技会準備"],
         ["Day 5 AM", "", "ホバリングタイム競技会"],
     ])
@@ -1012,7 +1012,7 @@ void loop_400Hz(float dt) {
         "ARM 後スロットルを上げて安定ホバリング",
         "スティック操作で機体が応答する",
         "DISARM で即座にモーターが停止する",
-    ], "Lesson 6: PID 制御")
+    ], "Lesson 6: システムモデリング")
 
     return prs
 
@@ -1020,194 +1020,14 @@ void loop_400Hz(float dt) {
 def build_lesson_06() -> Presentation:
     prs = new_presentation()
 
-    # Slide 1: Title
-    add_title_slide(prs, "Lesson 6: PID 制御", "PID Control")
-
-    # Slide 2: Goal (updated)
-    add_content_slide(prs, "今日のゴール / Today's Goal", [
-        "工学形式 PID を実装し、不完全微分でノイズに強い制御を実現する",
-        "",
-        "• P 制御の限界（定常偏差、振動）",
-        "• 工学形式 Kp / Ti / Td とは",
-        "• 不完全微分: ノイズに強い微分項",
-        "• ログから調整する方法",
-    ])
-
-    # Slide 3: PID Block Diagram
-    add_content_slide(
-        prs, "PID 制御器 / PID Controller",
-        [
-            "P（比例）: 現在の誤差に比例した出力",
-            "I（積分）: Kp/Ti で偏差の蓄積を補正",
-            "D（不完全微分）: Td·s/(η·Td·s+1) で高周波をカット",
-            "",
-            "C(s) = Kp(1 + 1/(Ti·s) + Td·s/(η·Td·s+1))",
-        ],
-        image_path=IMAGES_DIR / "pid_block.png",
-    )
-
-    # Slide 4: Why Incomplete Derivative? (new)
-    add_content_slide(prs, "なぜ不完全微分か / Why Incomplete Derivative?", [
-        "【問題】",
-        "• ジャイロセンサにはノイズがある",
-        "• 理想微分 de/dt はノイズを増幅",
-        "• 高周波振動 → モータに悪影響",
-        "",
-        "【解決策】",
-        "• 不完全微分フィルタ η で高周波をカット",
-        "• η = 0.1〜0.2（小→フィルタ弱い、大→フィルタ強い）",
-        "• 微分の効きとノイズ除去のトレードオフ",
-    ])
-
-    # Slide 5: Engineering Form Parameters (new)
-    add_table_slide(prs, "工学形式パラメータ / Engineering Form", [
-        "パラメータ", "意味", "効果",
-    ], [
-        ["Kp", "比例ゲイン", "大→応答速い、大きすぎ→振動"],
-        ["Ti", "積分時間 [s]", "小→積分強い、小さすぎ→ワインドアップ"],
-        ["Td", "微分時間 [s]", "大→微分強い、大きすぎ→ノイズ増幅"],
-        ["η", "フィルタ係数", "0.1〜0.2、大→ノイズに強い"],
-    ])
-
-    # Slide 6: Log-Based Tuning Guide (new)
-    add_table_slide(prs, "ログから調整する / Log-Based Tuning", [
-        "ログで見える症状", "原因", "調整",
-    ], [
-        ["振動が収まらない", "Kp 過大", "Kp↓"],
-        ["応答が遅い", "Kp 過小", "Kp↑"],
-        ["定常偏差が残る", "I項不足", "Ti↓（積分強化）"],
-        ["オーバーシュート大", "D項不足", "Td↑（微分強化）"],
-        ["高周波ノイズ", "η 過小", "η↑（0.1→0.2）"],
-        ["ゆっくり発散", "ワインドアップ", "Ti↑"],
-    ])
-
-    # Slide 7: Recommended Gains (Ti/Td form)
-    add_table_slide(prs, "推奨ゲイン / Recommended Gains", [
-        "軸", "Kp", "Ti [s]", "Td [s]", "η",
-    ], [
-        ["Roll", "0.5", "1.67", "0.01", "0.125"],
-        ["Pitch", "0.5", "1.67", "0.01", "0.125"],
-        ["Yaw", "2.0", "4.0", "0.005", "0.125"],
-    ])
-
-    # Slide 8: Hands-on Step 1 -- Ideal PID
-    add_code_slide(prs, "実習 Step 1: 理想 PID", """
-float Kp=0.5f, Ti=1.67f, Td=0.01f;
-float integral=0, prev_err=0;
-// inside loop_400Hz(dt)
-float error = target - ws::gyro_x();
-float P = Kp * error;
-if (Ti > 0)  // I term (trapezoidal)
-    integral += (dt/(2*Ti)) * (error + prev_err);
-float I = Kp * integral;
-float D = Kp*Td*(error - prev_err)/dt; // ideal D
-prev_err = error;
-float roll_out = P + I + D;
-""")
-
-    # Slide 9: Hands-on Step 2 -- Incomplete Derivative
-    add_code_slide(prs, "実習 Step 2: 不完全微分", """
-// Replace ideal D with incomplete derivative filter
-float eta = 0.125f;
-float d_filt = 0;  // persistent state
-// inside loop_400Hz(dt)
-float alpha = 2*eta*Td / dt;
-float a = (alpha - 1) / (alpha + 1);
-float b = 2*Td / ((alpha + 1) * dt);
-d_filt = a * d_filt + b * (error - prev_err);
-float D = Kp * d_filt;  // Filtered!
-""")
-
-    # Slide 10: Checkpoint (updated)
-    add_checkpoint_slide(prs, [
-        "理想微分 vs 不完全微分で高周波振動の違いを確認",
-        "定常偏差がなくなった（P のみと比較）",
-        "ゲイン調整表を使って応答を改善できた",
-    ], "Lesson 7: テレメトリ + ステップ応答")
-
-    return prs
-
-
-def build_lesson_07() -> Presentation:
-    prs = new_presentation()
-
-    add_title_slide(prs, "Lesson 7: テレメトリ + ステップ応答",
-                    "Telemetry + Step Response")
-
-    add_content_slide(prs, "今日のゴール / Today's Goal", [
-        "WiFi テレメトリでステップ応答データを取得し、制御性能を分析する",
-        "",
-        "• ステップ応答とは何か",
-        "• 立ち上がり時間・オーバーシュート・整定時間",
-        "• sf log wifi でデータ取得",
-    ])
-
-    add_content_slide(
-        prs, "ステップ応答 / Step Response",
-        [
-            "Rise Time: 目標値の 10%→90% に到達する時間",
-            "Overshoot: 目標値を超える量",
-            "Settling Time: ±5% 以内に収まる時間",
-        ],
-        image_path=IMAGES_DIR / "step_response.png",
-    )
-
-    add_content_slide(prs, "WiFi テレメトリ（自動送信）", [
-        "システムが IMU・姿勢・センサデータを 400Hz で自動送信",
-        "sf log wifi で受信 → CSV 保存 → sf log viz で可視化",
-    ])
-
-    add_table_slide(prs, "実験 API", [
-        "関数", "説明", "引数",
-    ], [
-        ["led_color(r, g, b)", "LED 色設定（フェーズ表示用）", "各 0-255"],
-    ])
-
-    add_content_slide(prs, "実験手順 / Experiment Procedure", [
-        "1. ホバリング状態でステップ入力を自動付加",
-        "2. sf log wifi でリアルタイム記録",
-        "3. CSV を分析して性能指標を計測",
-    ])
-
-    add_code_slide(prs, "実習: ステップ応答実験", """
-// Step response experiment (excerpt)
-float step_rate = 0.5f;    // Step amplitude [rad/s]
-uint32_t delay  = 800;     // 2s wait at 400Hz
-uint32_t dur    = 400;     // 1s step
-
-float roll_step = 0.0f;
-if (elapsed >= delay && elapsed < delay + dur)
-    roll_step = step_rate;  // Step ON!
-
-// Override roll target with step input
-float roll_target = roll_step;
-
-// LED: red during step, green otherwise
-if (roll_step > 0) ws::led_color(50, 0, 0);
-else               ws::led_color(0, 50, 0);
-// gyro_x = roll rate is auto-sent via WiFi telemetry
-""")
-
-    add_checkpoint_slide(prs, [
-        "sf log wifi でデータを取得できた",
-        "波形でオーバーシュートを確認",
-        "整定時間を計測（目安: 0.3s 以内）",
-    ], "Lesson 8: システムモデリング")
-
-    return prs
-
-
-def build_lesson_08() -> Presentation:
-    prs = new_presentation()
-
-    add_title_slide(prs, "Lesson 8: システムモデリング", "System Modeling")
+    add_title_slide(prs, "Lesson 6: システムモデリング", "System Modeling")
 
     add_content_slide(prs, "今日のゴール / Today's Goal", [
         "プラント伝達関数を導出し、モデルに基づいて P ゲインを設計する",
         "",
         "1. モータ+機体のプラント伝達関数 G_p(s) を理解",
         "2. P 制御の閉ループ特性（ωn, ζ）を導出",
-        "3. ζ から Kp を設計 — L05/L07 の経験をモデルで裏付け",
+        "3. ζ から Kp を設計 — L05 の初フライト経験をモデルで裏付け",
     ])
 
     add_content_slide(
@@ -1327,6 +1147,185 @@ float yaw_cmd   = Kp_yaw   * (target_yaw   - ws::gyro_z());
         "G_p(s) = K/(s(τm·s+1)) を説明できる",
         "モデルベース Kp と L05 の Kp=0.5 を比較飛行",
         "Roll/Pitch/Yaw の ζ 差を体感で理解",
+    ], "Lesson 7: システム同定")
+
+    return prs
+
+
+def build_lesson_07() -> Presentation:
+    prs = new_presentation()
+
+    add_title_slide(prs, "Lesson 7: システム同定",
+                    "System Identification")
+
+    add_content_slide(prs, "今日のゴール / Today's Goal", [
+        "L6 のモデル予測をフライトデータで検証し、パラメータを同定する",
+        "",
+        "• システム同定（SysID）の考え方",
+        "• WiFi テレメトリでデータ取得",
+        "• 2 種類の Kp で飛行し応答を比較",
+        "• オーバーシュート比から ζ を推定",
+    ])
+
+    add_content_slide(
+        prs, "システム同定とは / What is System Identification?",
+        [
+            "入出力データからプラントのパラメータ（K, τm）を推定する",
+            "L6 の理論モデルと実機データが一致するかを検証する",
+            "",
+            "u(t) → [Plant G_p(s)] → y(t) → [Parameter Estimation] → K̂, τ̂m",
+        ],
+        image_path=IMAGES_DIR / "sysid_concept.png",
+    )
+
+    add_content_slide(prs, "WiFi テレメトリ / WiFi Telemetry", [
+        "システムが IMU・姿勢・センサデータを 400Hz で自動送信",
+        "sf log wifi で受信 → CSV 保存 → sf log viz で可視化",
+        "",
+        "sf log wifi             — WiFi テレメトリ取得",
+        "sf log wifi -o data.csv — ファイル名指定で保存",
+        "sf log analyze data.csv — フライトデータ分析",
+        "sf log viz data.csv     — 波形可視化",
+    ])
+
+    add_table_slide(prs, "実験計画 / Experiment Plan", [
+        "モード", "Kp", "理論 ζ", "期待される挙動",
+    ], [
+        ["Mode 0 (L5)", "0.5 (全軸同一)", "Roll: 0.50", "やや振動的（~16% OS）"],
+        ["Mode 1 (L6)", "軸ごと設計", "Roll: 0.70", "ほぼ振動なし（~5% OS）"],
+    ])
+
+    add_code_slide(prs, "実習: Kp モード切替", """
+static int kp_mode = 0;  // 0=L5, 1=L6(model-based)
+
+// In loop_400Hz:
+float Kp_roll, Kp_pitch, Kp_yaw;
+if (kp_mode == 0) {
+    Kp_roll = Kp_pitch = 0.5f;  // L5 uniform
+    Kp_yaw = 2.0f;
+} else {
+    float zeta = 0.7f, tau_m = 0.02f;
+    Kp_roll  = 1.0f/(4*zeta*zeta*102.0f*tau_m);
+    Kp_pitch = 1.0f/(4*zeta*zeta* 70.0f*tau_m);
+    Kp_yaw   = 1.0f/(4*zeta*zeta* 19.0f*tau_m);
+}
+// gyro data is auto-sent via WiFi telemetry
+""")
+
+    add_table_slide(prs, "モデル検証 / Model Verification", [
+        "", "Mode 0 理論", "Mode 0 実測", "Mode 1 理論", "Mode 1 実測",
+    ], [
+        ["ζ (Roll)", "0.50", "?", "0.70", "?"],
+        ["OS (Roll)", "16%", "?", "5%", "?"],
+        ["ζ (Pitch)", "0.60", "?", "0.70", "?"],
+        ["ζ (Yaw)", "1.15", "?", "0.70", "?"],
+    ])
+
+    add_checkpoint_slide(prs, [
+        "sf log wifi で 2 種類のデータを取得できた",
+        "オーバーシュート比から ζ を推定した",
+        "理論値と実測値を比較し、モデルの妥当性を確認した",
+    ], "Lesson 8: PID 制御")
+
+    return prs
+
+
+def build_lesson_08() -> Presentation:
+    prs = new_presentation()
+
+    add_title_slide(prs, "Lesson 8: PID 制御", "PID Control")
+
+    add_content_slide(prs, "今日のゴール / Today's Goal", [
+        "モデルベースの Kp を起点に、I 項・D 項を追加して制御を改善する",
+        "",
+        "• P 制御の限界: モデル不確かさ・外乱に弱い",
+        "• 工学形式 Kp / Ti / Td とは",
+        "• 不完全微分: ノイズに強い微分項",
+        "• ログから調整する方法",
+    ])
+
+    add_content_slide(
+        prs, "PID 制御器 / PID Controller",
+        [
+            "P（比例）: 現在の誤差に比例した出力",
+            "I（積分）: Kp/Ti で偏差の蓄積を補正",
+            "D（不完全微分）: Td·s/(η·Td·s+1) で高周波をカット",
+            "",
+            "C(s) = Kp(1 + 1/(Ti·s) + Td·s/(η·Td·s+1))",
+        ],
+        image_path=IMAGES_DIR / "pid_block.png",
+    )
+
+    add_content_slide(prs, "なぜ不完全微分か / Why Incomplete Derivative?", [
+        "【問題】",
+        "• ジャイロセンサにはノイズがある",
+        "• 理想微分 de/dt はノイズを増幅",
+        "• 高周波振動 → モータに悪影響",
+        "",
+        "【解決策】",
+        "• 不完全微分フィルタ η で高周波をカット",
+        "• η = 0.1〜0.2（小→フィルタ弱い、大→フィルタ強い）",
+        "• 微分の効きとノイズ除去のトレードオフ",
+    ])
+
+    add_table_slide(prs, "工学形式パラメータ / Engineering Form", [
+        "パラメータ", "意味", "効果",
+    ], [
+        ["Kp", "比例ゲイン", "大→応答速い、大きすぎ→振動"],
+        ["Ti", "積分時間 [s]", "小→積分強い、小さすぎ→ワインドアップ"],
+        ["Td", "微分時間 [s]", "大→微分強い、大きすぎ→ノイズ増幅"],
+        ["η", "フィルタ係数", "0.1〜0.2、大→ノイズに強い"],
+    ])
+
+    add_table_slide(prs, "ログから調整する / Log-Based Tuning", [
+        "ログで見える症状", "原因", "調整",
+    ], [
+        ["振動が収まらない", "Kp 過大", "Kp↓"],
+        ["応答が遅い", "Kp 過小", "Kp↑"],
+        ["定常偏差が残る", "I項不足", "Ti↓（積分強化）"],
+        ["オーバーシュート大", "D項不足", "Td↑（微分強化）"],
+        ["高周波ノイズ", "η 過小", "η↑（0.1→0.2）"],
+        ["ゆっくり発散", "ワインドアップ", "Ti↑"],
+    ])
+
+    add_table_slide(prs, "推奨ゲイン / Recommended Gains", [
+        "軸", "Kp", "Ti [s]", "Td [s]", "η",
+    ], [
+        ["Roll", "0.25", "1.67", "0.01", "0.125"],
+        ["Pitch", "0.36", "1.67", "0.01", "0.125"],
+        ["Yaw", "1.34", "4.0", "0.005", "0.125"],
+    ])
+
+    add_code_slide(prs, "実習 Step 1: 理想 PID", """
+float Kp=0.25f, Ti=1.67f, Td=0.01f;
+float integral=0, prev_err=0;
+// inside loop_400Hz(dt)
+float error = target - ws::gyro_x();
+float P = Kp * error;
+if (Ti > 0)  // I term (trapezoidal)
+    integral += (dt/(2*Ti)) * (error + prev_err);
+float I = Kp * integral;
+float D = Kp*Td*(error - prev_err)/dt; // ideal D
+prev_err = error;
+float roll_out = P + I + D;
+""")
+
+    add_code_slide(prs, "実習 Step 2: 不完全微分", """
+// Replace ideal D with incomplete derivative filter
+float eta = 0.125f;
+float d_filt = 0;  // persistent state
+// inside loop_400Hz(dt)
+float alpha = 2*eta*Td / dt;
+float a = (alpha - 1) / (alpha + 1);
+float b = 2*Td / ((alpha + 1) * dt);
+d_filt = a * d_filt + b * (error - prev_err);
+float D = Kp * d_filt;  // Filtered!
+""")
+
+    add_checkpoint_slide(prs, [
+        "理想微分 vs 不完全微分で高周波振動の違いを確認",
+        "定常偏差がなくなった（P のみと比較）",
+        "ゲイン調整表を使って応答を改善できた",
     ], "Lesson 9: 姿勢推定")
 
     return prs
