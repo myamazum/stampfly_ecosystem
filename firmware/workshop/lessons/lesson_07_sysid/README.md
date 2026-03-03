@@ -77,7 +77,7 @@ sf sysid fit flight.csv --kp 0.5 -o my_plant.yaml
 | Pitch | ? | 70.0 | ? | 0.020 |
 | Yaw | ? | 19.0 | ? | 0.020 |
 
-同定した K, τm から設計 Kp を計算（導出は L8 で扱う）: $K_p = 1/(4\zeta^2 K \tau_m)$
+同定した K, τm から設計 Kp を計算: $K_p = 1/(4\zeta^2 K \tau_m)$
 
 ## 4. API
 
@@ -177,7 +177,7 @@ sf sysid fit flight.csv --kp 0.5 -o my_plant.yaml
 | Pitch | ? | 70.0 | ? | 0.020 |
 | Yaw | ? | 19.0 | ? | 0.020 |
 
-Compute design Kp from identified parameters (derivation in L8): $K_p = 1/(4\zeta^2 K \tau_m)$
+Compute design Kp from identified parameters: $K_p = 1/(4\zeta^2 K \tau_m)$
 
 ## 4. API
 

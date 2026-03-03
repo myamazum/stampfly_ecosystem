@@ -1239,7 +1239,7 @@ def build_lesson_07() -> Presentation:
     ])
 
     add_content_slide(prs, "設計 Kp の計算 / Design Kp", [
-        "同定した K, τm から設計 Kp を逆算（導出は L8 で扱う）",
+        "同定した K, τm から設計 Kp を逆算",
         "",
         "  Kp = 1 / (4·ζ²·K·τm)    (ζ = 0.7)",
         "",
