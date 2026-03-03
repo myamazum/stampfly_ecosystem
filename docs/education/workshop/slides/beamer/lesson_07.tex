@@ -1,100 +1,219 @@
 \documentclass[aspectratio=169, 14pt]{beamer}
 \usepackage{stampfly_slides}
 
-\lesson{7}{テレメトリ + ステップ応答}{Telemetry + Step Response}
+\lesson{7}{システム同定}{System Identification}
 
 \begin{document}
 
+% ------------------------------------------------------------------
+% Slide 1: Title
 % ------------------------------------------------------------------
 \begin{frame}
   \titlepage
 \end{frame}
 
 % ------------------------------------------------------------------
+% Slide 2: Goal
+% ------------------------------------------------------------------
 \begin{frame}{今日のゴール / Today's Goal}
   \begin{block}{目標}
-    WiFi テレメトリでステップ応答データを取得し、制御性能を分析する
+    L6 のモデル予測をフライトデータで検証し、パラメータを同定する
   \end{block}
 
   \vspace{1em}
 
   \begin{itemize}
-    \item ステップ応答とは何か
-    \item 立ち上がり時間・オーバーシュート・整定時間
-    \item \code{sf log wifi} でデータ取得
+    \item システム同定（SysID）の考え方
+    \item WiFi テレメトリでデータ取得
+    \item 2 種類の $K_p$ で飛行し応答を比較
+    \item オーバーシュート比から $\zeta$ を推定
   \end{itemize}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{ステップ応答 / Step Response}
+% Slide 3: What is System Identification?
+% ------------------------------------------------------------------
+\begin{frame}{システム同定とは / What is System Identification?}
   \begin{center}
-    \resizebox{!}{0.78\textheight}{\input{../tikz/step_response}}
+    \resizebox{0.85\textwidth}{!}{\input{../tikz/sysid_concept}}
   \end{center}
+
+  \vspace{0.5em}
+
+  \begin{block}{目的}
+    入出力データからプラントのパラメータ（$K$, $\tau_m$）を推定する。
+    L6 の理論モデルと実機データが一致するかを検証する。
+  \end{block}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{テレメトリと実験 API}
+% Slide 4: WiFi Telemetry
+% ------------------------------------------------------------------
+\begin{frame}{WiFi テレメトリ / WiFi Telemetry}
   \begin{block}{WiFi テレメトリ（自動送信）}
     システムが IMU・姿勢・センサデータを 400\,Hz で自動送信 \\
     \code{sf log wifi} で受信 → CSV 保存 → \code{sf log viz} で可視化
   \end{block}
 
-  \vspace{0.3em}
+  \vspace{0.5em}
 
   \begin{table}
     \centering
-    \begin{tabular}{lll}
+    \begin{tabular}{ll}
       \hline
-      \textbf{関数} & \textbf{説明} & \textbf{引数} \\
+      \textbf{コマンド} & \textbf{説明} \\
       \hline
-      \api{led\_color(r, g, b)} & LED 色設定（フェーズ表示用） & 各 0--255 \\
+      \code{sf log wifi} & WiFi テレメトリ取得（CSV保存） \\
+      \code{sf log wifi -o data.csv} & ファイル名指定で保存 \\
+      \code{sf log analyze data.csv} & フライトデータ分析 \\
+      \code{sf log viz data.csv} & 波形可視化 \\
+      \hline
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+% ------------------------------------------------------------------
+% Slide 5: Experiment Plan
+% ------------------------------------------------------------------
+\begin{frame}{実験計画 / Experiment Plan}
+  \begin{table}
+    \centering
+    \begin{tabular}{lccl}
+      \hline
+      \textbf{モード} & \textbf{$K_p$} & \textbf{理論 $\zeta$} & \textbf{期待される挙動} \\
+      \hline
+      Mode 0 (L5) & 0.5 (全軸同一) & Roll: 0.50 & やや振動的（$\sim$16\% OS） \\
+      Mode 1 (L6) & 軸ごと設計 & Roll: 0.70 & ほぼ振動なし（$\sim$5\% OS） \\
       \hline
     \end{tabular}
   \end{table}
 
-  \vspace{0.3em}
+  \vspace{0.8em}
 
   \begin{block}{実験手順}
     \begin{enumerate}
-      \item ホバリング状態でステップ入力を自動付加
-      \item \code{sf log wifi} でリアルタイム記録
-      \item CSV を分析して性能指標を計測
+      \item Mode 0 で飛行 → \code{sf log wifi} でデータ取得
+      \item Mode 1 に切替 → 同様にデータ取得
+      \item 両方のオーバーシュートを比較 → $\zeta$ を推定
     \end{enumerate}
   \end{block}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{実習: ステップ応答実験 / Hands-on}
+% Slide 6: Hands-on Code
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{実習: Kp モード切替 / Hands-on}
   \begin{lstlisting}[style=sfcpp, title={user\_code.cpp (excerpt)}]
-// Step response: 2s wait -> 1s step -> 1s recovery
-float step_rate = 0.5f;   // Step amplitude [rad/s]
-uint32_t delay  = 800;    // 2s at 400Hz
-uint32_t dur    = 400;    // 1s step
-float roll_step = 0.0f;
-if (elapsed >= delay && elapsed < delay + dur)
-    roll_step = step_rate;  // Step ON!
-float roll_target = roll_step;  // Override stick
-// LED: red during step, green otherwise
-if (roll_step > 0) ws::led_color(50, 0, 0);
-else               ws::led_color(0, 50, 0);
-// gyro_x = roll rate is auto-sent via WiFi telemetry
+static int kp_mode = 0;  // 0=L5, 1=L6(model-based)
+
+// In loop_400Hz:
+float Kp_roll, Kp_pitch, Kp_yaw;
+if (kp_mode == 0) {
+    Kp_roll = Kp_pitch = 0.5f;  // L5 uniform
+    Kp_yaw = 2.0f;
+} else {
+    float zeta = 0.7f, tau_m = 0.02f;
+    Kp_roll  = 1.0f/(4*zeta*zeta*102.0f*tau_m);
+    Kp_pitch = 1.0f/(4*zeta*zeta* 70.0f*tau_m);
+    Kp_yaw   = 1.0f/(4*zeta*zeta* 19.0f*tau_m);
+}
+// gyro data is auto-sent via WiFi telemetry
   \end{lstlisting}
 \end{frame}
 
 % ------------------------------------------------------------------
+% Slide 7: Data Analysis
+% ------------------------------------------------------------------
+\begin{frame}{データ分析 / Data Analysis}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{オーバーシュート比 → $\zeta$}
+        \vspace{-0.5em}
+        \[
+          \text{OS} \approx e^{-\pi\zeta/\sqrt{1-\zeta^2}}
+        \]
+        \vspace{-1.5em}
+      \end{block}
+
+      \vspace{0.3em}
+
+      {\small
+      \begin{tabular}{cc}
+        \hline
+        \textbf{OS} & \textbf{$\zeta$} \\
+        \hline
+        16\% & 0.50 \\
+        5\% & 0.70 \\
+        0\% & $\geq 1.0$ \\
+        \hline
+      \end{tabular}}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{分析コマンド}
+        \code{sf log analyze data\_mode0.csv}\\
+        \code{sf log analyze data\_mode1.csv}
+      \end{block}
+
+      \vspace{0.3em}
+
+      \begin{exampleblock}{確認ポイント}
+        \begin{itemize}
+          \item Mode 0: OS $\approx$ 16\%?
+          \item Mode 1: OS $\approx$ 5\%?
+          \item 理論値と一致するか?
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+% Slide 8: Model Verification
+% ------------------------------------------------------------------
+\begin{frame}{モデル検証 / Model Verification}
+  \begin{table}
+    \centering
+    \begin{tabular}{lcccc}
+      \hline
+      & \multicolumn{2}{c}{\textbf{Mode 0 ($K_p$=0.5)}}
+      & \multicolumn{2}{c}{\textbf{Mode 1 (モデルベース)}} \\
+      & 理論 & 実測 & 理論 & 実測 \\
+      \hline
+      $\zeta$ (Roll)  & 0.50 & ? & 0.70 & ? \\
+      OS (Roll)       & 16\% & ? & 5\%  & ? \\
+      $\zeta$ (Pitch) & 0.60 & ? & 0.70 & ? \\
+      $\zeta$ (Yaw)   & 1.15 & ? & 0.70 & ? \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{0.5em}
+
+  \begin{exampleblock}{考察}
+    \begin{itemize}
+      \item 理論と実測のずれ → 無駄時間・モデル誤差が原因
+      \item Yaw の Mode 0: 過減衰 → 応答遅い（振動なし）
+      \item 軸ごとの $K_p$ 設計がなぜ重要かをデータで実感
+    \end{itemize}
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+% Slide 9: Checkpoint
+% ------------------------------------------------------------------
 \begin{frame}{チェックポイント / Checkpoint}
   \begin{alertblock}{確認事項}
     \begin{itemize}
-      \item[$\square$] \code{sf log wifi} でデータを取得できた
-      \item[$\square$] 波形でオーバーシュートを確認
-      \item[$\square$] 整定時間を計測（目安: 0.3s 以内）
+      \item[$\square$] \code{sf log wifi} で 2 種類のデータを取得できた
+      \item[$\square$] オーバーシュート比から $\zeta$ を推定した
+      \item[$\square$] 理論値と実測値を比較し、モデルの妥当性を確認した
     \end{itemize}
   \end{alertblock}
 
   \vspace{1em}
 
   \begin{block}{次のレッスン}
-    Lesson 8: システムモデリング --- 伝達関数からゲインを設計
+    Lesson 8: PID 制御 --- モデルに基づく I/D 項の追加で制御を改善
   \end{block}
 \end{frame}
 

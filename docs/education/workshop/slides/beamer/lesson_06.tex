@@ -1,219 +1,338 @@
 \documentclass[aspectratio=169, 14pt]{beamer}
 \usepackage{stampfly_slides}
 
-\lesson{6}{PID 制御}{PID Control}
+\lesson{6}{システムモデリング}{System Modeling}
 
 \begin{document}
 
-% ------------------------------------------------------------------
-% Slide 1: Title
 % ------------------------------------------------------------------
 \begin{frame}
   \titlepage
 \end{frame}
 
 % ------------------------------------------------------------------
-% Slide 2: Goal (updated)
-% ------------------------------------------------------------------
 \begin{frame}{今日のゴール / Today's Goal}
   \begin{block}{目標}
-    工学形式 PID を実装し、不完全微分でノイズに強い制御を実現する
+    プラント伝達関数を導出し、モデルに基づいて P ゲインを設計する
   \end{block}
 
-  \vspace{0.8em}
+  \vspace{1em}
 
-  \begin{itemize}
-    \item P 制御の限界（定常偏差、振動）
-    \item 工学形式 $K_p / T_i / T_d$ とは
-    \item 不完全微分: ノイズに強い微分項
-    \item ログから調整する方法
-  \end{itemize}
+  \begin{enumerate}
+    \item モータ+機体のプラント伝達関数 $G_p(s)$ を理解
+    \item P 制御の閉ループ特性（$\omega_n$, $\zeta$）を導出
+    \item $\zeta$ から $K_p$ を設計 --- L05 の初フライト経験をモデルで裏付け
+  \end{enumerate}
 \end{frame}
 
 % ------------------------------------------------------------------
-% Slide 3: PID Block Diagram (TikZ updated)
-% ------------------------------------------------------------------
-\begin{frame}{PID 制御器 / PID Controller}
+\begin{frame}{物理メカニズム / Physical Mechanism}
   \begin{center}
-    \resizebox{0.78\textwidth}{!}{\input{../tikz/pid_block}}
+    \vspace{-2mm}
+    \resizebox{0.95\textwidth}{!}{\input{../tikz/plant_detail}}
   \end{center}
+
+  \vspace{-0.5em}
+
+  {\small duty 信号がどうやって機体の角速度になるか --- 4 つのステージ}
 \end{frame}
 
 % ------------------------------------------------------------------
-% Slide 4: Why Incomplete Derivative? (new)
+\begin{frame}{プラントモデル（簡略化）/ Plant Model (Simplified)}
+  \begin{center}
+    \vspace{-2mm}
+    \resizebox{0.85\textwidth}{!}{\input{../tikz/plant_model}}
+  \end{center}
+
+  \vspace{-0.5em}
+
+  \begin{exampleblock}{ホバー近傍で線形化 → 2ブロックに集約}
+    \begin{itemize}
+      \item \textbf{Mixer + Motor}: duty $\to$ トルク
+            --- 1次遅れ $K_m/(\tau_m s + 1)$
+      \item \textbf{Body}: トルク $\to$ 角速度
+            --- 積分器 $1/(I \cdot s)$
+    \end{itemize}
+  \end{exampleblock}
+\end{frame}
+
 % ------------------------------------------------------------------
-\begin{frame}{なぜ不完全微分か / Why Incomplete Derivative?}
-  \begin{columns}[T]
+\begin{frame}{$\tau_m$ と $K_m$ の導出 / Deriving $\tau_m$ and $K_m$}
+  \vspace{-2mm}
+  \begin{columns}[t]
     \begin{column}{0.48\textwidth}
-      \begin{alertblock}{問題}
-        \begin{itemize}
-          \item ジャイロにはノイズがある
-          \item 理想微分 $\frac{de}{dt}$ はノイズを増幅
-          \item 高周波振動 $\to$ モータに悪影響
-        \end{itemize}
-      \end{alertblock}
+      \begin{block}{モータ時定数 $\tau_m$}\small
+        DC モータの電気$\cdot$機械モデルから:
+        \vspace{-0.5em}
+        \[
+          \tau_m = \frac{J_{mp} \cdot R_m}{K_e^2 + D_m R_m}
+        \]
+        \vspace{-1.5em}
+      \end{block}
+      \vspace{-0.2em}
+      {\scriptsize
+      \begin{tabular}{lll}
+        \hline
+        $J_{mp}$ & 2.01e-8\,kg$\cdot$m$^2$ & 回転子慣性 \\
+        $R_m$    & 0.34\,$\Omega$    & 巻線抵抗 \\
+        $K_e$    & 6.13e-4\,V/(rad/s) & 逆起電力定数 \\
+        $D_m$    & 3.69e-8 & 粘性摩擦 \\
+        \hline
+        $\tau_m$ & \textbf{0.018\,s} $\approx$ \textbf{0.02\,s} & \\
+        \hline
+      \end{tabular}}
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \begin{exampleblock}{解決策}
-        \begin{itemize}
-          \item 不完全微分フィルタで高周波カット
-          \item $\eta = 0.1 \sim 0.2$
-          \item 小 $\to$ フィルタ弱い
-          \item 大 $\to$ フィルタ強い
-        \end{itemize}
-      \end{exampleblock}
+    \begin{column}{0.52\textwidth}
+      \begin{block}{実効トルクゲイン $K_m$}\small
+        $K_f$: ホバー点で duty を $\Delta d$ 変えたときの
+        1モータ推力変化量\vspace{-0.3em}
+        \[
+          K_f = \left.\frac{dF}{dd}\right|_{\!hover}\!,\quad
+          K_m = \begin{cases}
+            4L \cdot K_f & \text{Roll/Pitch}\\
+            4\kappa \cdot K_f & \text{Yaw}
+          \end{cases}
+        \]
+        \vspace{-1.5em}
+      \end{block}
+      \vspace{-0.2em}
+      {\scriptsize
+      \begin{tabular}{lll}
+        \hline
+        $K_f$       & 0.010\,N/duty & 同定値 \\
+        $L$         & 0.023\,m & アーム長 \\
+        $\kappa$    & 9.71e-3\,m & トルク推力比 \\
+        \hline
+        $K_{m,rp}$  & \textbf{9.3e-4}\,N$\cdot$m & Roll/Pitch \\
+        $K_{m,yaw}$ & \textbf{3.9e-4}\,N$\cdot$m & Yaw \\
+        \hline
+      \end{tabular}}
     \end{column}
   \end{columns}
 
-  \vspace{0.8em}
-
-  \begin{block}{トレードオフ}
-    微分の効き（応答速度）$\longleftrightarrow$ ノイズ除去（安定性）
-  \end{block}
+  \vspace{0.5em}
+  \centering
+  実効プラントゲイン: \; $K = K_m / I$
+  \quad ($K_{roll}\!=\!102$,\; $K_{pitch}\!=\!70$,\; $K_{yaw}\!=\!19$\,rad/s$^2$)
 \end{frame}
 
 % ------------------------------------------------------------------
-% Slide 5: Engineering Form Parameters (new)
-% ------------------------------------------------------------------
-\begin{frame}{工学形式パラメータ / Engineering Form}
+\begin{frame}{パラメータ一覧 / Parameter Summary}
   \begin{table}
     \centering
-    \footnotesize
-    \begin{tabular}{llp{55mm}}
+    \begin{tabular}{llccc}
       \hline
-      \textbf{パラメータ} & \textbf{意味} & \textbf{効果} \\
+      \textbf{パラメータ} & \textbf{記号} & \textbf{Roll} & \textbf{Pitch} & \textbf{Yaw} \\
       \hline
-      $K_p$  & 比例ゲイン   & 大$\to$応答速い、大きすぎ$\to$振動 \\
-      $T_i$  & 積分時間 [s] & 小$\to$積分強い（偏差早く消える）、小さすぎ$\to$ワインドアップ \\
-      $T_d$  & 微分時間 [s] & 大$\to$微分強い（振動抑制）、大きすぎ$\to$ノイズ増幅 \\
-      $\eta$ & フィルタ係数  & $0.1 \sim 0.2$、大$\to$ノイズに強い \\
+      慣性モーメント & $I$ & 9.16e-6 & 13.3e-6 & 20.4e-6\,kg\,$\cdot$\,m$^2$ \\
+      トルクゲイン & $K_m$ & 9.3e-4 & 9.3e-4 & 3.9e-4\,N$\cdot$m \\
+      モータ時定数 & $\tau_m$ & \multicolumn{3}{c}{0.02\,s（共通）} \\
+      \hline
+      \textbf{プラントゲイン} & $\bm{K = K_m/I}$
+        & \textbf{102} & \textbf{70} & \textbf{19}\,rad/s$^2$ \\
       \hline
     \end{tabular}
   \end{table}
 
   \vspace{0.5em}
 
-  \begin{block}{教科書形式との対応}
-    $K_i = K_p / T_i$\,,\quad $K_d = K_p \cdot T_d$
+  \begin{exampleblock}{なぜ軸ごとに $K$ が違う？}
+    \begin{itemize}
+      \item Roll/Pitch: 同じ $K_m$ だが $I_{yy} > I_{xx}$ → Pitch の方が遅い
+      \item Yaw: $\kappa \ll L$ なので $K_m$ 自体が小さい → さらに遅い
+    \end{itemize}
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{P 制御の閉ループ / P Control Closed Loop}
+  \begin{center}
+    \vspace{-2mm}
+    \resizebox{0.85\textwidth}{!}{\input{../tikz/closed_loop_model}}
+  \end{center}
+
+  \vspace{-0.5em}
+
+  \begin{block}{閉ループ伝達関数}
+    $G_{cl}(s) = \dfrac{K_p K}{\tau_m s^2 + s + K_p K}$
+    \hfill $\longleftarrow$ \textbf{2 次系！}
   \end{block}
 \end{frame}
 
 % ------------------------------------------------------------------
-% Slide 6: Log-Based Tuning Guide (new -- participant request)
-% ------------------------------------------------------------------
-\begin{frame}{ログから調整する / Log-Based Tuning}
-  \begin{table}
-    \centering
-    \footnotesize
-    \begin{tabular}{lll}
-      \hline
-      \textbf{ログで見える症状} & \textbf{原因} & \textbf{調整} \\
-      \hline
-      振動が収まらない   & $K_p$ 過大          & $K_p\!\downarrow$ \\
-      応答が遅い         & $K_p$ 過小          & $K_p\!\uparrow$ \\
-      定常偏差が残る     & I 項不足            & $T_i\!\downarrow$（積分強化）\\
-      オーバーシュート大 & D 項不足            & $T_d\!\uparrow$（微分強化）\\
-      高周波ノイズ       & $\eta$ 過小         & $\eta\!\uparrow$（$0.1\!\to\!0.2$）\\
-      ゆっくり発散       & ワインドアップ      & $T_i\!\uparrow$ \\
-      \hline
-    \end{tabular}
-  \end{table}
+\begin{frame}{2次系の特性 / Second-Order Characteristics}
+  \vspace{-2mm}
+  \begin{columns}[c]
+    \begin{column}{0.42\textwidth}
+      \centering
+      \resizebox{\columnwidth}{!}{\input{../tikz/step_response_zeta}}
+    \end{column}
+    \begin{column}{0.58\textwidth}
+      \begin{block}{固有振動数と減衰比}
+        \vspace{-0.8em}
+        \begin{align*}
+          \omega_n &= \sqrt{\frac{K_p K}{\tau_m}}, \quad
+          \zeta = \frac{1}{2\sqrt{K_p K \tau_m}}
+        \end{align*}
+        \vspace{-1.2em}
+      \end{block}
 
-  \vspace{0.5em}
+      \vspace{0.2em}
 
-  \begin{block}{次のステップ}
-    Lesson 7 でステップ応答を計測し、この表を使って調整する
-  \end{block}
+      \begin{block}{設計式: $\zeta$ から $K_p$ を逆算}
+        \vspace{-0.5em}
+        \[
+          K_p = \frac{1}{4\zeta^2 K \tau_m}
+        \]
+        \vspace{-1em}
+      \end{block}
+
+      \vspace{0.2em}
+
+      {\small オーバーシュート量
+      $\approx e^{-\pi\zeta/\sqrt{1-\zeta^2}}$
+      \quad ($\zeta\!=\!0.5 \to 16\%$,\; $\zeta\!=\!0.7 \to 5\%$)}
+    \end{column}
+  \end{columns}
 \end{frame}
 
 % ------------------------------------------------------------------
-% Slide 7: Recommended Gains (Ti/Td form)
+\begin{frame}{開ループボード線図 / Open-Loop Bode Plot}
+  \begin{columns}[c]
+    \begin{column}{0.50\textwidth}
+      \centering
+      \resizebox{\columnwidth}{!}{\input{../tikz/bode_loop_shaping}}
+    \end{column}
+    \begin{column}{0.50\textwidth}
+      \begin{block}{開ループ伝達関数}\small
+        \vspace{-0.5em}
+        \[
+          L(s) = K_p \cdot G_p(s)
+               = \frac{K_p K}{s(\tau_m s + 1)}
+        \]
+        \vspace{-1.2em}
+      \end{block}
+
+      \vspace{0.3em}
+
+      \begin{block}{位相余裕 PM}\small
+        \vspace{-0.3em}
+        \begin{itemize}\setlength{\itemsep}{0.2em}
+          \item $\omega_{gc}$: $|L(j\omega_{gc})| = 1$ となる周波数
+          \item $\text{PM} = 90° - \arctan(\tau_m \omega_{gc})$
+        \end{itemize}
+        \vspace{-0.3em}
+      \end{block}
+
+      \vspace{0.3em}
+
+      {\small $K_p$ を上げると $\omega_{gc} \uparrow$
+       → PM $\downarrow$ → 振動的に}
+    \end{column}
+  \end{columns}
+\end{frame}
+
 % ------------------------------------------------------------------
-\begin{frame}{推奨ゲイン / Recommended Gains}
+\begin{frame}{無駄時間の影響 / Dead Time Effect}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \centering
+      \resizebox{\columnwidth}{!}{\input{../tikz/bode_dead_time}}
+    \end{column}
+    \begin{column}{0.52\textwidth}
+      \begin{block}{制御ループの無駄時間}\small
+        $\tau_d \approx 5$\,ms（センサ処理 + 制御演算 + PWM 更新）
+        \vspace{-0.3em}
+        \[
+          L_{delay}(s) = L(s) \cdot e^{-\tau_d s}
+        \]
+        \vspace{-1.5em}
+      \end{block}
+
+      \vspace{0.2em}
+
+      {\small
+      \begin{tabular}{lccc}
+        \hline
+        & \textbf{モデル} & \textbf{実機} & \\
+        \hline
+        $K_p\!=\!0.5$  & PM=51° & PM$\approx$40° & {\color{red}60°未達!} \\
+        $K_p\!=\!0.25$ & PM=65° & PM$\approx$59° & ギリギリ \\
+        \hline
+      \end{tabular}}
+
+      \vspace{0.5em}
+
+      \begin{alertblock}{\small 実用上 PM $\geq$ 60° が必要}\scriptsize
+        $\zeta\!=\!0.7$ 設計でも遅延込みでボーダーライン
+        → 「モデル上は安定」でも実機で振動する理由
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{ゲイン設計表 / Gain Design Table}
   \begin{table}
     \centering
     \begin{tabular}{lcccc}
       \hline
-      \textbf{軸} & \textbf{$K_p$} & \textbf{$T_i$ [s]} & \textbf{$T_d$ [s]} & \textbf{$\eta$} \\
+      & \textbf{$K$} & \textbf{$K_p=0.5$ の $\zeta$}
+      & \textbf{$\zeta=0.7$ の $K_p$} & \textbf{$\zeta=1.0$ の $K_p$} \\
       \hline
-      Roll  & 0.5 & 1.67 & 0.01  & 0.125 \\
-      Pitch & 0.5 & 1.67 & 0.01  & 0.125 \\
-      Yaw   & 2.0 & 4.0  & 0.005 & 0.125 \\
+      Roll  & 102 & 0.50 & 0.25 & 0.12 \\
+      Pitch &  70 & 0.60 & 0.36 & 0.18 \\
+      Yaw   &  19 & 1.15 & 1.34 & 0.66 \\
       \hline
     \end{tabular}
   \end{table}
 
   \vspace{0.5em}
 
-  \begin{block}{チューニング手順}
-    \begin{enumerate}
-      \item $T_i{=}0,\; T_d{=}0$ にして $K_p$ を調整（振動しない最大値）
-      \item $T_i$ を大きい値 (5.0) から徐々に下げる
-      \item $T_d$ を小さい値 (0.001) から徐々に上げる
-    \end{enumerate}
-  \end{block}
-\end{frame}
-
-% ------------------------------------------------------------------
-% Slide 8: Hands-on Step 1 -- Ideal PID (extension of L5)
-% ------------------------------------------------------------------
-\begin{frame}[fragile]{実習 Step\,1: 理想 PID / Ideal PID}
-  \begin{lstlisting}[style=sfcpp, title={user\_code.cpp (roll axis excerpt)}]
-float Kp=0.5f, Ti=1.67f, Td=0.01f;
-float integral=0, prev_err=0;
-// inside loop_400Hz(dt)
-float error = target - ws::gyro_x();
-float P = Kp * error;
-if (Ti > 0)  // I term (trapezoidal)
-    integral += (dt/(2*Ti)) * (error + prev_err);
-float I = Kp * integral;
-float D = Kp*Td*(error - prev_err)/dt; // ideal D
-prev_err = error;
-float roll_out = P + I + D;
-  \end{lstlisting}
-
-  \begin{exampleblock}{やってみよう}
-    飛ばしてみて $\to$ 高周波振動に注目
+  \begin{exampleblock}{読み取り}
+    \begin{itemize}
+      \item L05 の $K_p=0.5$ は Roll で $\zeta=0.50$（やや振動的）
+      \item Yaw は $\zeta > 1$（過減衰 = 応答が遅い）--- 軸ごとに
+            $K_p$ を変えるべき理由！
+    \end{itemize}
   \end{exampleblock}
 \end{frame}
 
 % ------------------------------------------------------------------
-% Slide 9: Hands-on Step 2 -- Incomplete Derivative Filter
-% ------------------------------------------------------------------
-\begin{frame}[fragile]{実習 Step\,2: 不完全微分 / Incomplete Derivative}
-  \begin{lstlisting}[style=sfcpp, title={user\_code.cpp (D term replacement)}]
-// Replace ideal D with incomplete derivative filter
-float eta = 0.125f;
-float d_filt = 0;  // persistent state
-// inside loop_400Hz(dt)
-float alpha = 2*eta*Td / dt;
-float a = (alpha - 1) / (alpha + 1);
-float b = 2*Td / ((alpha + 1) * dt);
-d_filt = a * d_filt + b * (error - prev_err);
-float D = Kp * d_filt;  // Filtered!
-  \end{lstlisting}
+\begin{frame}[fragile]{実習: モデルベースゲイン設計 / Hands-on}
+  \begin{lstlisting}[style=sfcpp, title={user\_code.cpp (excerpt)}]
+// Model-based Kp design (target zeta = 0.7)
+const float tau_m = 0.02f;
+const float K_roll  = 102.0f;
+const float K_pitch =  70.0f;
+const float K_yaw   =  19.0f;
+float zeta = 0.7f;
 
-  \begin{exampleblock}{やってみよう}
-    再び飛ばして $\to$ 高周波振動が減ったことを確認
-  \end{exampleblock}
+float Kp_roll  = 1.0f/(4*zeta*zeta*K_roll *tau_m);
+float Kp_pitch = 1.0f/(4*zeta*zeta*K_pitch*tau_m);
+float Kp_yaw   = 1.0f/(4*zeta*zeta*K_yaw  *tau_m);
+
+// Apply per-axis Kp in control loop
+float roll_cmd  = Kp_roll  * (target_roll  - ws::gyro_x());
+float pitch_cmd = Kp_pitch * (target_pitch - ws::gyro_y());
+float yaw_cmd   = Kp_yaw   * (target_yaw   - ws::gyro_z());
+  \end{lstlisting}
 \end{frame}
 
-% ------------------------------------------------------------------
-% Slide 10: Checkpoint (updated)
 % ------------------------------------------------------------------
 \begin{frame}{チェックポイント / Checkpoint}
   \begin{alertblock}{確認事項}
     \begin{itemize}
-      \item[$\square$] 理想微分 vs 不完全微分で高周波振動の違いを確認
-      \item[$\square$] 定常偏差がなくなった（P のみと比較）
-      \item[$\square$] ゲイン調整表を使って応答を改善できた
+      \item[$\square$] $G_p(s) = K / (s(\tau_m s + 1))$ を説明できる
+      \item[$\square$] モデルベース $K_p$ と L05 の $K_p=0.5$ を比較飛行
+      \item[$\square$] Roll/Pitch/Yaw の $\zeta$ 差を体感で理解
     \end{itemize}
   \end{alertblock}
 
   \vspace{1em}
 
   \begin{block}{次のレッスン}
-    Lesson 7: テレメトリ + ステップ応答 --- データで性能を評価
+    Lesson 7: システム同定 --- フライトデータでモデルを検証
   \end{block}
 \end{frame}
 
