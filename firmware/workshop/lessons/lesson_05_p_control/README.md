@@ -53,9 +53,9 @@ output = Kp * error
 | Just right | Quick response, small steady-state error | 素早い応答、小さい定常偏差 |
 | Too high | Oscillation, vibration | 振動、発振 |
 
-**Important:** P-control alone has **steady-state error**. The drone will drift slightly. This is normal and will be fixed in Lesson 6 (PID).
+**Important:** P-control alone has **steady-state error**. The drone will drift slightly. This is normal and will be fixed in Lesson 8 (PID).
 
-**重要:** P制御だけでは**定常偏差**が残る。ドローンは多少ドリフトする。これは正常で、レッスン6(PID)で解消する。
+**重要:** P制御だけでは**定常偏差**が残る。ドローンは多少ドリフトする。これは正常で、レッスン8(PID)で解消する。
 
 ## API / 使用するAPI
 

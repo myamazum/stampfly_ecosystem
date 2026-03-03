@@ -45,14 +45,14 @@
 | 時間 | 内容 | ツール/API | 備考 |
 |------|------|-----------|------|
 | 9:00-10:30 | **Lesson 5: 角速度 P 制御 + 初フライト** | `ws::motor_mixer()` | P 制御実装、初フライト |
-| 10:30-12:00 | **Lesson 6: PID 制御** | I 項/D 項追加 | アンチワインドアップ、安定性 |
+| 10:30-12:00 | **Lesson 6: システムモデリング** | 伝達関数、設計式 | モデルの導出、Kp 設計 |
 
 ### 午後 (13:00-16:00)
 
 | 時間 | 内容 | ツール/API | 備考 |
 |------|------|-----------|------|
-| 13:00-14:30 | **Lesson 7: テレメトリ活用** | `sf log wifi`, `sf log viz` | WiFi テレメトリ解説、ステップ応答解析 |
-| 14:30-16:00 | 自由チューニング + フライトテスト | PID ゲイン調整 | 各自フライトテスト |
+| 13:00-14:30 | **Lesson 7: システム同定** | `sf log wifi`, `sf log analyze` | 2モードで飛行、モデル検証 |
+| 14:30-16:00 | 自由チューニング + フライトテスト | Kp 調整 | 各自フライトテスト |
 
 ## 4. Day 3: 制御理論 + 応用 (6h)
 
@@ -60,7 +60,7 @@
 
 | 時間 | 内容 | ツール/API | 備考 |
 |------|------|-----------|------|
-| 9:00-10:30 | **Lesson 8: モデリング・制御系設計** | Loop Shaping Tool | ボード線図、極零点マップ |
+| 9:00-10:30 | **Lesson 8: PID 制御** | I 項/D 項追加 | モデルベース Kp + アンチワインドアップ |
 | 10:30-12:00 | **Lesson 9: 姿勢推定** | 相補フィルタ → ESKF 比較 | センサフュージョンの基礎 |
 
 ### 午後 (13:00-16:00)
@@ -155,15 +155,15 @@
 | Time | Content | Tools |
 |------|---------|-------|
 | 9:00-10:30 | Lesson 5: P control + first flight | `ws::motor_mixer()` |
-| 10:30-12:00 | Lesson 6: PID control | Anti-windup |
-| 13:00-14:30 | Lesson 7: Telemetry | `sf log wifi`, `sf log viz` |
-| 14:30-16:00 | Free tuning + flight test | PID gain tuning |
+| 10:30-12:00 | Lesson 6: System Modeling | Transfer function, Kp design |
+| 13:00-14:30 | Lesson 7: System Identification | `sf log wifi`, model verification |
+| 14:30-16:00 | Free tuning + flight test | Kp tuning |
 
 ## 4. Day 3: Control Theory + Applications (6h)
 
 | Time | Content | Tools |
 |------|---------|-------|
-| 9:00-10:30 | Lesson 8: Modeling / control design | Loop Shaping Tool |
+| 9:00-10:30 | Lesson 8: PID control | Model-based Kp + anti-windup |
 | 10:30-12:00 | Lesson 9: Attitude estimation | Complementary filter, ESKF |
 | 13:00-14:00 | Cascade control introduction | Angle → Rate |
 | 14:00-16:00 | Deep dive + free practice | `sf sysid`, `sf cal`, ESKF Sim |

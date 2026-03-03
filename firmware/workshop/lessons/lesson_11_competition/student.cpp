@@ -8,9 +8,9 @@
 // Goal: Optimize your rate PID gains for the longest hover time.
 // 目標: 角速度PIDゲインを最適化し、最長ホバリングタイムを目指す
 //
-// This is the same rate PID structure from Lesson 6.
+// This is the same rate PID structure from Lesson 8.
 // Tune the gains below to achieve the best stability!
-// レッスン6と同じ角速度PID構造です。
+// レッスン8と同じ角速度PID構造です。
 // 下のゲインを調整して最高の安定性を目指しましょう！
 //
 // Block diagram / ブロック線図:

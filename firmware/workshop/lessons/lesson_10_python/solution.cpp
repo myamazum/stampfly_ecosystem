@@ -17,9 +17,9 @@ void setup()
 
 void loop_400Hz(float dt)
 {
-    // Standard PID control (same as Lesson 6 solution)
+    // Standard PID control (same as Lesson 8 solution)
     // This provides stable flight for Python SDK control
-    // 標準PID制御（Lesson 6の解答と同じ）
+    // 標準PID制御（Lesson 8の解答と同じ）
     // Python SDKからの操作のために安定した飛行を提供する
 
     constexpr float Kp = 0.5f, Ki = 0.3f, Kd = 0.005f;

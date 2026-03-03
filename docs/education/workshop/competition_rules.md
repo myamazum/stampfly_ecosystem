@@ -24,7 +24,7 @@ StampFly 勉強会の最終日（Day 5）に開催するホバリング競技会
 | 制限時間 | 60 秒（上限） |
 | 試行回数 | 3 回（ベストタイム採用） |
 | 操縦方式 | コントローラ操縦（スロットルは手動、姿勢安定化は自分のプログラム） |
-| 制御方式 | Lesson 5-6 で実装した角速度フィードバック制御（P制御 or PID制御） |
+| 制御方式 | Lesson 5/8 で実装した角速度フィードバック制御（P制御 or PID制御） |
 
 ### ホバリングの定義
 
@@ -69,7 +69,7 @@ sf competition hover-time --team "TeamName"
 
 | 項目 | 規定 |
 |------|------|
-| ベースコード | Lesson 5（P制御）または Lesson 6（PID制御）で実装したコード |
+| ベースコード | Lesson 5（P制御）または Lesson 8（PID制御）で実装したコード |
 | ゲイン調整 | 自由（Kp, Ki, Kd の値は各自最適化してよい） |
 | ヨー制御 | 追加してよい |
 | テレメトリ | `ws::telemetry_send()` の使用可 |
@@ -79,7 +79,7 @@ sf competition hover-time --team "TeamName"
 
 | 禁止 | 理由 |
 |------|------|
-| カスケード制御（姿勢→角速度） | Lesson 5-6 の範囲外 |
+| カスケード制御（姿勢→角速度） | Lesson 5/8 の範囲外 |
 | 高度制御の自動化 | スロットルは手動操作 |
 | 他の参加者のコードのコピー | 自分で実装したコードで競う |
 | 機体の物理的改造 | 公平性の確保 |
@@ -155,7 +155,7 @@ Competition rulebook for the StampFly Workshop final day (Day 5). Participants c
 | Time limit | 60 seconds (maximum) |
 | Attempts | 3 (best time counts) |
 | Control | Controller-operated (manual throttle, attitude stabilized by your program) |
-| Code | Angular rate feedback from Lessons 5-6 (P or PID control) |
+| Code | Angular rate feedback from Lessons 5/8 (P or PID control) |
 
 ### Hover Definition
 
@@ -187,7 +187,7 @@ sf competition hover-time --team "TeamName"
 
 ### Allowed
 
-- Code from Lesson 5 (P control) or Lesson 6 (PID control)
+- Code from Lesson 5 (P control) or Lesson 8 (PID control)
 - Gain tuning (any Kp, Ki, Kd values)
 - Yaw control addition
 - Telemetry and LED usage

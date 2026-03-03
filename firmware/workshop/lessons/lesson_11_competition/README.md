@@ -7,11 +7,11 @@ Optimize your angular rate feedback controller for the longest possible hover ti
 
 ## Overview / 概要
 
-This is the final lesson. You use the rate PID controller you built in Lessons 5-6
+This is the final lesson. You use the rate PID controller you built in Lessons 5/8
 and optimize the gains to achieve the most stable hover possible.
 The competition is simple: **who can hover the longest?**
 
-これが最終レッスン。レッスン 5-6 で実装した角速度PID制御のゲインを最適化し、
+これが最終レッスン。レッスン 5/8 で実装した角速度PID制御のゲインを最適化し、
 最も安定したホバリングを目指す。
 競技はシンプル: **誰が一番長くホバリングできるか？**
 
@@ -40,7 +40,7 @@ The competition is simple: **who can hover the longest?**
 
 ## Starting Template / スタートテンプレート
 
-The `student.cpp` provides a **rate PID controller** (same structure as Lesson 6):
+The `student.cpp` provides a **rate PID controller** (same structure as Lesson 8):
 ```
 Stick Input ──> [Scale] ──> Target Rate ──>(+)──> Error ──> [PID] ──> Motor Mixer
                                             ^(-)
