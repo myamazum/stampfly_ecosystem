@@ -1,4 +1,4 @@
-# Lesson 8: システムモデリング / System Modeling
+# Lesson 6: システムモデリング / System Modeling
 
 > **Note:** [English version follows after the Japanese section.](#english) / 日本語の後に英語版があります。
 
@@ -13,8 +13,6 @@ L05 で経験的に選んだ `Kp=0.5` がモデル上どのような減衰比 ζ
 ### 前提知識
 
 - L05: レート P 制御と初フライト
-- L06: PID 制御
-- L07: ステップ応答実験
 
 ## 2. プラント伝達関数
 
@@ -161,8 +159,6 @@ and compute optimal per-axis Kp from a target ζ.
 ### Prerequisites
 
 - L05: Rate P control and first flight
-- L06: PID control
-- L07: Step response experiment
 
 ## 2. Plant Transfer Function
 

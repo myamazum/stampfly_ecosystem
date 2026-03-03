@@ -1,19 +1,19 @@
 #include "workshop_api.hpp"
 
 // =========================================================================
-// Lesson 6: PID Control - Solution
-// レッスン 6: PID制御 - 解答
+// Lesson 8: PID Control - Solution
+// レッスン 8: PID制御 - 解答
 // =========================================================================
 
 static uint32_t tick = 0;
 
 // --- PID gains ---
 // PID ゲイン
-static const float Kp_roll  = 0.5f;
+static const float Kp_roll  = 0.25f;  // Model-based (zeta=0.7, K=102)
 static const float Ki_roll  = 0.3f;
 static const float Kd_roll  = 0.005f;
 
-static const float Kp_pitch = 0.5f;
+static const float Kp_pitch = 0.36f;  // Model-based (zeta=0.7, K=70)
 static const float Ki_pitch = 0.3f;
 static const float Kd_pitch = 0.005f;
 
@@ -56,7 +56,7 @@ static float clamp(float value, float limit)
 
 void setup()
 {
-    ws::print("Lesson 6: PID Control - Solution");
+    ws::print("Lesson 8: PID Control - Solution");
 
     // Set WiFi channel (use 1, 6, or 11 to avoid interference)
     // WiFiチャンネルを設定（混信を避けるため1, 6, 11のいずれかを使用）

@@ -1,8 +1,8 @@
 #include "workshop_api.hpp"
 
 // =========================================================================
-// Lesson 6: PID Control
-// レッスン 6: PID制御
+// Lesson 8: PID Control
+// レッスン 8: PID制御
 // =========================================================================
 //
 // Goal: Add Integral (I) and Derivative (D) terms to eliminate
@@ -20,11 +20,11 @@
 
 // --- PID gains ---
 // PID ゲイン
-static float Kp_roll  = 0.5f;   // TODO: tune
+static float Kp_roll  = 0.25f;  // From L6 model (zeta=0.7, K=102)
 static float Ki_roll  = 0.0f;   // TODO: add integral gain (try 0.3)
 static float Kd_roll  = 0.0f;   // TODO: add derivative gain (try 0.005)
 
-static float Kp_pitch = 0.5f;   // TODO: tune
+static float Kp_pitch = 0.36f;  // From L6 model (zeta=0.7, K=70)
 static float Ki_pitch = 0.0f;   // TODO: add integral gain
 static float Kd_pitch = 0.0f;   // TODO: add derivative gain
 
@@ -47,7 +47,7 @@ static float rate_max_yaw = 5.0f;
 
 void setup()
 {
-    ws::print("Lesson 6: PID Control");
+    ws::print("Lesson 8: PID Control");
 
     // TODO: Set your WiFi channel (1, 6, or 11)
     // TODO: 自分のWiFiチャンネルを設定する（1, 6, 11のいずれか）

@@ -1,4 +1,4 @@
-# Lesson 6: PID Control
+# Lesson 8: PID Control
 
 ## Goal / 目標
 Add Integral (I) and Derivative (D) terms to the P controller from Lesson 5. Eliminate steady-state error and reduce overshoot.
@@ -7,7 +7,8 @@ Add Integral (I) and Derivative (D) terms to the P controller from Lesson 5. Eli
 
 ## Prerequisites / 前提条件
 - Lesson 5 completed (P-control working, first flight achieved)
-- Understanding of P-control concepts
+- Lesson 6 completed (System Modeling, model-based Kp design)
+- Lesson 7 completed (System Identification, flight data analysis)
 
 ## Key Concept: PID Control / PID制御
 
@@ -82,8 +83,8 @@ if (!ws::is_armed()) {
 
 | Axis | Kp | Ki | Kd |
 |------|----|----|----|
-| Roll | 0.5 | 0.3 | 0.005 |
-| Pitch | 0.5 | 0.3 | 0.005 |
+| Roll | 0.25 | 0.3 | 0.005 |
+| Pitch | 0.36 | 0.3 | 0.005 |
 | Yaw | 2.0 | 0.5 | 0.01 |
 
 ### Tuning Guide / チューニングガイド
@@ -113,7 +114,7 @@ if (!ws::is_armed()) {
 | `ws::telemetry_send(name, val)` | Send telemetry |
 
 ## Steps / 手順
-1. `sf lesson switch 6`
+1. `sf lesson switch 8`
 2. Add I and D terms to each axis in `student.cpp`
 3. Implement anti-windup (clamp integral to +/-0.5)
 4. Add output limiting (clamp output to +/-1.0)
