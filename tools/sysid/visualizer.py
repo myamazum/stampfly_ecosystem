@@ -345,3 +345,101 @@ def plot_param_comparison(
         return None
 
     return fig
+
+
+def plot_plant_fit(
+    time: np.ndarray,
+    u_plant: np.ndarray,
+    y_measured: np.ndarray,
+    y_simulated: np.ndarray,
+    residual: np.ndarray,
+    axis: str = "roll",
+    K: Optional[float] = None,
+    tau_m: Optional[float] = None,
+    r_squared: Optional[float] = None,
+    output_path: Optional[str | Path] = None,
+    show: bool = True,
+) -> Optional['plt.Figure']:
+    """
+    Plot plant model fit results
+    プラントモデルフィット結果をプロット
+
+    Upper subplot: measured output and fitted output with plant input on twin axis
+    Lower subplot: residual (measured - fitted)
+
+    Args:
+        time: Time array [s]
+        u_plant: Reconstructed plant input (duty)
+        y_measured: Measured angular velocity [rad/s]
+        y_simulated: Simulated angular velocity [rad/s]
+        residual: y_measured - y_simulated [rad/s]
+        axis: Axis name ('roll', 'pitch', 'yaw')
+        K: Identified plant gain (for annotation)
+        tau_m: Identified time constant (for annotation)
+        r_squared: Fit quality R^2 (for annotation)
+        output_path: If provided, save figure to this path
+        show: If True, display plot interactively
+
+    Returns:
+        Matplotlib figure (or None if showing)
+    """
+    check_matplotlib()
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True,
+                                    gridspec_kw={'height_ratios': [3, 1]})
+
+    # Upper: measured/fitted output + plant input on secondary axis
+    color_meas = 'steelblue'
+    color_fit = 'orangered'
+    color_input = 'gray'
+
+    ax1.plot(time, y_measured, color=color_meas, linewidth=0.8,
+             alpha=0.7, label='Measured (gyro)')
+    ax1.plot(time, y_simulated, color=color_fit, linewidth=1.5,
+             alpha=0.9, linestyle='--', label='Fitted model')
+    ax1.set_ylabel('Angular velocity [rad/s]')
+    ax1.grid(True, alpha=0.3)
+
+    # Plant input on secondary axis
+    ax1_twin = ax1.twinx()
+    ax1_twin.plot(time, u_plant, color=color_input, linewidth=0.5,
+                  alpha=0.3, label='Plant input u(t)')
+    ax1_twin.set_ylabel('Plant input [duty]', color=color_input)
+    ax1_twin.tick_params(axis='y', labelcolor=color_input)
+
+    # Annotation with fit parameters
+    info_parts = [f"Axis: {axis}"]
+    if K is not None:
+        info_parts.append(f"K = {K:.1f}")
+    if tau_m is not None:
+        info_parts.append(f"tau_m = {tau_m:.4f} s")
+    if r_squared is not None:
+        info_parts.append(f"R2 = {r_squared:.3f}")
+    info_text = "  |  ".join(info_parts)
+    ax1.set_title(f"Plant Model Fit: G_p(s) = K / (s * (tau_m * s + 1))\n{info_text}")
+
+    # Combine legends
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax1_twin.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
+    # Lower: residual
+    ax2.plot(time, residual, color='green', linewidth=0.5, alpha=0.7)
+    ax2.axhline(y=0, color='black', linewidth=0.5, linestyle='-')
+    ax2.set_xlabel('Time [s]')
+    ax2.set_ylabel('Residual [rad/s]')
+    ax2.grid(True, alpha=0.3)
+
+    rmse = np.sqrt(np.mean(residual ** 2))
+    ax2.set_title(f"Residual (RMSE = {rmse:.4f} rad/s)")
+
+    plt.tight_layout()
+
+    if output_path:
+        plt.savefig(output_path, dpi=150)
+
+    if show:
+        plt.show()
+        return None
+
+    return fig

@@ -45,6 +45,12 @@ from .motor import (
     estimate_motor_params,
     MotorResult,
 )
+from .plant_fit import (
+    fit_plant,
+    compute_fit_timeseries,
+    PlantFitResult,
+    REFERENCE_PLANT_GAINS,
+)
 from .drag import (
     estimate_drag,
     DragResult,
@@ -84,6 +90,11 @@ __all__ = [
     # Motor
     "estimate_motor_params",
     "MotorResult",
+    # Plant fit
+    "fit_plant",
+    "compute_fit_timeseries",
+    "PlantFitResult",
+    "REFERENCE_PLANT_GAINS",
     # Drag
     "estimate_drag",
     "DragResult",
