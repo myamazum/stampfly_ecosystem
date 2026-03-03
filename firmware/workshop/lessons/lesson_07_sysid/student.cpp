@@ -5,31 +5,35 @@
 // レッスン 7: システム同定
 // =========================================================================
 //
-// Goal: Fly with two Kp configurations and compare responses with
-//       the L6 model predictions. Verify model parameters from data.
-// 目標: 2種類のKp設定で飛行し、L6のモデル予測と応答を比較する。
-//       データからモデルパラメータを検証する。
+// Goal: Fly with P control and capture telemetry data.
+//       Use sf sysid fit to identify plant parameters K, tau_m.
+// 目標: P 制御で飛行しテレメトリデータを取得する。
+//       sf sysid fit でプラントパラメータ K, τm を同定する。
 //
-// Mode 0: L5 uniform Kp (Kp=0.5 all axes)
-// Mode 1: L6 model-based Kp (per-axis, zeta=0.7)
+// Plant model: G_p(s) = K / (s * (tau_m * s + 1))
+//   K    = plant gain [rad/s^2 per duty]
+//   tau_m = motor time constant [s]
+//
+// The sf sysid fit tool reconstructs plant I/O from this data:
+//   target = ctrl * rate_max
+//   u_plant = Kp * (target - gyro)   <- plant input
+//   y_plant = gyro                   <- plant output
+// So you need to remember the Kp and rate_max values used here.
 
 static uint32_t tick = 0;
 
-// --- Kp mode ---
-// 0 = L5 uniform, 1 = L6 model-based
-static int kp_mode = 0;
+// --- P gain ---
+// TODO: Set the Kp you want to use (same as L5, or your own value)
+// TODO: 使用する Kp を設定する（L5 と同じ値、または自分の値）
+// IMPORTANT: Remember this value for sf sysid fit --kp <value>
+// 重要: この値を sf sysid fit --kp に渡すので覚えておくこと
+static float Kp = 0.5f;        // TODO: Set your P gain
+static float Kp_yaw = 2.0f;
 
-// Physical parameters from L6
-// L6 の物理パラメータ
-static const float tau_m = 0.02f;
-static const float K_roll  = 102.0f;
-static const float K_pitch =  70.0f;
-static const float K_yaw   =  19.0f;
-
-// Rate limits
-// レート制限
-static const float rate_max_rp  = 1.0f;
-static const float rate_max_yaw = 5.0f;
+// Rate limits (also needed for sf sysid fit --rate-max)
+// レート制限（sf sysid fit --rate-max にも必要）
+static const float rate_max_rp  = 1.0f;    // [rad/s] roll/pitch
+static const float rate_max_yaw = 5.0f;    // [rad/s] yaw
 
 static float clamp(float val, float lim)
 {
@@ -57,49 +61,22 @@ void loop_400Hz(float dt)
         return;
     }
 
+    ws::led_color(0, 50, 0);  // Green = flying
     float throttle = ws::rc_throttle();
 
     // =====================================================================
-    // Kp mode selection
-    // Kp モード選択
+    // P control (same structure as L5)
+    // P 制御（L5 と同じ構造）
     // =====================================================================
-    // TODO: Switch kp_mode between 0 and 1
-    //       (e.g., change the value here and re-flash, or
-    //        implement a stick-based toggle)
-    // ヒント: kp_mode の値をここで変えて再書き込みする
-
-    float Kp_roll_val, Kp_pitch_val, Kp_yaw_val;
-
-    if (kp_mode == 0) {
-        // Mode 0: L5 uniform Kp
-        // モード 0: L5 の一律 Kp
-        Kp_roll_val  = 0.5f;
-        Kp_pitch_val = 0.5f;
-        Kp_yaw_val   = 2.0f;
-        ws::led_color(0, 50, 0);   // Green = Mode 0
-    } else {
-        // Mode 1: L6 model-based Kp (zeta = 0.7)
-        // モード 1: L6 のモデルベース Kp (zeta = 0.7)
-        // TODO: Calculate Kp from the design formula
-        //   Kp = 1 / (4 * zeta^2 * K * tau_m)
-        float zeta = 0.7f;
-        Kp_roll_val  = 0.0f;  // TODO: compute from K_roll
-        Kp_pitch_val = 0.0f;  // TODO: compute from K_pitch
-        Kp_yaw_val   = 0.0f;  // TODO: compute from K_yaw
-        ws::led_color(0, 0, 50);   // Blue = Mode 1
-    }
-
-    // =====================================================================
-    // P control (same structure as L5/L6)
-    // P 制御（L5/L6 と同じ構造）
-    // =====================================================================
+    // Telemetry automatically records ctrl_roll, gyro_corrected_x, etc.
+    // テレメトリが ctrl_roll, gyro_corrected_x 等を自動記録する
     float roll_target  = ws::rc_roll()  * rate_max_rp;
     float pitch_target = ws::rc_pitch() * rate_max_rp;
     float yaw_target   = ws::rc_yaw()   * rate_max_yaw;
 
-    float roll_cmd  = Kp_roll_val  * (roll_target  - ws::gyro_x());
-    float pitch_cmd = Kp_pitch_val * (pitch_target - ws::gyro_y());
-    float yaw_cmd   = Kp_yaw_val   * (yaw_target   - ws::gyro_z());
+    float roll_cmd  = Kp     * (roll_target  - ws::gyro_x());
+    float pitch_cmd = Kp     * (pitch_target - ws::gyro_y());
+    float yaw_cmd   = Kp_yaw * (yaw_target   - ws::gyro_z());
 
     ws::motor_mixer(throttle,
                     clamp(roll_cmd,  1.0f),
@@ -111,7 +88,7 @@ void loop_400Hz(float dt)
     // デバッグ出力 (2Hz)
     // =====================================================================
     if (tick % 200 == 0) {
-        ws::print("Mode=%d Kp_r=%.3f Kp_p=%.3f Kp_y=%.3f",
-                  kp_mode, Kp_roll_val, Kp_pitch_val, Kp_yaw_val);
+        ws::print("Kp=%.2f rate_max=%.1f gyro_x=%.3f",
+                  Kp, rate_max_rp, ws::gyro_x());
     }
 }
