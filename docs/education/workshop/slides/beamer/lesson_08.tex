@@ -90,27 +90,37 @@
 
 % ------------------------------------------------------------------
 \begin{frame}{2次系の特性 / Second-Order Characteristics}
+  \vspace{-2mm}
   \begin{columns}[c]
-    \begin{column}{0.5\textwidth}
-      \begin{block}{固有振動数と減衰比}
-        \begin{align*}
-          \omega_n &= \sqrt{\frac{K_p K}{\tau_m}} \\[6pt]
-          \zeta &= \frac{1}{2\sqrt{K_p K \tau_m}}
-        \end{align*}
-      \end{block}
+    \begin{column}{0.42\textwidth}
+      \centering
+      \resizebox{\columnwidth}{!}{\input{../tikz/step_response_zeta}}
     \end{column}
-    \begin{column}{0.5\textwidth}
+    \begin{column}{0.58\textwidth}
+      \begin{block}{固有振動数と減衰比}
+        \vspace{-0.8em}
+        \begin{align*}
+          \omega_n &= \sqrt{\frac{K_p K}{\tau_m}}, \quad
+          \zeta = \frac{1}{2\sqrt{K_p K \tau_m}}
+        \end{align*}
+        \vspace{-1.2em}
+      \end{block}
+
+      \vspace{0.2em}
+
       \begin{block}{設計式: $\zeta$ から $K_p$ を逆算}
+        \vspace{-0.5em}
         \[
           K_p = \frac{1}{4\zeta^2 K \tau_m}
         \]
+        \vspace{-1em}
       \end{block}
 
-      \vspace{0.5em}
+      \vspace{0.2em}
 
-      \begin{exampleblock}{L07 との接続}
-        ステップ応答の\\オーバーシュート量 $\approx e^{-\pi\zeta/\sqrt{1-\zeta^2}}$
-      \end{exampleblock}
+      {\small オーバーシュート量
+      $\approx e^{-\pi\zeta/\sqrt{1-\zeta^2}}$
+      \quad ($\zeta\!=\!0.5 \to 16\%$,\; $\zeta\!=\!0.7 \to 5\%$)}
     \end{column}
   \end{columns}
 \end{frame}

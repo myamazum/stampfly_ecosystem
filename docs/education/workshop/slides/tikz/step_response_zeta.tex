@@ -1,0 +1,82 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+
+\begin{document}
+
+\definecolor{refcolor}{RGB}{150, 150, 150}
+\definecolor{labelcolor}{RGB}{80, 80, 80}
+\definecolor{gridcolor}{RGB}{220, 220, 220}
+% Three zeta colors
+\definecolor{z05color}{RGB}{220, 50, 30}   % Red - underdamped
+\definecolor{z07color}{RGB}{0, 120, 200}   % Blue - optimal
+\definecolor{z10color}{RGB}{40, 160, 40}   % Green - critically damped
+\begin{tikzpicture}[
+    axis/.style={-{Stealth[length=2.5mm]}, line width=0.8pt, labelcolor},
+    ref/.style={refcolor, line width=1pt, dashed},
+    curve/.style={line width=2pt},
+  ]
+
+  % Grid
+  \foreach \x in {0, 1, ..., 8} {
+    \draw[gridcolor] (\x, 0) -- (\x, 5);
+  }
+  \foreach \y in {0, 1, ..., 5} {
+    \draw[gridcolor] (0, \y) -- (8, \y);
+  }
+
+  % Axes
+  \draw[axis] (-0.3, 0) -- (8.5, 0)
+    node[right, font=\small\bfseries] {$t$};
+  \draw[axis] (0, -0.3) -- (0, 5.5)
+    node[above, font=\small\bfseries] {$\omega$};
+
+  % Reference line at y=3.5 (steady state)
+  \pgfmathsetmacro{\A}{3.5}
+  \draw[ref] (0, \A) -- (8, \A);
+  \node[font=\scriptsize, refcolor, left] at (-0.1, \A) {target};
+
+  % ζ = 0.5 (underdamped, ωn=10)
+  % y(t) = A*[1 - exp(-ζωn t)/√(1-ζ²) * sin(ωd t + φ)]
+  % ζ=0.5, ωn=10, ωd=8.66, φ=60°
+  \pgfmathsetmacro{\zetaA}{0.5}
+  \pgfmathsetmacro{\wnA}{10}
+  \pgfmathsetmacro{\zwA}{\zetaA*\wnA}         % 5.0
+  \pgfmathsetmacro{\wdAdeg}{\wnA*sqrt(1-\zetaA*\zetaA)*180/3.14159} % ≈496°/s
+  \pgfmathsetmacro{\phiAdeg}{acos(\zetaA)}     % 60°
+  \pgfmathsetmacro{\invA}{1/sqrt(1-\zetaA*\zetaA)} % 1.155
+  \draw[curve, z05color] plot[domain=0:2.0, samples=200]
+    ({\x*4}, {\A*(1 - \invA*exp(-\zwA*\x)*sin(\wdAdeg*\x + \phiAdeg))});
+
+  % ζ = 0.7 (slightly underdamped, ωn=10)
+  \pgfmathsetmacro{\zetaB}{0.7}
+  \pgfmathsetmacro{\wnB}{10}
+  \pgfmathsetmacro{\zwB}{\zetaB*\wnB}         % 7.0
+  \pgfmathsetmacro{\wdBdeg}{\wnB*sqrt(1-\zetaB*\zetaB)*180/3.14159} % ≈409°/s
+  \pgfmathsetmacro{\phiBdeg}{acos(\zetaB)}     % 45.6°
+  \pgfmathsetmacro{\invB}{1/sqrt(1-\zetaB*\zetaB)} % 1.400
+  \draw[curve, z07color] plot[domain=0:2.0, samples=200]
+    ({\x*4}, {\A*(1 - \invB*exp(-\zwB*\x)*sin(\wdBdeg*\x + \phiBdeg))});
+
+  % ζ = 1.0 (critically damped, ωn=10)
+  % y(t) = A*[1 - (1 + ωn t) exp(-ωn t)]
+  \pgfmathsetmacro{\wnC}{10}
+  \draw[curve, z10color] plot[domain=0:2.0, samples=200]
+    ({\x*4}, {\A*(1 - (1 + \wnC*\x)*exp(-\wnC*\x))});
+
+  % Legend
+  \node[font=\small\bfseries, z05color, right] at (5.2, 4.8)
+    {$\zeta = 0.5$};
+  \node[font=\small\bfseries, z07color, right] at (5.2, 4.2)
+    {$\zeta = 0.7$};
+  \node[font=\small\bfseries, z10color, right] at (5.2, 3.0)
+    {$\zeta = 1.0$};
+
+  % Overshoot annotation for ζ=0.5
+  \pgfmathsetmacro{\peakY}{\A*(1+exp(-3.14159*\zetaA/sqrt(1-\zetaA*\zetaA)))}
+  \draw[z05color, line width=0.6pt, dashed]
+    (1.45, \A) -- (1.45, \peakY);
+  \node[font=\tiny, z05color, above] at (1.45, \peakY) {16\%};
+
+\end{tikzpicture}
+\end{document}
