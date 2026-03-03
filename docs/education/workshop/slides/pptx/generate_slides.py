@@ -1205,7 +1205,7 @@ def build_lesson_07() -> Presentation:
     add_content_slide(prs, "実習: データ取得 / Hands-on: Data Acquisition", [
         "L5 の P 制御（Kp=0.5）で飛行し、テレメトリデータを取得",
         "",
-        "1. student.cpp に Kp をセット（例: 0.5）",
+        "1. user_code.cpp に Kp をセット（例: 0.5）",
         "2. sf build workshop → sf flash vehicle",
         "3. ホバリング中にスティック操作（2〜3回で十分）",
         "4. PC でデータ受信: sf log wifi -o flight.csv",
