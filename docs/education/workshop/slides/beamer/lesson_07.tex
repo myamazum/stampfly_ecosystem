@@ -183,6 +183,9 @@ sf log wifi -o flight.csv
 % Slide 8: Model Verification
 % ------------------------------------------------------------------
 \begin{frame}{モデル検証 / Model Verification}
+  \vspace{-0.3em}
+
+  {\small
   \begin{table}
     \centering
     \begin{tabular}{lccccc}
@@ -195,8 +198,9 @@ sf log wifi -o flight.csv
       \hline
     \end{tabular}
   \end{table}
+  }
 
-  \vspace{0.5em}
+  \vspace{0.2em}
 
   \begin{block}{設計 $K_p$ の計算（$\zeta = 0.7$）}
     \vspace{-0.5em}
@@ -206,11 +210,11 @@ sf log wifi -o flight.csv
     \vspace{-1em}
   \end{block}
 
-  \vspace{0.3em}
+  \vspace{0.2em}
 
   \begin{exampleblock}{考察}
-    {\small
-    \begin{itemize}
+    {\footnotesize
+    \begin{itemize}\setlength{\itemsep}{0pt}
       \item 同定値と理論値のずれ → モデル誤差・無駄時間が原因
       \item 同定 $K$, $\tau_m$ で設計した $K_p$ は L6 の理論値と近いか?
     \end{itemize}
