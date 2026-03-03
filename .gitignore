@@ -85,6 +85,19 @@ tools/log_analyzer/*.png
 *.hex
 *.map
 
+# ====================
+# LaTeX build artifacts
+# ====================
+*.aux
+*.fdb_latexmk
+*.fls
+*.nav
+*.out
+*.snm
+*.toc
+*.vrb
+*.synctex.gz
+
 # Personal notes
 knote/
 
