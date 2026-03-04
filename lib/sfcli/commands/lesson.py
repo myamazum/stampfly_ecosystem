@@ -275,6 +275,13 @@ def run_switch(args: argparse.Namespace) -> int:
     # Copy file
     shutil.copy2(src, dst)
 
+    # Clean build directory to ensure the new user_code.cpp is compiled
+    # ビルドディレクトリを削除して新しいuser_code.cppが確実にコンパイルされるようにする
+    build_dir = paths.workshop() / "build"
+    if build_dir.exists():
+        shutil.rmtree(build_dir, ignore_errors=True)
+        console.info("Build directory cleaned")
+
     console.success(f"Switched to Lesson {args.number:02d} ({label})")
     console.print(f"  Source: {src}")
     console.print(f"  Target: {dst}")
