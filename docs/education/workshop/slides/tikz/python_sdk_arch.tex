@@ -38,11 +38,11 @@
     -- node[lbl, above] {TCP CLI (port 23)} ($(sf.north)+(0, 1.2)$)
     -- (sf.north);
 
-  % WebSocket connection (bottom): center of bottom edges
-  \draw[biconn, wscolor]
-    (pc.south) -- ++(0, -1.2)
-    -- node[lbl, below, text=wscolor] {WebSocket (port 81)} ($(sf.south)+(0, -1.2)$)
-    -- (sf.south);
+  % WebSocket connection (bottom): unidirectional StampFly → PC (telemetry broadcast)
+  \draw[conn, wscolor]
+    (sf.south) -- ++(0, -1.2)
+    -- node[lbl, below, text=wscolor] {WebSocket (port 81)} ($(pc.south)+(0, -1.2)$)
+    -- (pc.south);
 
   % Labels on the horizontal segments of the paths
   \node[font=\scriptsize, blockcolor, below left] at ($(sf.north)+(0, 1.2)$) {commands};
