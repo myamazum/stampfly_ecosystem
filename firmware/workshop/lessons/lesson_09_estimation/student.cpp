@@ -49,4 +49,16 @@ void loop_400Hz(float dt)
     // TODO: Print values every 200ms (80 ticks)
     // 200ms毎に値を表示する（CF vs ESKF を比較）
     // 200ms毎に値を表示する
+
+    // TODO: Add Teleplot output for real-time graphing (every 4 ticks = 100Hz)
+    // TODO: Teleplot出力を追加してリアルタイムグラフ化（4tick毎 = 100Hz）
+    // VSCode Teleplot extension: alexnesnes.teleplot
+    // Format: ws::print(">variable_name:%.2f", value);
+    // Example / 例:
+    //   if (tick % 4 == 0) {
+    //       ws::print(">cf_roll:%.2f", cf_roll * 57.3f);
+    //       ws::print(">cf_pitch:%.2f", cf_pitch * 57.3f);
+    //       ws::print(">eskf_roll:%.2f", eskf_roll * 57.3f);
+    //       ws::print(">eskf_pitch:%.2f", eskf_pitch * 57.3f);
+    //   }
 }

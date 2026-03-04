@@ -27,7 +27,7 @@
 |------|------|-----------|------|
 | 13:00-14:00 | **Lesson 2: コントローラ入力** | `ws::rc_*()` | ESP-NOW、スティック値、開ループ制御 |
 | 14:00-15:00 | **Lesson 3: LED 表示** | `ws::led_color()` | WS2812、ARM 状態表示 |
-| 15:00-16:00 | **Lesson 4: IMU センサ取得** | `ws::gyro_*()`, `ws::telemetry_send()`, `sf log wifi` | 座標系、テレメトリ可視化 |
+| 15:00-16:00 | **Lesson 4: IMU センサ取得** | `ws::gyro_*()`, Teleplot, `sf monitor` | 座標系、Teleplot 可視化 |
 
 ### エコシステム紹介の内容 (Day 1 冒頭 1時間)
 
@@ -61,14 +61,14 @@
 | 時間 | 内容 | ツール/API | 備考 |
 |------|------|-----------|------|
 | 9:00-10:30 | **Lesson 8: PID 制御** | I 項/D 項追加 | モデルベース Kp + アンチワインドアップ |
-| 10:30-12:00 | **Lesson 9: 姿勢推定** | 相補フィルタ → ESKF 比較 | センサフュージョンの基礎 |
+| 10:30-12:00 | **Lesson 9: 姿勢推定** | 相補フィルタ + Teleplot | CF 実装 + Madgwick/EKF/ESKF 紹介 |
 
 ### 午後 (13:00-16:00)
 
 | 時間 | 内容 | ツール/API | 備考 |
 |------|------|-----------|------|
-| 13:00-14:00 | 姿勢制御（カスケード導入） | Angle → Rate カスケード | |
-| 14:00-16:00 | **エコシステム深掘り + 自由練習** | `sf sysid`, `sf cal`, ESKF Sim | デモ + 自由練習 |
+| 13:00-14:30 | **Lesson 10: API 総覧とセンサ活用** | StampFlyState, `sf app new`, Teleplot | 全 API + 独自ファーム作成 |
+| 14:30-16:00 | 自由練習 + エコシステム深掘り | `sf sysid`, `sf cal`, ESKF Sim | デモ + 自由練習 |
 
 ## 5. Day 4: Python SDK + 競技会準備 (6h)
 
@@ -76,23 +76,22 @@
 
 | 時間 | 内容 | ツール/API | 備考 |
 |------|------|-----------|------|
-| 9:00-10:30 | **Lesson 10: Python SDK プログラム飛行** | `StampFly`, `connect_or_simulate()`, Jupyter | |
-| 10:30-12:00 | **Lesson 10 続: RC 制御 + 自律飛行** | `send_rc_control()`, `get_telemetry()` | 外部 PID |
+| 9:00-12:00 | **Lesson 11: Python SDK プログラム飛行** | `StampFly`, `connect_or_simulate()`, Jupyter | 将来像解説、Tello 互換 |
 
 ### 午後 (13:00-16:00)
 
 | 時間 | 内容 | ツール/API | 備考 |
 |------|------|-----------|------|
-| 13:00-13:30 | **Lesson 11: 競技会ルール説明** | スライド | |
+| 13:00-13:30 | **Lesson 12: 精密着陸競技会ルール説明** | スライド | 3m 先のヘリポートに着陸 |
 | 13:30-16:00 | 競技会準備・自由練習・予選 | 全ツール | |
 
-## 6. Day 5: ホバリングタイム競技会 + アンケート (半日)
+## 6. Day 5: 精密着陸競技会 + アンケート (半日)
 
 ### 種目
 
 | 種目 | 内容 | 評価基準 | ツール |
 |------|------|---------|--------|
-| ホバリングタイム | 角速度フィードバック制御でホバリング | 滞空時間（最長60秒） | `sf competition hover-time` |
+| 精密着陸 | パイロット定位置から3m先のヘリポートに着陸 | 着陸タイム（ベスト採用） | Teleplot, `sf monitor` |
 
 ### タイムスケジュール
 
@@ -115,6 +114,7 @@
 | 予備バッテリー | 人数分 | |
 | 充電器 | 3-4台 | |
 | 安全ネット/フェンス | 適量 | フライトエリア囲い |
+| ヘリポートマット | 2枚 | 40cm × 40cm |
 | プロジェクター | 1台 | |
 | WiFi ルーター | 1台 | 開発環境用（StampFly WiFi とは別） |
 
@@ -148,7 +148,7 @@
 | 11:00-12:00 | Lesson 1: Motor control | `ws::motor_set_duty()` |
 | 13:00-14:00 | Lesson 2: Controller input | `ws::rc_*()` |
 | 14:00-15:00 | Lesson 3: LED display | `ws::led_color()` |
-| 15:00-16:00 | Lesson 4: IMU sensors | `ws::gyro_*()`, `sf log wifi` |
+| 15:00-16:00 | Lesson 4: IMU sensors | `ws::gyro_*()`, Teleplot |
 
 ## 3. Day 2: Feedback Control (6h)
 
@@ -164,20 +164,19 @@
 | Time | Content | Tools |
 |------|---------|-------|
 | 9:00-10:30 | Lesson 8: PID control | Model-based Kp + anti-windup |
-| 10:30-12:00 | Lesson 9: Attitude estimation | Complementary filter, ESKF |
-| 13:00-14:00 | Cascade control introduction | Angle → Rate |
-| 14:00-16:00 | Deep dive + free practice | `sf sysid`, `sf cal`, ESKF Sim |
+| 10:30-12:00 | Lesson 9: Attitude estimation | Complementary filter + Teleplot, Madgwick/EKF/ESKF intro |
+| 13:00-14:30 | Lesson 10: API overview + sensor exploration | StampFlyState, `sf app new`, Teleplot |
+| 14:30-16:00 | Free practice + ecosystem deep dive | `sf sysid`, `sf cal`, ESKF Sim |
 
 ## 5. Day 4: Python SDK + Competition Prep (6h)
 
 | Time | Content | Tools |
 |------|---------|-------|
-| 9:00-10:30 | Lesson 10: Python SDK flight | `StampFly`, Jupyter |
-| 10:30-12:00 | Lesson 10 cont.: Autonomous flight | `send_rc_control()` |
-| 13:00-13:30 | Lesson 11: Competition rules | Slides |
+| 9:00-12:00 | Lesson 11: Python SDK programmatic flight | `StampFly`, Tello compat, Jupyter |
+| 13:00-13:30 | Lesson 12: Precision landing competition rules | Slides |
 | 13:30-16:00 | Competition prep / qualifying | All tools |
 
-## 6. Day 5: Hover Time Competition + Survey (half day)
+## 6. Day 5: Precision Landing Competition + Survey (half day)
 
 | Time | Content |
 |------|---------|

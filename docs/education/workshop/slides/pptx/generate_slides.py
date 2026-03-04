@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate StampFly Workshop slides (Lesson 0-9) as PowerPoint files.
+"""Generate StampFly Workshop slides (Lesson 0-12) as PowerPoint files.
 
 Usage:
     python generate_slides.py              # Generate all lessons
@@ -1381,7 +1381,7 @@ def build_lesson_09() -> Presentation:
         "",
         "• ジャイロ積分のドリフト問題を理解",
         "• 相補フィルタで加速度センサとジャイロを融合",
-        "• テレメトリで CF vs ESKF をリアルタイム比較",
+        "• Teleplot で CF vs ESKF をリアルタイム比較",
     ])
 
     add_content_slide(
@@ -1410,7 +1410,7 @@ def build_lesson_09() -> Presentation:
         image_path=IMAGES_DIR / "comp_filter.png",
     )
 
-    add_code_slide(prs, "実習: 相補フィルタ実装", """
+    add_code_slide(prs, "実習: 相補フィルタ + Teleplot", """
 #include "workshop_api.hpp"
 #include <cmath>
 static float cf_roll = 0.0f, cf_pitch = 0.0f;
@@ -1430,17 +1430,80 @@ void loop_400Hz(float dt) {
     cf_pitch = alpha*(cf_pitch + gy*dt)
              + (1-alpha)*accel_pitch;
 
-    ws::telemetry_send("cf_roll",  cf_roll*57.3f);
-    ws::telemetry_send("eskf_roll",
-                       ws::estimated_roll()*57.3f);
+    // Teleplot output (VSCode Teleplot extension)
+    ws::print(">cf_roll:%.1f", cf_roll*57.3f);
+    ws::print(">eskf_roll:%.1f",
+              ws::estimated_roll()*57.3f);
 }
 """)
 
+    add_content_slide(prs, "Teleplot によるリアルタイム可視化", [
+        "Teleplot フォーマット: >変数名:値 をシリアルに出力するだけ",
+        "",
+        "ws::print(\">cf_roll:%.2f\", cf_roll * 57.3f);",
+        "ws::print(\">eskf_roll:%.2f\", ws::estimated_roll() * 57.3f);",
+        "",
+        "セットアップ:",
+        "1. VSCode 拡張: alexnesnes.teleplot をインストール",
+        "2. sf monitor でシリアル接続",
+        "3. Teleplot パネルで自動グラフ化",
+        "",
+        "注意: 400Hz 全 tick で出力するとシリアル帯域に負荷。4 tick 毎（100Hz）にデシメーション推奨",
+    ])
+
+    add_content_slide(prs, "Madgwick フィルタ", [
+        "勾配降下法によるクォータニオン推定",
+        "チューニングパラメータが β の1つだけ",
+        "",
+        "状態: q = [q₀, q₁, q₂, q₃]",
+        "予測: q̇ = ½ q ⊗ ω",
+        "補正勾配: ∇f = Jᵀ(q̂, d̂) · f(q̂, d̂)",
+        "更新: q_{t+1} = q_t + dt·(½ q_t ⊗ ω − β · ∇f / |∇f|)",
+        "",
+        "f: 加速度/磁気の目的関数、J: そのヤコビアン、β: 補正ゲイン (≈ 0.04)",
+    ])
+
+    add_content_slide(prs, "EKF（拡張カルマンフィルタ）", [
+        "非線形カルマンフィルタの5ステップ",
+        "状態ベクトル例: x = [φ, θ, ψ, b_gx, b_gy, b_gz]ᵀ",
+        "",
+        "1. 状態予測: x̂⁻ = f(x̂, u)  ← ジャイロで姿勢を積分",
+        "2. 共分散予測: P⁻ = FPFᵀ + Q  ← 不確かさの伝播",
+        "3. カルマンゲイン: K = P⁻Hᵀ(HP⁻Hᵀ+R)⁻¹",
+        "4. 状態更新: x̂ = x̂⁻ + K(z − h(x̂⁻))  ← 観測で補正",
+        "5. 共分散更新: P = (I − KH)P⁻  ← 不確かさを縮小",
+    ])
+
+    add_content_slide(prs, "ESKF（誤差状態カルマンフィルタ）", [
+        "StampFly で実際に使われている 15 状態 ESKF",
+        "名目状態 + 誤差状態の分離アーキテクチャ",
+        "",
+        "誤差状態ベクトル（15 states）:",
+        "δx = [δp, δv, δθ, δb_g, δb_a]ᵀ",
+        "",
+        "予測: 名目状態はジャイロ/加速度で直接積分、誤差共分散のみ伝播",
+        "更新: 気圧/ToF/磁気/光学フローの各観測で誤差状態を補正",
+        "",
+        "利点: 誤差状態は常に小さいため線形化が正確",
+    ])
+
+    add_table_slide(prs, "推定手法の比較 / Estimator Comparison",
+        ["", "相補フィルタ", "Madgwick", "EKF", "ESKF"],
+        [
+            ["計算量", "極小", "小", "中", "中〜大"],
+            ["パラメータ数", "1 (α)", "1 (β)", "Q, R 行列", "Q, R 行列"],
+            ["推定対象", "Roll/Pitch", "Roll/Pitch/Yaw", "姿勢+バイアス", "位置/速度/姿勢/バイアス"],
+            ["使用センサ", "Gyro+Accel", "Gyro+Accel+Mag", "Gyro+Accel+Mag", "全センサ（6種）"],
+            ["精度", "○", "◎", "◎", "◎◎"],
+        ],
+    )
+
     add_checkpoint_slide(prs, [
         "手で傾けると CF のロール・ピッチが変化する",
-        "CF と ESKF の値が概ね一致する",
+        "CF と ESKF の値が概ね一致する（Teleplot で確認）",
         "α を変えて応答の違いを観察した",
-    ], "TBD")
+        "Madgwick / EKF / ESKF の特徴を説明できる",
+    ], "Lesson 10: API 総覧とアプリケーション開発")
 
     return prs
 
@@ -1448,14 +1511,134 @@ void loop_400Hz(float dt) {
 def build_lesson_10() -> Presentation:
     prs = new_presentation()
 
-    add_title_slide(prs, "Lesson 10: Python SDK プログラム飛行", "Python SDK Flight")
+    add_title_slide(prs, "Lesson 10: API 総覧とアプリケーション開発",
+                    "API Overview & App Development")
 
     add_content_slide(prs, "今日のゴール / Today's Goal", [
-        "Python SDK でプログラム飛行を実現する",
+        "ws:: API の全体像を理解し、独自ファームウェアで全センサにアクセスする",
         "",
-        "• WiFi 経由で PC から StampFly を制御",
-        "• SDK API で離陸・移動・着陸をプログラム化",
-        "• RC 制御値の送信とテレメトリの取得",
+        "• ws:: API のカテゴリ別全関数を把握",
+        "• StampFlyState で全センサに直接アクセス",
+        "• sf app new で独自ファームウェアプロジェクトを作成",
+    ])
+
+    add_table_slide(prs, "ws:: API 一覧 / ws:: API Reference",
+        ["カテゴリ", "関数", "説明"],
+        [
+            ["Motor", "motor_set_duty(m, d), motor_mixer(t,r,p,y)", "モータ制御"],
+            ["RC Input", "rc_throttle/roll/pitch/yaw()", "スティック値 [-1,1]"],
+            ["Buttons", "rc_throttle_yaw_button(), rc_stabilize_acro_mode()", "ボタン/モード"],
+            ["LED", "led_color(r,g,b), disable_led_task()", "LED 制御"],
+            ["IMU", "gyro_x/y/z(), accel_x/y/z()", "角速度, 加速度"],
+            ["Estimation", "estimated_roll/pitch/yaw/altitude()", "ESKF 推定値"],
+            ["Utility", "millis(), battery_voltage(), print()", "時刻, 電圧, 出力"],
+        ],
+    )
+
+    add_table_slide(prs, "StampFlyState: 全センサアクセス",
+        ["メソッド", "センサ", "取得データ"],
+        [
+            ["getBaroData()", "BMP280 気圧", "高度 [m], 気圧 [Pa]"],
+            ["getMagData()", "BMM150 磁気", "磁気 x,y,z [uT]"],
+            ["getToFData(pos)", "VL53L3CX ToF", "下方/前方距離 [m]"],
+            ["getFlowData()", "PMW3901 光学フロー", "速度 vx,vy [m/s]"],
+            ["getPowerData()", "電源", "電圧 [V], 電流 [A]"],
+        ],
+    )
+
+    add_table_slide(prs, "ハードウェアセンサ仕様 / Hardware Sensors",
+        ["センサ", "型番", "サンプルレート", "測定量"],
+        [
+            ["IMU", "BMI270", "400 Hz", "加速度 + ジャイロ"],
+            ["気圧", "BMP280", "50 Hz", "気圧 → 高度"],
+            ["磁気", "BMM150", "10-30 Hz", "磁気ベクトル"],
+            ["ToF（下方）", "VL53L3CX", "30 Hz", "対地距離（0-2 m）"],
+            ["ToF（前方）", "VL53L3CX", "30 Hz", "前方距離（0-2 m）"],
+            ["光学フロー", "PMW3901", "100 Hz", "対地速度"],
+        ],
+    )
+
+    add_content_slide(prs, "エコシステム概要 / Ecosystem Overview", [
+        "【開発ツール】",
+        "• sf build / flash / monitor",
+        "• sf cal gyro/accel/mag",
+        "• sf log wifi / capture / viz",
+        "• sf sim list / run",
+        "",
+        "【解析・応用】",
+        "• Python SDK（開発中）",
+        "• Jupyter Notebooks",
+        "• Genesis シミュレータ",
+        "• フライトログ解析",
+    ])
+
+    add_content_slide(prs, "独自ファーム作成: sf app new", [
+        "sf app new でカスタムプロジェクトを生成",
+        "vehicle のコンポーネントを再利用しつつ、独自の main.cpp を記述",
+        "",
+        "# sf app new my_drone",
+        "#  → firmware/my_drone/ が生成される",
+        "# sf build my_drone",
+        "# sf flash my_drone -m",
+        "",
+        "仕組み: EXTRA_COMPONENT_DIRS で vehicle/components と common を参照",
+        "IMU, 気圧, ToF, 光学フロー, モーター等すべてのコンポーネントが使える",
+    ])
+
+    add_content_slide(prs, "Teleplot によるセンサ可視化", [
+        "L09 で導入した Teleplot を活用",
+        "",
+        "printf(\">baro_alt:%.2f\\n\", baro.altitude);",
+        "printf(\">tof_bottom:%.3f\\n\", tof.distance);",
+        "printf(\">eskf_alt:%.2f\\n\", att.z);",
+        "printf(\">mag_x:%.1f\\n\", mag.x);",
+        "printf(\">flow_vx:%.3f\\n\", flow.vx);",
+        "",
+        "複数センサの同時グラフ化で",
+        "気圧高度 vs ToF vs ESKF 推定高度の比較が可能",
+    ])
+
+    add_code_slide(prs, "実習: 全センサ読み取り", """
+#include "workshop_api.hpp"
+#include "stampfly_state.hpp"
+void setup() { ws::print("Lesson 10: API Overview"); }
+void loop_400Hz(float dt) {
+    static uint32_t tick = 0; tick++;
+    if (tick % 8 != 0) return;  // 50 Hz
+    auto& s = StampFlyState::getInstance();
+    auto baro = s.getBaroData();
+    auto tof  = s.getToFData(ToFPosition::BOTTOM);
+    auto mag  = s.getMagData();
+    // Teleplot output
+    ws::print(">baro_alt:%.2f", baro.altitude);
+    ws::print(">tof_bottom:%.3f", tof.distance);
+    float heading = atan2f(-mag.y, mag.x) * 57.3f;
+    ws::print(">heading:%.1f", heading);
+}
+""")
+
+    add_checkpoint_slide(prs, [
+        "ws:: API の全カテゴリを把握した",
+        "StampFlyState で全センサ値を取得できた",
+        "Teleplot で複数センサのグラフを同時表示した",
+        "sf app new でカスタムプロジェクトを作成できた",
+    ], "Lesson 11: Python SDK プログラム飛行")
+
+    return prs
+
+
+def build_lesson_11() -> Presentation:
+    prs = new_presentation()
+
+    add_title_slide(prs, "Lesson 11: Python SDK プログラム飛行",
+                    "Python SDK Programmatic Flight")
+
+    add_content_slide(prs, "今日のゴール / Today's Goal", [
+        "Python SDK の設計思想と将来の自律飛行の姿を理解する",
+        "",
+        "• SDK アーキテクチャ（TCP CLI + WebSocket）を理解",
+        "• Python API で離陸・移動・着陸をプログラム化",
+        "• Tello SDK 互換設計の利点を知る",
     ])
 
     add_content_slide(
@@ -1483,7 +1666,21 @@ def build_lesson_10() -> Presentation:
         ["end()", "切断", "リソース解放"],
     ])
 
-    add_code_slide(prs, "実習1: 基本プログラム飛行", """
+    add_content_slide(prs, "Tello SDK との互換性", [
+        "djitellopy 互換設計",
+        "Tello のコードをほぼそのまま StampFly に移植可能",
+        "",
+        "• 同じ API 名（takeoff, land, move_forward...）",
+        "• connect_or_simulate() でオフライン開発も可能",
+        "• 大学の Tello 教材を流用可能",
+        "",
+        "【StampFly の利点】",
+        "• 内部の PID ゲインを自由に変更可能",
+        "• テレメトリを 400 Hz で取得",
+        "• 制御理論の実験プラットフォーム",
+    ])
+
+    add_code_slide(prs, "コード例: 基本フライト", """
 from stampfly import StampFly
 
 drone = StampFly()
@@ -1498,7 +1695,7 @@ drone.land()
 drone.end()
 """, filename="flight_basic.py")
 
-    add_code_slide(prs, "実習2: RC制御 + テレメトリ", """
+    add_code_slide(prs, "コード例: テレメトリ取得", """
 import time
 from stampfly import StampFly
 
@@ -1515,40 +1712,58 @@ for _ in range(50):
 
 drone.land()
 drone.end()
-""", filename="flight_rc.py")
+""", filename="flight_telemetry.py")
+
+    add_table_slide(prs, "開発ロードマップ / Development Roadmap",
+        ["状態", "機能"],
+        [
+            ["✅", "TCP CLI 通信（port 23）"],
+            ["✅", "WebSocket テレメトリ（port 81）"],
+            ["✅", "ws:: ワークショップ API"],
+            ["✅", "sf CLI ツール群"],
+            ["🔧", "Python SDK パッケージ"],
+            ["🔧", "connect_or_simulate()"],
+            ["📋", "Jupyter Notebook 連携"],
+            ["📋", "自律ミッション（ウェイポイント）"],
+        ],
+    )
 
     add_checkpoint_slide(prs, [
-        "WiFi AP に接続し connect() が成功する",
-        "takeoff() → move_forward() → land() が動作する",
-        "get_telemetry() で高度データを取得できる",
-    ], "Lesson 11: ホバリングタイム競技会 ルール説明")
+        "SDK アーキテクチャ（TCP + WebSocket）を理解した",
+        "Python API の基本関数を把握した",
+        "Tello 互換の設計意図を理解した",
+        "開発ロードマップを確認した",
+    ], "Lesson 12: 精密着陸競技会 ルール説明")
 
     return prs
 
 
-def build_lesson_11() -> Presentation:
+def build_lesson_12() -> Presentation:
     prs = new_presentation()
 
-    add_title_slide(prs, "Lesson 11: ホバリングタイム競技会", "Hover Time Competition")
+    add_title_slide(prs, "Lesson 12: 精密着陸競技会",
+                    "Precision Landing Competition")
 
     add_content_slide(prs, "競技会概要 / Competition Overview", [
-        "ホバリングタイム競技",
-        "PID 制御で安定ホバリングし、滞空時間を競う",
+        "精密着陸競技",
+        "パイロットは定位置から操縦し、3m 先のヘリポートに精密着陸する",
         "",
-        "• 種目: ホバリングタイム（角速度フィードバック制御）",
-        "• 目標: 最長 60 秒の安定ホバリング",
-        "• 評価: 滞空時間（ベストタイム採用）",
-        "• ツール: sf competition hover-time",
+        "• 種目: 精密着陸（パイロット定位置、3m 先のヘリポートに着陸）",
+        "• ヘリポート: 約 40cm × 40cm",
+        "• 評価: 着陸までのタイム（ベストタイム採用）",
     ])
 
     add_table_slide(prs, "競技ルール詳細 / Competition Rules",
         ["項目", "内容"],
         [
-            ["種目", "ホバリングタイム（角速度フィードバック制御）"],
-            ["制限時間", "最長 60 秒"],
+            ["種目", "精密着陸（パイロット定位置操縦）"],
+            ["距離", "パイロットからヘリポートまで 3m"],
+            ["ヘリポート", "40cm × 40cm"],
+            ["制限時間", "60 秒"],
             ["試行回数", "3 回（ベストタイム採用）"],
-            ["判定", "離陸〜接地までの滞空時間"],
-            ["失格条件", "安全エリア外への飛行、手による介入"],
+            ["判定", "ARM → 離陸 → ヘリポート着陸までの時間"],
+            ["パイロット", "定位置から動かない"],
+            ["失格条件", "安全エリア外飛行、手による介入、パイロットの移動"],
         ],
     )
 
@@ -1566,16 +1781,16 @@ def build_lesson_11() -> Presentation:
 
     add_content_slide(prs, "攻略のヒント / Tips for Success", [
         "【PID ゲイン調整】",
-        "• まず P ゲインだけで安定させる",
-        "• 振動が出たら D ゲインを追加",
-        "• 定常偏差があれば I ゲインを微調整",
+        "• 安定性重視（急旋回よりも穏やかな応答）",
+        "• ヨー制御で方向を合わせる",
+        "• スロットル微調整で高度を安定させる",
         "",
-        "【バッテリ & 安全】",
-        "• フル充電で本番に臨む",
-        "• プロペラの取付を再確認",
-        "• 異常振動はすぐに着陸",
+        "【練習のポイント】",
+        "• まず安定ホバリングを確立",
+        "• 前進 → 停止 → 降下の手順を練習",
+        "• バッテリ・プロペラを毎回チェック",
         "",
-        "テレメトリ活用: sf log wifi でリアルタイムデータを確認",
+        "テレメトリ活用: Teleplot でリアルタイムデータを確認",
     ])
 
     add_checkpoint_slide(prs, [
@@ -1605,12 +1820,13 @@ BUILDERS = {
     9: build_lesson_09,
     10: build_lesson_10,
     11: build_lesson_11,
+    12: build_lesson_12,
 }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate StampFly workshop PPTX")
-    parser.add_argument("--lesson", type=int, help="Lesson number (0-11)")
+    parser.add_argument("--lesson", type=int, help="Lesson number (0-12)")
     args = parser.parse_args()
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

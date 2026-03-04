@@ -21,7 +21,7 @@
   \begin{itemize}
     \item ジャイロ積分のドリフト問題を理解
     \item 相補フィルタで加速度センサとジャイロを融合
-    \item テレメトリで CF vs ESKF をリアルタイム比較
+    \item Teleplot で CF vs ESKF をリアルタイム比較
   \end{itemize}
 \end{frame}
 
@@ -70,7 +70,7 @@
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{実習: 相補フィルタ実装 / Hands-on}
+\begin{frame}[fragile]{実習: 相補フィルタ + Teleplot / Hands-on}
   \begin{lstlisting}[style=sfcpp, title={user\_code.cpp (excerpt)}]
 #include "workshop_api.hpp"
 #include <cmath>
@@ -87,11 +87,157 @@ void loop_400Hz(float dt) {
              + (1-alpha)*accel_roll;
     cf_pitch = alpha*(cf_pitch + gy*dt)
              + (1-alpha)*accel_pitch;
-    ws::telemetry_send("cf_roll",  cf_roll*57.3f);
-    ws::telemetry_send("eskf_roll",
-                       ws::estimated_roll()*57.3f);
+    // Teleplot output (VSCode Teleplot extension)
+    ws::print(">cf_roll:%.1f", cf_roll*57.3f);
+    ws::print(">eskf_roll:%.1f",
+              ws::estimated_roll()*57.3f);
 }
   \end{lstlisting}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Teleplot によるリアルタイム可視化}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \begin{block}{Teleplot フォーマット}
+        \api{>変数名:値} をシリアルに出力するだけ
+      \end{block}
+      \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+// Teleplot format: >name:value
+ws::print(">cf_roll:%.2f", cf_roll * 57.3f);
+ws::print(">cf_pitch:%.2f", cf_pitch * 57.3f);
+ws::print(">eskf_roll:%.2f",
+           ws::estimated_roll() * 57.3f);
+      \end{lstlisting}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \begin{exampleblock}{セットアップ}
+        \begin{enumerate}
+          \item VSCode 拡張: \texttt{alexnesnes.teleplot} をインストール
+          \item \api{sf monitor} でシリアル接続
+          \item Teleplot パネルで自動グラフ化
+        \end{enumerate}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.5em}
+  {\footnotesize \textbf{注意:} 400\,Hz 全 tick で出力するとシリアル帯域に負荷。4\,tick 毎（100\,Hz）にデシメーション推奨}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Madgwick フィルタ / Madgwick Filter}
+  \begin{block}{勾配降下法によるクォータニオン推定}
+    チューニングパラメータが $\beta$ の \textbf{1つだけ} --- シンプルかつ高精度
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      {\small
+      \begin{itemize}
+        \item 状態: $\mathbf{q} = [q_0,\, q_1,\, q_2,\, q_3]$
+        \item 予測: $\dot{\mathbf{q}} = \tfrac{1}{2}\,\mathbf{q} \otimes \boldsymbol{\omega}$
+        \item 補正勾配:\\[2pt]
+              $\nabla f = \mathbf{J}^T(\hat{\mathbf{q}},\,\hat{\mathbf{d}})\;\mathbf{f}(\hat{\mathbf{q}},\,\hat{\mathbf{d}})$
+      \end{itemize}
+      }
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{更新則}
+        $\mathbf{q}_{t+1} = \mathbf{q}_t + \Delta t\Bigl(\tfrac{1}{2}\,\mathbf{q}_t \otimes \boldsymbol{\omega} - \beta\,\dfrac{\nabla f}{|\nabla f|}\Bigr)$
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+  {\footnotesize $\mathbf{f}$: 加速度/磁気の目的関数、$\mathbf{J}$: そのヤコビアン、$\beta$: 補正ゲイン（$\approx 0.04$）}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{EKF（拡張カルマンフィルタ）}
+  \begin{block}{非線形カルマンフィルタの5ステップ}
+    状態ベクトル例: $\mathbf{x} = [\phi,\;\theta,\;\psi,\;b_{gx},\;b_{gy},\;b_{gz}]^T$
+  \end{block}
+
+  \vspace{0.3em}
+
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{ステップ} & \textbf{数式} & \textbf{意味} \\
+    \hline
+    状態予測 & $\hat{\mathbf{x}}^- = f(\hat{\mathbf{x}},\,\mathbf{u})$ & ジャイロで姿勢を積分 \\
+    共分散予測 & $\mathbf{P}^- = \mathbf{F}\mathbf{P}\mathbf{F}^T + \mathbf{Q}$ & 不確かさの伝播 \\
+    カルマンゲイン & $\mathbf{K} = \mathbf{P}^-\mathbf{H}^T(\mathbf{H}\mathbf{P}^-\mathbf{H}^T + \mathbf{R})^{-1}$ & 予測と観測の信頼度配分 \\
+    状態更新 & $\hat{\mathbf{x}} = \hat{\mathbf{x}}^- + \mathbf{K}(\mathbf{z} - h(\hat{\mathbf{x}}^-))$ & 観測で補正 \\
+    共分散更新 & $\mathbf{P} = (\mathbf{I} - \mathbf{K}\mathbf{H})\mathbf{P}^-$ & 不確かさを縮小 \\
+    \hline
+  \end{tabular}
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{ESKF（誤差状態カルマンフィルタ）}
+  \begin{block}{StampFly で実際に使われている 15 状態 ESKF}
+    名目状態 + 誤差状態の分離アーキテクチャ
+  \end{block}
+
+  \vspace{0.3em}
+
+  {\small
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \textbf{誤差状態ベクトル（15 states）:}
+      \[
+        \delta\mathbf{x} = [\delta\mathbf{p},\;\delta\mathbf{v},\;\delta\boldsymbol{\theta},\;\delta\mathbf{b}_g,\;\delta\mathbf{b}_a]^T
+      \]
+      \begin{itemize}
+        \item 予測: 名目状態はジャイロ/加速度で直接積分
+        \item 誤差共分散のみ伝播
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{観測更新:}
+      \begin{itemize}
+        \item 気圧 → 高度補正
+        \item ToF → 対地高度補正
+        \item 磁気 → ヨー補正
+        \item 光学フロー → 速度補正
+      \end{itemize}
+      \vspace{0.3em}
+      \begin{alertblock}{利点}
+        誤差状態は常に小さい → 線形化が正確
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{推定手法の比較 / Estimator Comparison}
+  \centering
+  {\small
+  \begin{tabular}{lcccc}
+    \hline
+    & \textbf{相補フィルタ} & \textbf{Madgwick} & \textbf{EKF} & \textbf{ESKF} \\
+    \hline
+    計算量       & 極小           & 小             & 中           & 中〜大 \\
+    パラメータ数  & 1（$\alpha$）  & 1（$\beta$）   & $\mathbf{Q},\mathbf{R}$ 行列 & $\mathbf{Q},\mathbf{R}$ 行列 \\
+    推定対象     & Roll/Pitch     & Roll/Pitch/Yaw & 姿勢 + バイアス & 位置/速度/姿勢/バイアス \\
+    使用センサ   & Gyro + Accel   & Gyro + Accel + Mag & Gyro + Accel + Mag & 全センサ（6種） \\
+    精度         & ○              & ◎             & ◎            & ◎◎ \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.8em}
+
+  {\footnotesize
+    \textbf{StampFly のデフォルト:} ESKF（15 状態）を使用。
+    このレッスンでは相補フィルタを自作し、ESKF と比較して理解を深める。
+  }
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -99,15 +245,16 @@ void loop_400Hz(float dt) {
   \begin{alertblock}{確認事項}
     \begin{itemize}
       \item[$\square$] 手で傾けると CF のロール・ピッチが変化する
-      \item[$\square$] CF と ESKF の値が概ね一致する
+      \item[$\square$] CF と ESKF の値が概ね一致する（Teleplot で確認）
       \item[$\square$] $\alpha$ を変えて応答の違いを観察
+      \item[$\square$] Madgwick / EKF / ESKF の特徴を説明できる
     \end{itemize}
   \end{alertblock}
 
   \vspace{1em}
 
   \begin{block}{次のレッスン}
-    TBD --- 今後のカリキュラムで決定
+    Lesson 10: API 総覧とアプリケーション開発
   \end{block}
 \end{frame}
 

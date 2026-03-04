@@ -1,7 +1,7 @@
 \documentclass[aspectratio=169, 14pt]{beamer}
 \usepackage{stampfly_slides}
 
-\lesson{10}{Python SDK プログラム飛行}{Python SDK Flight}
+\lesson{10}{API 総覧とアプリケーション開発}{API Overview \& App Development}
 
 \begin{document}
 
@@ -13,96 +13,183 @@
 % ------------------------------------------------------------------
 \begin{frame}{今日のゴール / Today's Goal}
   \begin{block}{目標}
-    Python SDK でプログラム飛行を実現する
+    ws:: API の全体像を理解し、独自ファームウェアで全センサにアクセスする
   \end{block}
 
   \vspace{1em}
 
   \begin{itemize}
-    \item WiFi 経由で PC から StampFly を制御
-    \item SDK API で離陸・移動・着陸をプログラム化
-    \item RC 制御値の送信とテレメトリの取得
+    \item ws:: API のカテゴリ別全関数を把握
+    \item StampFlyState で全センサに直接アクセス
+    \item \api{sf app new} で独自ファームウェアプロジェクトを作成
   \end{itemize}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{SDK アーキテクチャ / SDK Architecture}
-  \centering
-  \resizebox{0.85\linewidth}{!}{\input{../tikz/python_sdk_arch}}
-
-  \vspace{0.5em}
-
-  \begin{columns}[c]
-    \begin{column}{0.48\textwidth}
-      \begin{block}{TCP CLI (port 23)}
-        コマンド送受信（takeoff, land...）
-      \end{block}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \begin{block}{WebSocket (port 81)}
-        テレメトリ受信（400\,Hz RT）
-      \end{block}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-% ------------------------------------------------------------------
-\begin{frame}{Python SDK API}
-  \small
+\begin{frame}{ws:: API 一覧 / ws:: API Reference}
+  {\scriptsize
   \begin{tabular}{lll}
     \hline
-    \textbf{関数} & \textbf{説明} & \textbf{備考} \\
+    \textbf{カテゴリ} & \textbf{関数} & \textbf{説明} \\
     \hline
-    \api{StampFly(host)} & インスタンス生成 & デフォルト 192.168.4.1 \\
-    \api{connect()} & WiFi 接続 & TCP CLI + WS \\
-    \api{takeoff()} & 離陸 & ブロッキング \\
-    \api{land()} & 着陸 & ブロッキング \\
-    \api{move\_forward(cm)} & 前進 & 20--200\,cm \\
-    \api{rotate\_clockwise(deg)} & 時計回り回転 & 1--360° \\
-    \api{send\_rc\_control(lr,fb,ud,yaw)} & RC 制御値送信 & $-100$\textasciitilde$+100$ \\
-    \api{get\_telemetry()} & テレメトリ取得 & 400\,Hz dict \\
-    \api{end()} & 切断 & リソース解放 \\
+    Motor   & \api{motor\_set\_duty(m, d)}, \api{motor\_mixer(t,r,p,y)} & モータ制御 \\
+    RC Input & \api{rc\_throttle/roll/pitch/yaw()} & スティック値 $[-1,1]$ \\
+    Buttons  & \api{rc\_throttle\_yaw\_button()}, \api{rc\_stabilize\_acro\_mode()} & ボタン/モード \\
+    LED     & \api{led\_color(r,g,b)}, \api{disable\_led\_task()} & LED 制御 \\
+    IMU     & \api{gyro\_x/y/z()}, \api{accel\_x/y/z()} & 角速度 [rad/s], 加速度 [m/s\textsuperscript{2}] \\
+    Estimation & \api{estimated\_roll/pitch/yaw/altitude()} & ESKF 推定値 [rad], [m] \\
+    Utility & \api{millis()}, \api{battery\_voltage()}, \api{print()} & 時刻, 電圧, 出力 \\
     \hline
   \end{tabular}
+  }
+
+  \vspace{0.5em}
+  {\footnotesize ws:: API はワークショップ用の簡易ラッパー。より深いアクセスには \textbf{StampFlyState} を使用。}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{実習1: 基本プログラム飛行 / Basic Flight}
-  \begin{lstlisting}[style=sfpython, title={flight\_basic.py}]
-from stampfly import StampFly
+\begin{frame}{StampFlyState: 全センサアクセス}
+  \begin{block}{ws:: の裏側にある本体 API}
+    \api{StampFlyState::getInstance()} でシングルトンを取得
+  \end{block}
 
-drone = StampFly()
-drone.connect()
+  \vspace{0.3em}
 
-drone.takeoff()
-drone.move_forward(50)    # 50 cm forward
-drone.rotate_clockwise(90)
-drone.move_forward(50)
-drone.land()
+  {\small
+  \begin{tabular}{llp{55mm}}
+    \hline
+    \textbf{メソッド} & \textbf{センサ} & \textbf{取得データ} \\
+    \hline
+    \api{getBaroData()}    & BMP280 気圧     & 高度 [m], 気圧 [Pa] \\
+    \api{getMagData()}     & BMM150 磁気     & 磁気 x,y,z [$\mu$T] \\
+    \api{getToFData(pos)}  & VL53L3CX ToF    & 下方/前方距離 [m] \\
+    \api{getFlowData()}    & PMW3901 光学フロー & 速度 vx,vy [m/s] \\
+    \api{getFlowRawData()} & PMW3901 Raw     & delta\_x, delta\_y, squal（品質） \\
+    \api{getPowerData()}   & 電源             & 電圧 [V], 電流 [A] \\
+    \hline
+  \end{tabular}
+  }
+\end{frame}
 
-drone.end()
+% ------------------------------------------------------------------
+\begin{frame}{ハードウェアセンサ仕様 / Hardware Sensors}
+  \centering
+  {\small
+  \begin{tabular}{llll}
+    \hline
+    \textbf{センサ} & \textbf{型番} & \textbf{サンプルレート} & \textbf{測定量} \\
+    \hline
+    IMU        & BMI270  & 400\,Hz  & 加速度 + ジャイロ \\
+    気圧       & BMP280  & 50\,Hz   & 気圧 → 高度 \\
+    磁気       & BMM150  & 10--30\,Hz & 磁気ベクトル \\
+    ToF（下方） & VL53L3CX & 30\,Hz  & 対地距離（0--2\,m） \\
+    ToF（前方） & VL53L3CX & 30\,Hz  & 前方距離（0--2\,m） \\
+    光学フロー  & PMW3901 & 100\,Hz  & 対地速度 \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{1em}
+
+  {\footnotesize ESKF は全センサを統合して位置・速度・姿勢を推定（Lesson 9 参照）}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{エコシステム概要 / Ecosystem Overview}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{開発ツール}
+        \begin{itemize}
+          \item \api{sf build / flash / monitor}
+          \item \api{sf cal gyro/accel/mag}
+          \item \api{sf log wifi / capture / viz}
+          \item \api{sf sim list / run}
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{解析・応用}
+        \begin{itemize}
+          \item Python SDK（開発中）
+          \item Jupyter Notebooks
+          \item Genesis シミュレータ
+          \item フライトログ解析
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.5em}
+  {\footnotesize ワークショップで学んだスキルは、エコシステムの全ツールで活用可能}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{独自ファーム作成: \texttt{sf app new}}
+  \begin{block}{\api{sf app new} でカスタムプロジェクトを生成}
+    vehicle のコンポーネントを再利用しつつ、独自の main.cpp を記述
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfbash]
+# Create project / プロジェクト作成
+sf app new my_drone
+# -> firmware/my_drone/ が生成される
+
+# Build and flash / ビルド & 書き込み
+sf build my_drone
+sf flash my_drone -m
   \end{lstlisting}
+
+  \vspace{0.3em}
+  {\footnotesize
+    \textbf{仕組み:} \texttt{EXTRA\_COMPONENT\_DIRS} で vehicle/components と common を参照。\\
+    IMU, 気圧, ToF, 光学フロー, モーター等すべてのコンポーネントが使える。
+  }
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{実習2: RC制御 + テレメトリ / RC + Telemetry}
-  \begin{lstlisting}[style=sfpython, title={flight\_rc.py}]
-import time
-from stampfly import StampFly
+\begin{frame}[fragile]{Teleplot によるセンサ可視化}
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize, title={全センサを Teleplot で可視化}]
+auto& s = StampFlyState::getInstance();
+auto baro = s.getBaroData();
+auto tof  = s.getToFData(ToFPosition::BOTTOM);
+auto mag  = s.getMagData();
+auto flow = s.getFlowData();
+auto att  = s.getAttitudeEuler();
 
-drone = StampFly()
-drone.connect()
-drone.takeoff()
+// Teleplot output (>name:value format)
+printf(">baro_alt:%.2f\n", baro.altitude);
+printf(">tof_bottom:%.3f\n", tof.distance);
+printf(">eskf_alt:%.2f\n", att.z);  // estimated alt
+printf(">mag_x:%.1f\n", mag.x);
+printf(">flow_vx:%.3f\n", flow.vx);
+  \end{lstlisting}
 
-# Hover + read telemetry for 5 seconds
-for _ in range(50):
-    drone.send_rc_control(0, 0, 0, 0)
-    t = drone.get_telemetry()
-    print(f"alt={t.get('alt',0):.1f}")
-    time.sleep(0.1)
+  {\footnotesize 複数センサの同時グラフ化で、気圧高度 vs ToF vs ESKF 推定高度の比較が可能}
+\end{frame}
 
-drone.land()
-drone.end()
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{実習: 全センサ読み取り / Hands-on}
+  {\small ワークショップ版（\api{sf lesson switch 10}）のコード例:}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize, title={user\_code.cpp (excerpt)}]
+#include "workshop_api.hpp"
+#include "stampfly_state.hpp"
+void setup() { ws::print("Lesson 10: API Overview"); }
+void loop_400Hz(float dt) {
+    static uint32_t tick = 0; tick++;
+    if (tick % 8 != 0) return;  // 50 Hz decimation
+    auto& s = StampFlyState::getInstance();
+    auto baro = s.getBaroData();
+    auto tof  = s.getToFData(ToFPosition::BOTTOM);
+    auto mag  = s.getMagData();
+    // Teleplot output
+    ws::print(">baro_alt:%.2f", baro.altitude);
+    ws::print(">tof_bottom:%.3f", tof.distance);
+    float heading = atan2f(-mag.y, mag.x) * 57.3f;
+    ws::print(">heading:%.1f", heading);
+}
   \end{lstlisting}
 \end{frame}
 
@@ -110,16 +197,17 @@ drone.end()
 \begin{frame}{チェックポイント / Checkpoint}
   \begin{alertblock}{確認事項}
     \begin{itemize}
-      \item[$\square$] WiFi AP に接続し \api{connect()} が成功する
-      \item[$\square$] \api{takeoff()} → \api{move\_forward()} → \api{land()} が動作する
-      \item[$\square$] \api{get\_telemetry()} で高度データを取得できる
+      \item[$\square$] ws:: API の全カテゴリを把握した
+      \item[$\square$] StampFlyState で全センサ値を取得できた
+      \item[$\square$] Teleplot で複数センサのグラフを同時表示した
+      \item[$\square$] \api{sf app new} でカスタムプロジェクトを作成できた
     \end{itemize}
   \end{alertblock}
 
   \vspace{1em}
 
   \begin{block}{次のレッスン}
-    Lesson 11: ホバリングタイム競技会 ルール説明
+    Lesson 11: Python SDK プログラム飛行
   \end{block}
 \end{frame}
 

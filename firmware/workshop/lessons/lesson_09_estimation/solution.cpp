@@ -43,8 +43,19 @@ void loop_400Hz(float dt)
     float eskf_roll  = ws::estimated_roll();
     float eskf_pitch = ws::estimated_pitch();
 
-    // Print every 200ms (80 ticks at 400Hz)
-    // 200ms毎に表示
+    // Teleplot output (real-time graph in VSCode Teleplot extension)
+    // Teleplot出力（VSCode Teleplot拡張でリアルタイムグラフ化）
+    // Decimation: every 4 ticks = 100Hz (to avoid serial bandwidth overload)
+    // デシメーション: 4tick毎 = 100Hz（シリアル帯域の負荷軽減）
+    if (tick % 4 == 0) {
+        ws::print(">cf_roll:%.2f", cf_roll * 57.3f);
+        ws::print(">cf_pitch:%.2f", cf_pitch * 57.3f);
+        ws::print(">eskf_roll:%.2f", eskf_roll * 57.3f);
+        ws::print(">eskf_pitch:%.2f", eskf_pitch * 57.3f);
+    }
+
+    // Print every 200ms (80 ticks at 400Hz) for serial monitor
+    // 200ms毎にシリアルモニタ用テキスト表示
     if (tick % 80 == 0) {
         ws::print("CF: R=%.1f P=%.1f | ESKF: R=%.1f P=%.1f",
                   cf_roll * 57.3f, cf_pitch * 57.3f,

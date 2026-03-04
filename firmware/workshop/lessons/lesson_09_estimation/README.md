@@ -12,7 +12,7 @@ Implement a complementary filter for roll/pitch estimation and compare it with t
 | `ws::accel_x/y/z()` | Linear acceleration | m/s^2 |
 | `ws::estimated_roll()` | ESKF roll estimate | rad |
 | `ws::estimated_pitch()` | ESKF pitch estimate | rad |
-| `ws::telemetry_send(name, val)` | Send via WiFi | - |
+| `ws::print(fmt, ...)` | Serial print (Teleplot compatible) | - |
 
 ## Background / 背景
 
@@ -77,14 +77,42 @@ These are valid only when the drone is **not accelerating** (static or constant 
 | Magnetometer | Not used | Uses mag for yaw |
 | CPU cost | Minimal | Higher |
 
+## Teleplot Setup / Teleplotセットアップ
+
+### What is Teleplot? / Teleplotとは？
+
+Teleplot is a VSCode extension that visualizes serial output as real-time graphs.
+Simply print data in the format `>variable_name:value` and Teleplot graphs it automatically.
+
+TeleplotはVSCode拡張機能で、シリアル出力をリアルタイムグラフとして可視化します。
+`>変数名:値` の形式でprintするだけで自動的にグラフ化されます。
+
+### Setup / セットアップ手順
+
+1. Install VSCode extension: `alexnesnes.teleplot`
+2. Connect via `sf monitor`
+3. Open Teleplot panel in VSCode
+4. Data in `>name:value` format will be graphed automatically
+
+### Output Format / 出力フォーマット
+```cpp
+// Teleplot format: >variable_name:value
+ws::print(">cf_roll:%.2f", cf_roll * 57.3f);
+ws::print(">cf_pitch:%.2f", cf_pitch * 57.3f);
+ws::print(">eskf_roll:%.2f", eskf_roll * 57.3f);
+ws::print(">eskf_pitch:%.2f", eskf_pitch * 57.3f);
+```
+
+**Decimation:** Output at 100Hz (every 4 ticks) to avoid serial bandwidth overload.
+
 ## Steps / 手順
 1. `sf lesson switch 9`
 2. Compute accelerometer-based roll and pitch angles using `atan2f`
 3. Implement the complementary filter with `alpha = 0.98`
-4. Send both CF and ESKF angles via telemetry
-5. Tilt the drone by hand and compare the two estimates
+4. Add Teleplot output for CF and ESKF angles
+5. Tilt the drone by hand and compare the two estimates in Teleplot
 6. Try different alpha values (0.9, 0.99) and observe the effect
-7. View telemetry: `sf log wifi`
+7. View telemetry: `sf monitor` + Teleplot
 
 ## Challenge / チャレンジ
 - Try alpha = 0.5 (equal trust) and observe the noise
@@ -97,3 +125,4 @@ These are valid only when the drone is **not accelerating** (static or constant 
 - Alpha controls the trade-off between noise rejection and drift correction
 - ESKF (Error-State Kalman Filter) is the production-grade approach
 - `57.3f` converts radians to degrees (180/pi)
+- Teleplot enables real-time visualization without extra tools
