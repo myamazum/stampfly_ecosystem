@@ -61,7 +61,8 @@
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{Motor Control API（1/2）: モータ制御}
+\begin{frame}[fragile]{Motor Control API（1/2）}
+  \framesubtitle{モータ制御: デューティ設定とミキサー}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -88,7 +89,8 @@ ws::motor_mixer(0.5f, 0.0f, 0.0f, 0.0f);  // Hover
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{Motor Control API（2/2）: Arm / Disarm}
+\begin{frame}[fragile]{Motor Control API（2/2）}
+  \framesubtitle{Arm / Disarm: モータ出力の有効化・無効化}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -119,7 +121,8 @@ if (ws::is_armed()) {
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{RC Input API: スティック入力}
+\begin{frame}[fragile]{RC Input API}
+  \framesubtitle{コントローラスティック入力}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -148,6 +151,7 @@ void loop_400Hz(float dt) {
 
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{RC Buttons / Mode API}
+  \framesubtitle{ボタン入力と飛行モード判定}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -177,6 +181,7 @@ void loop_400Hz(float dt) {
 
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{IMU Sensor API}
+  \framesubtitle{ジャイロ・加速度センサ（BMI270）}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -207,7 +212,8 @@ void loop_400Hz(float dt) {
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{Estimation API: ESKF 推定値}
+\begin{frame}[fragile]{Estimation API}
+  \framesubtitle{ESKF 姿勢・高度推定}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -239,7 +245,8 @@ void loop_400Hz(float dt) {
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{環境センサ API（1/2）: 気圧・磁気}
+\begin{frame}[fragile]{環境センサ API（1/2）}
+  \framesubtitle{気圧・磁気センサ}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -265,7 +272,8 @@ ws::print(">baro_alt:%.2f", alt);
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}[fragile]{環境センサ API（2/2）: ToF・光学フロー}
+\begin{frame}[fragile]{環境センサ API（2/2）}
+  \framesubtitle{ToF・光学フローセンサ}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -292,6 +300,7 @@ ws::print(">tof_bottom:%.3f", dist);
 
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{LED Control API}
+  \framesubtitle{LED 色制御}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -324,6 +333,7 @@ void loop_400Hz(float dt) {
 
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{Utility API}
+  \framesubtitle{時刻・電圧・通信・出力}
   {\small
   \begin{tabular}{lll}
     \hline
@@ -357,7 +367,8 @@ void loop_400Hz(float dt) {
 % ==================================================================
 
 % ------------------------------------------------------------------
-\begin{frame}{StampFlyState: 全センサ + 推定値}
+\begin{frame}{StampFlyState}
+  \framesubtitle{全センサ + 推定値への直接アクセス}
   {\small
   \begin{tabular}{lll}
     \hline
