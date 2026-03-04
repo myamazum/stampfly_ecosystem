@@ -32,26 +32,24 @@
   \node[wifi]  (wifi) at (6, 0) {WiFi AP\\192.168.4.1};
   \node[block] (sf) at (12, 0) {StampFly\\ESP32-S3};
 
-  % TCP CLI connection (top)
+  % TCP CLI connection (top): center of top edges
   \draw[biconn, blockcolor]
-    (pc.north east) ++(0, 0.2) -- ++(0, 1.0) coordinate (tcp_l)
-    -- node[lbl, above] {TCP CLI (port 23)} ($(wifi.north)+(0, 1.2)$) coordinate (tcp_m)
-    -- ($(sf.north west)+(0, 1.2)$) coordinate (tcp_r)
-    -- ++(0, -1.0) -- (sf.north west);
+    (pc.north) -- ++(0, 1.2)
+    -- node[lbl, above] {TCP CLI (port 23)} ($(sf.north)+(0, 1.2)$)
+    -- (sf.north);
 
-  % WebSocket connection (bottom)
+  % WebSocket connection (bottom): center of bottom edges
   \draw[biconn, wscolor]
-    (pc.south east) ++(0, -0.2) -- ++(0, -1.0) coordinate (ws_l)
-    -- node[lbl, below, text=wscolor] {WebSocket (port 81)} ($(wifi.south)+(0, -1.2)$) coordinate (ws_m)
-    -- ($(sf.south west)+(0, -1.2)$) coordinate (ws_r)
-    -- ++(0, 1.0) -- (sf.south west);
+    (pc.south) -- ++(0, -1.2)
+    -- node[lbl, below, text=wscolor] {WebSocket (port 81)} ($(sf.south)+(0, -1.2)$)
+    -- (sf.south);
 
   % Labels for connections
-  \node[font=\scriptsize, blockcolor, above right] at (pc.north east) {commands};
-  \node[font=\scriptsize, wscolor, below right] at (pc.south east) {telemetry 400\,Hz};
+  \node[font=\scriptsize, blockcolor, right=2mm] at (pc.north) {commands};
+  \node[font=\scriptsize, wscolor, right=2mm] at (pc.south) {telemetry 400\,Hz};
 
   % Internal labels
-  \node[font=\scriptsize, arrowcolor, below=2mm] at (sf.south) {sensors / motors};
+  \node[font=\scriptsize, arrowcolor, right=2mm] at (sf.south) {sensors / motors};
 
 \end{tikzpicture}
 \end{document}
