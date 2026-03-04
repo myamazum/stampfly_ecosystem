@@ -159,13 +159,13 @@ firmware/my_drone/
 \begin{frame}{main.cpp の全体構造}
   \framesubtitle{テンプレートの 3 要素}
 
-  \begin{block}{\api{app\_main()} — ブートシーケンス}
+  \begin{block}{\texttt{app\_main()} — ブートシーケンス}
     {\small NVS → センサ初期化 → ESKF 起動 → タスク起動（自動生成済み）}
   \end{block}
 
   \vspace{0.3em}
 
-  \begin{alertblock}{\api{ControlTask()} — 400\,Hz ユーザーコード \textbf{← ここを編集}}
+  \begin{alertblock}{\texttt{ControlTask()} — 400\,Hz ユーザーコード \textbf{← ここを編集}}
     {\small センサ読み取り・制御計算・モーター出力を記述するメインループ}
   \end{alertblock}
 
