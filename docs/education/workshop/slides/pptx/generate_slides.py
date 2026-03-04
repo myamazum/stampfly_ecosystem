@@ -1530,7 +1530,6 @@ def build_lesson_10() -> Presentation:
         "• ws:: API 全 43 関数をカテゴリ別に理解",
         "• 各 API の使い方をコード例で確認",
         "• 環境・距離センサ API で全センサに直接アクセス",
-        "• StampFlyState による上級アクセスを知る",
     ])
 
     add_table_slide(prs, "ws:: API 一覧 / ws:: API Reference",
