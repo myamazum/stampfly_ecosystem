@@ -1,17 +1,17 @@
 #include "workshop_api.hpp"
 
 // =========================================================================
-// Lesson 11: Hover Time Competition
-// レッスン 11: ホバリングタイム競技
+// Lesson 12: Precision Landing Competition
+// レッスン 12: 精密着陸競技
 // =========================================================================
 //
-// Goal: Optimize your rate PID gains for the longest hover time.
-// 目標: 角速度PIDゲインを最適化し、最長ホバリングタイムを目指す
+// Goal: Optimize your rate PID gains for precision landing.
+// 目標: 角速度PIDゲインを最適化し、精密着陸を目指す
 //
 // This is the same rate PID structure from Lesson 8.
-// Tune the gains below to achieve the best stability!
+// Tune the gains below to achieve precise control for landing!
 // レッスン8と同じ角速度PID構造です。
-// 下のゲインを調整して最高の安定性を目指しましょう！
+// 下のゲインを調整して精密な着陸制御を目指しましょう！
 //
 // Block diagram / ブロック線図:
 //
@@ -56,9 +56,9 @@ static float clamp(float val, float lim)
 
 void setup()
 {
-    ws::print("Lesson 11: Hover Time Competition");
-    ws::print("Tune your PID gains and hover as long as you can!");
-    // ゲインを調整して、できるだけ長くホバリングしよう！
+    ws::print("Lesson 12: Precision Landing Competition");
+    ws::print("Tune your PID gains for precision landing!");
+    // ゲインを調整して、精密着陸を目指そう！
 
     // TODO: Set your WiFi channel (1, 6, or 11)
     // TODO: 自分のWiFiチャンネルを設定する（1, 6, 11のいずれか）

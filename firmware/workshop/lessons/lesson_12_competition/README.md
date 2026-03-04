@@ -1,29 +1,32 @@
-# Lesson 11: Hover Time Competition
+# Lesson 12: Precision Landing Competition
 
 ## Goal / 目標
-Optimize your angular rate feedback controller for the longest possible hover time.
+Optimize your controller for precise 3m landing on a helipad.
 
-自分の角速度フィードバック制御を最適化し、できるだけ長くホバリングすることを目指す。
+自分のコントローラを最適化し、3m先のヘリポートに精密着陸する。
 
 ## Overview / 概要
 
 This is the final lesson. You use the rate PID controller you built in Lessons 5/8
-and optimize the gains to achieve the most stable hover possible.
-The competition is simple: **who can hover the longest?**
+and optimize the gains to achieve the most precise landing possible.
+The competition is simple: **who can land on the helipad the fastest?**
 
 これが最終レッスン。レッスン 5/8 で実装した角速度PID制御のゲインを最適化し、
-最も安定したホバリングを目指す。
-競技はシンプル: **誰が一番長くホバリングできるか？**
+最も精密な着陸を目指す。
+競技はシンプル: **誰が一番速くヘリポートに着陸できるか？**
 
 ## Competition Rules / 競技会ルール
 
 | Item / 項目 | Rule / ルール |
-|-------------|--------------|
-| Objective / 目的 | Hover as long as possible / できるだけ長くホバリング |
-| Time limit / 制限時間 | 60 seconds (max) / 60秒（上限） |
-| Attempts / 試行 | 3 times (best counts) / 3回（ベストタイム採用） |
-| Throttle / スロットル | Manual (controller) / 手動（コントローラ） |
-| Attitude / 姿勢安定化 | Your rate feedback program / 自分の角速度フィードバックプログラム |
+|---|---|
+| Objective / 目的 | Land precisely on helipad 3m away / 3m先のヘリポートに精密着陸 |
+| Helipad / ヘリポート | 40cm x 40cm |
+| Distance / 距離 | 3m from pilot / パイロットから3m |
+| Time limit / 制限時間 | 60 seconds / 60秒 |
+| Attempts / 試行 | 3 times (best time counts) / 3回（ベストタイム採用） |
+| Scoring / 判定 | ARM → takeoff → land on helipad time / ARM→離陸→ヘリポート着陸のタイム |
+| Pilot / パイロット | Must stay at start position / 定位置から動かない |
+| Disqualification / 失格 | Flying outside safety area, hand intervention, pilot movement |
 
 ### What's Allowed / できること
 
@@ -99,9 +102,9 @@ d_filtered = 0.8f * d_filtered + 0.2f * d_raw;  // alpha = 0.8
 
 ## Steps / 手順
 
-1. `sf lesson switch 11`
+1. `sf lesson switch 12`
 2. Build and test the default PID controller / デフォルトPIDをビルドしてテスト
-3. Record baseline hover time / ベースラインのホバリングタイムを記録
+3. Practice takeoff and landing / 離着陸を練習
 4. Tune gains: P → D → I / ゲイン調整: P → D → I の順
 5. Use telemetry to analyze / テレメトリで解析
 6. Iterate until satisfied / 満足するまで反復
@@ -115,5 +118,6 @@ d_filtered = 0.8f * d_filtered + 0.2f * d_raw;  // alpha = 0.8
 | Start with low throttle / 低スロットルから | Increase gradually / 徐々に上げる |
 | Immediately disarm if unstable / 不安定ならすぐDISARM | Safety first / 安全第一 |
 | Stay in flight area / フライトエリア内で | 3m x 3m boundary / 3m x 3m の範囲内 |
+| Do not move from pilot position / パイロット位置から動かない | Disqualification if moved / 動いたら失格 |
 
 > **Note / 注:** StampFly はプロペラガード一体型で、極めて小型のためプロペラの危険性は低いです。

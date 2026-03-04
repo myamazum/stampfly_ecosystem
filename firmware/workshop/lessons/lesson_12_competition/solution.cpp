@@ -1,8 +1,8 @@
 #include "workshop_api.hpp"
 
 // =========================================================================
-// Lesson 11: Hover Time Competition - Reference Solution
-// レッスン 11: ホバリングタイム競技 - リファレンス解答
+// Lesson 12: Precision Landing Competition - Reference Solution
+// レッスン 12: 精密着陸競技 - リファレンス解答
 // =========================================================================
 //
 // This is the same as student.cpp - the competition is about YOUR tuning!
@@ -40,7 +40,7 @@ static float clamp(float val, float lim)
 
 void setup()
 {
-    ws::print("Lesson 11: Hover Time Competition - Reference");
+    ws::print("Lesson 12: Precision Landing Competition - Reference");
 
     // Set WiFi channel (use 1, 6, or 11 to avoid interference)
     // WiFiチャンネルを設定（混信を避けるため1, 6, 11のいずれかを使用）

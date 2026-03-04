@@ -1,4 +1,4 @@
-# Lesson 10: Python SDK Flight
+# Lesson 11: Python SDK Flight
 
 ## Goal / 目標
 Control StampFly from Python using the SDK. Send flight commands from a Jupyter notebook.
@@ -31,7 +31,7 @@ Lesson 8の安定したPID制御を実行する。Python SDKと`sf` CLIを使っ
 
 | Item | Description |
 |------|-------------|
-| Firmware | Flash Lesson 10 (`sf lesson switch 10`) |
+| Firmware | Flash Lesson 11 (`sf lesson switch 11`) |
 | WiFi | Connect PC to StampFly AP (`StampFly_XXXX`) |
 | Python | `pip install stampfly-edu` (or `pip install -e ".[edu]"`) |
 
@@ -39,7 +39,7 @@ Lesson 8の安定したPID制御を実行する。Python SDKと`sf` CLIを使っ
 
 ### 1. Flash stable firmware / 安定ファームウェアを書き込む
 ```bash
-sf lesson switch 10
+sf lesson switch 11
 sf flash vehicle -m
 ```
 
