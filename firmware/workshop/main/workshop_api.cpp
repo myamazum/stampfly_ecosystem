@@ -169,6 +169,40 @@ bool ws::is_armed()
 }
 
 // =============================================================================
+// Controller Buttons / Modes
+// =============================================================================
+
+bool ws::rc_throttle_yaw_button()
+{
+    auto& state = stampfly::StampFlyState::getInstance();
+    return (state.getControlFlags() & stampfly::CTRL_FLAG_ARM) != 0;
+}
+
+bool ws::rc_roll_pitch_button()
+{
+    auto& state = stampfly::StampFlyState::getInstance();
+    return (state.getControlFlags() & stampfly::CTRL_FLAG_FLIP) != 0;
+}
+
+bool ws::rc_stabilize_acro_mode()
+{
+    auto& state = stampfly::StampFlyState::getInstance();
+    return (state.getControlFlags() & stampfly::CTRL_FLAG_MODE) != 0;
+}
+
+bool ws::rc_alt_mode()
+{
+    auto& state = stampfly::StampFlyState::getInstance();
+    return (state.getControlFlags() & stampfly::CTRL_FLAG_ALT_MODE) != 0;
+}
+
+bool ws::rc_pos_mode()
+{
+    auto& state = stampfly::StampFlyState::getInstance();
+    return (state.getControlFlags() & stampfly::CTRL_FLAG_POS_MODE) != 0;
+}
+
+// =============================================================================
 // LED Control
 // =============================================================================
 

@@ -148,6 +148,45 @@ void disarm();
 bool is_armed();
 
 // -----------------------------------------------------------------------------
+// Controller Buttons / Modes
+// コントローラボタン・モード
+// -----------------------------------------------------------------------------
+
+/**
+ * @brief Check if throttle/yaw stick button is pressed (raw state)
+ *        スロットル/ヨースティックボタンの生押下状態を取得
+ *
+ * Note: This is also the ARM button. is_armed() returns the vehicle
+ * flight state, while this returns the raw button press.
+ * 注意: ARMボタンと同じ。is_armed()はVehicleの状態、これはボタンの生値。
+ */
+bool rc_throttle_yaw_button();
+
+/**
+ * @brief Check if roll/pitch stick button is pressed (raw state)
+ *        ロール/ピッチスティックボタンの生押下状態を取得
+ */
+bool rc_roll_pitch_button();
+
+/**
+ * @brief Get stabilize/acro mode state (true = ACRO)
+ *        スタビライズ/アクロモード状態を取得 (true = ACRO)
+ */
+bool rc_stabilize_acro_mode();
+
+/**
+ * @brief Get altitude hold mode state
+ *        高度維持モード状態を取得
+ */
+bool rc_alt_mode();
+
+/**
+ * @brief Get position hold mode state
+ *        位置保持モード状態を取得
+ */
+bool rc_pos_mode();
+
+// -----------------------------------------------------------------------------
 // LED Control (Lesson 3)
 // LED制御
 // -----------------------------------------------------------------------------
