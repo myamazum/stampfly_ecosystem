@@ -91,9 +91,37 @@ sf flash my_drone -m   # 書き込み + モニタ
 \end{frame}
 
 % ------------------------------------------------------------------
-% Frame 5: main.cpp Structure
+% Frame 5: Project File Structure
 % ------------------------------------------------------------------
-\begin{frame}{main.cpp の構造}
+\begin{frame}[fragile]{プロジェクト構成 / Project Structure}
+  \framesubtitle{\texttt{sf app new my\_drone} が生成するファイル}
+  \begin{lstlisting}[style=sfbash, basicstyle=\ttfamily\small]
+firmware/my_drone/
+  CMakeLists.txt        # ビルド設定
+  main/
+    CMakeLists.txt      # コンパイル対象の定義
+    main.cpp            # ← ここを編集
+  \end{lstlisting}
+
+  \vspace{0.3em}
+
+  {\footnotesize
+  \begin{tabular}{ll}
+    \hline
+    \textbf{ファイル} & \textbf{役割} \\
+    \hline
+    \texttt{CMakeLists.txt}      & vehicle/components と common を参照（全コンポーネント利用可能） \\
+    \texttt{main/CMakeLists.txt} & vehicle のタスク（IMU, Baro, ToF 等）と init.cpp を再利用 \\
+    \texttt{main/main.cpp}       & ユーザーが編集する唯一のファイル（ControlTask + コールバック） \\
+    \hline
+  \end{tabular}
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 6: main.cpp Overview
+% ------------------------------------------------------------------
+\begin{frame}{main.cpp の全体構造}
   \framesubtitle{テンプレートの 3 要素}
 
   \begin{block}{\api{app\_main()} — ブートシーケンス}
@@ -119,7 +147,36 @@ sf flash my_drone -m   # 書き込み + モニタ
 \end{frame}
 
 % ------------------------------------------------------------------
-% Frame 6: StampFlyState API Table
+% Frame 7: ControlTask Detail
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{ControlTask の中身}
+  \framesubtitle{400\,Hz ループの処理フロー}
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+void ControlTask(void* pvParameters) {
+    while (true) {
+        xSemaphoreTake(g_control_semaphore, ...);
+        // --- 1. センサ読み取り ---
+        state.getIMUData(accel, gyro);    // 400 Hz
+        state.getAttitudeEuler(r, p, y);  // ESKF 推定値
+        state.getBaroData(alt, p);        // 50 Hz
+        state.getToFData(bot, fnt);       // 30 Hz
+        // --- 2. 制御計算（ユーザー実装） ---
+        // PID, モーターミキシング等
+        // --- 3. モーター出力 ---
+        // g_motor.setThrust(0, thrust);
+        // --- 4. Teleplot 出力（50 Hz） ---
+        if (tick % 8 == 0) printf(...);
+    }
+}
+  \end{lstlisting}
+
+  {\footnotesize
+    セマフォで IMU タイマー（2500\,$\mu$s）と同期。各センサは独立タスクで取得済み。
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 8: StampFlyState API Table
 % ------------------------------------------------------------------
 \begin{frame}{StampFlyState API}
   \framesubtitle{全センサ + 推定値への直接アクセス}
@@ -146,7 +203,7 @@ sf flash my_drone -m   # 書き込み + モニタ
 \end{frame}
 
 % ------------------------------------------------------------------
-% Frame 7: Hands-on
+% Frame 9: Hands-on
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{実習: 全センサ Teleplot 可視化 / Hands-on}
   \framesubtitle{ControlTask 内でセンサ値を取得し Teleplot へ出力}
@@ -174,12 +231,13 @@ if (tick % 8 == 0) {  // 50 Hz
 \end{frame}
 
 % ------------------------------------------------------------------
-% Frame 8: Checkpoint
+% Frame 10: Checkpoint
 % ------------------------------------------------------------------
 \begin{frame}{チェックポイント / Checkpoint}
   \begin{alertblock}{確認事項}
     \begin{itemize}
       \item[$\square$] \api{sf app new} でプロジェクトを作成しビルドできた
+      \item[$\square$] プロジェクト構成（3 ファイルの役割）を理解した
       \item[$\square$] \api{app\_main()} と \api{ControlTask()} の役割を理解した
       \item[$\square$] StampFlyState で全センサ値を直接取得できた
       \item[$\square$] Teleplot でリアルタイムグラフを確認した

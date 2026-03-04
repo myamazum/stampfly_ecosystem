@@ -1673,7 +1673,21 @@ def build_lesson_11() -> Presentation:
         "• IMU, 気圧, ToF, 光学フロー, モーター等すべて利用可能",
     ])
 
-    add_content_slide(prs, "main.cpp の構造", [
+    add_content_slide(prs, "プロジェクト構成 / Project Structure", [
+        "sf app new my_drone が生成するファイル:",
+        "",
+        "firmware/my_drone/",
+        "  CMakeLists.txt      → vehicle/components, common を参照",
+        "  main/",
+        "    CMakeLists.txt    → vehicle タスク・初期化を直接コンパイルに含める",
+        "    main.cpp          → ← ここを編集",
+        "",
+        "• CMakeLists.txt: 全センサ・通信・推定コンポーネントを利用可能にする",
+        "• main/CMakeLists.txt: IMU, Baro, ToF 等のタスクと init.cpp を再利用",
+        "• main/main.cpp: ユーザーが編集する唯一のファイル（ControlTask + コールバック）",
+    ])
+
+    add_content_slide(prs, "main.cpp の全体構造", [
         "【app_main() — ブートシーケンス】",
         "NVS → センサ初期化 → ESKF 起動 → タスク起動（自動生成済み）",
         "",
@@ -1684,6 +1698,24 @@ def build_lesson_11() -> Presentation:
         "• onButtonEvent() — ボタン押下で ARM / DISARM",
         "• handleControlInput() — コントローラからの操縦入力を処理",
     ])
+
+    add_code_slide(prs, "ControlTask の中身", """
+void ControlTask(void* pvParameters) {
+    while (true) {
+        xSemaphoreTake(g_control_semaphore, ...);
+        // 1. センサ読み取り
+        state.getIMUData(accel, gyro);    // 400 Hz
+        state.getAttitudeEuler(r, p, y);  // ESKF
+        state.getBaroData(alt, p);        // 50 Hz
+        state.getToFData(bot, fnt);       // 30 Hz
+        // 2. 制御計算（ユーザー実装）
+        // 3. モーター出力
+        // g_motor.setThrust(0, thrust);
+        // 4. Teleplot 出力（50 Hz）
+        if (tick % 8 == 0) printf(...);
+    }
+}
+""")
 
     add_table_slide(prs, "StampFlyState API",
         ["メソッド", "ソース", "取得データ"],
@@ -1717,6 +1749,7 @@ if (tick % 8 == 0) {  // 50 Hz
 
     add_checkpoint_slide(prs, [
         "sf app new でプロジェクトを作成しビルドできた",
+        "プロジェクト構成（3 ファイルの役割）を理解した",
         "app_main() と ControlTask() の役割を理解した",
         "StampFlyState で全センサ値を直接取得できた",
         "Teleplot でリアルタイムグラフを確認した",
