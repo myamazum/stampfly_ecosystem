@@ -286,9 +286,9 @@ void onControlPacket(const stampfly::ControlPacket& packet)
 
 // P-gain for angular rate control [V / (rad/s)]
 // 角速度制御の比例ゲイン [V / (rad/s)]
-static constexpr float KP_ROLL  = 0.8f;
-static constexpr float KP_PITCH = 0.8f;
-static constexpr float KP_YAW   = 0.3f;
+static constexpr float KP_ROLL  = 1.362f;
+static constexpr float KP_PITCH = 1.984f;
+static constexpr float KP_YAW   = 7.310f;
 
 // Maximum angular rate command from stick [rad/s]
 // スティック最大角速度指令 [rad/s]
