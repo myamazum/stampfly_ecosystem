@@ -2,12 +2,11 @@
  * @file stationary_detector.hpp
  * @brief Stationary state detector for landing calibration
  *
- * Detects when the vehicle is stationary (not moving) based on
- * gyroscope and accelerometer readings. Used to trigger calibration
- * after landing.
+ * Detects when the vehicle is stationary (not moving) using EMA-filtered
+ * gyroscope and accelerometer readings. Robust to transient noise spikes.
  *
- * 静止状態検出器。ジャイロと加速度から機体が静止しているかを判定。
- * 着陸後のキャリブレーショントリガーに使用。
+ * 静止状態検出器。EMAフィルタ済みジャイロ・加速度から機体が静止しているかを判定。
+ * 瞬間的なノイズスパイクに対してロバスト。
  */
 
 #pragma once
@@ -26,14 +25,16 @@ public:
         float accel_variance_threshold;
         int required_samples;
         int averaging_samples;
+        float ema_alpha;
 
         Config()
-            : gyro_threshold(0.02f)              // rad/s - max gyro magnitude for stationary
-            , accel_norm_min(9.5f)               // m/s² - min accel norm (not free fall)
-            , accel_norm_max(10.1f)              // m/s² - max accel norm (not accelerating)
+            : gyro_threshold(0.02f)              // rad/s - max filtered gyro magnitude
+            , accel_norm_min(9.5f)               // m/s² - min filtered accel norm
+            , accel_norm_max(10.1f)              // m/s² - max filtered accel norm
             , accel_variance_threshold(0.05f)    // (m/s²)² - max accel variance
             , required_samples(200)              // samples needed (0.5s @ 400Hz)
             , averaging_samples(200)             // samples for averaging (0.5s @ 400Hz)
+            , ema_alpha(0.05f)                   // EMA smoothing factor (~3Hz cutoff @ 400Hz)
         {}
     };
 
@@ -55,6 +56,9 @@ public:
         accel_sum_ = math::Vector3::zero();
         accel_sq_sum_ = math::Vector3::zero();
         sample_count_ = 0;
+        ema_initialized_ = false;
+        gyro_mag_ema_ = 0.0f;
+        accel_norm_ema_ = 0.0f;
     }
 
     /**
@@ -63,21 +67,32 @@ public:
      * @param accel Accelerometer reading [m/s²] (body frame)
      */
     void update(const math::Vector3& gyro, const math::Vector3& accel) {
-        // Check gyro magnitude
         float gyro_mag = std::sqrt(gyro.x * gyro.x + gyro.y * gyro.y + gyro.z * gyro.z);
-
-        // Check accel norm (should be ~g when stationary)
         float accel_norm = std::sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z);
 
-        // Stationary conditions
-        bool gyro_ok = gyro_mag < config_.gyro_threshold;
-        bool accel_ok = (accel_norm > config_.accel_norm_min) &&
-                        (accel_norm < config_.accel_norm_max);
+        // Apply EMA low-pass filter to suppress transient noise spikes
+        // EMAローパスフィルタで瞬間的なノイズスパイクを抑制
+        const float a = config_.ema_alpha;
+        if (!ema_initialized_) {
+            gyro_mag_ema_ = gyro_mag;
+            accel_norm_ema_ = accel_norm;
+            ema_initialized_ = true;
+        } else {
+            gyro_mag_ema_ = a * gyro_mag + (1.0f - a) * gyro_mag_ema_;
+            accel_norm_ema_ = a * accel_norm + (1.0f - a) * accel_norm_ema_;
+        }
+
+        // Stationary conditions on filtered values
+        // フィルタ済み値で静止条件を判定
+        bool gyro_ok = gyro_mag_ema_ < config_.gyro_threshold;
+        bool accel_ok = (accel_norm_ema_ > config_.accel_norm_min) &&
+                        (accel_norm_ema_ < config_.accel_norm_max);
 
         if (gyro_ok && accel_ok) {
             stationary_count_++;
 
-            // Accumulate for averaging
+            // Accumulate raw values for averaging (unfiltered for accuracy)
+            // 平均計算には生の値を蓄積（精度のためフィルタなし）
             gyro_sum_ += gyro;
             accel_sum_ += accel;
             accel_sq_sum_.x += accel.x * accel.x;
@@ -105,7 +120,8 @@ public:
                 }
             }
         } else {
-            // Not stationary - reset
+            // Not stationary - reset count and accumulators
+            // 非静止 - カウンタと蓄積値をリセット
             stationary_count_ = 0;
             is_stationary_ = false;
             gyro_sum_ = math::Vector3::zero();
@@ -145,12 +161,31 @@ public:
      */
     int getSampleCount() const { return sample_count_; }
 
+    /**
+     * @brief Get filtered gyro magnitude (for debugging)
+     * フィルタ済みジャイロ振幅を取得（デバッグ用）
+     */
+    float getFilteredGyroMag() const { return gyro_mag_ema_; }
+
+    /**
+     * @brief Get filtered accel norm (for debugging)
+     * フィルタ済み加速度ノルムを取得（デバッグ用）
+     */
+    float getFilteredAccelNorm() const { return accel_norm_ema_; }
+
 private:
     Config config_;
     int stationary_count_ = 0;
     bool is_stationary_ = false;
 
-    // Accumulators for averaging
+    // EMA filter state
+    // EMAフィルタ状態
+    bool ema_initialized_ = false;
+    float gyro_mag_ema_ = 0.0f;
+    float accel_norm_ema_ = 0.0f;
+
+    // Accumulators for averaging (raw values)
+    // 平均計算用の蓄積値（生の値）
     math::Vector3 gyro_sum_;
     math::Vector3 accel_sum_;
     math::Vector3 accel_sq_sum_;  // For variance calculation
