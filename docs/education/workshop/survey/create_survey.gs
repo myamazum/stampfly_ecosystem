@@ -159,15 +159,14 @@ function createWorkshopSurvey() {
 
   var ecosystemItem = form.addCheckboxItem();
   ecosystemItem.setTitle('Q14. StampFly Ecosystem の中で、特に便利だった・良かったものを選んでください（複数選択可）');
-  ecosystemItem.setChoices([
-    ecosystemItem.createChoice('ws:: API（ワークショップ用簡易API）'),
-    ecosystemItem.createChoice('sf CLI（ビルド・書き込みツール）'),
-    ecosystemItem.createChoice('Teleplot（リアルタイム可視化）'),
-    ecosystemItem.createChoice('CLI コンソール（シリアルコマンド）'),
-    ecosystemItem.createChoice('スライド教材（Beamer / PPTX）'),
-    ecosystemItem.createChoice('Python SDK'),
-    ecosystemItem.createChoice('ドキュメント / README'),
-    ecosystemItem.createChoice('その他')
+  ecosystemItem.setChoiceValues([
+    'ws:: API（ワークショップ用簡易API）',
+    'sf CLI（ビルド・書き込みツール）',
+    'Teleplot（リアルタイム可視化）',
+    'CLI コンソール（シリアルコマンド）',
+    'スライド教材（Beamer / PPTX）',
+    'Python SDK',
+    'ドキュメント / README'
   ]);
   ecosystemItem.showOtherOption(true);
   ecosystemItem.setRequired(false);
@@ -227,14 +226,13 @@ function createWorkshopSurvey() {
 
   var futureItem = form.addCheckboxItem();
   futureItem.setTitle('Q20. 今後、以下のような発展コースがあれば参加したいですか？（複数選択可）');
-  futureItem.setChoices([
-    futureItem.createChoice('自律飛行（GPS/ビジョンベース）'),
-    futureItem.createChoice('機械学習を用いた制御'),
-    futureItem.createChoice('群制御（マルチドローン）'),
-    futureItem.createChoice('シミュレーション（SIL/HIL）'),
-    futureItem.createChoice('ドローン自作（機体設計・電子回路）'),
-    futureItem.createChoice('ROS 2 連携'),
-    futureItem.createChoice('その他')
+  futureItem.setChoiceValues([
+    '自律飛行（GPS/ビジョンベース）',
+    '機械学習を用いた制御',
+    '群制御（マルチドローン）',
+    'シミュレーション（SIL/HIL）',
+    'ドローン自作（機体設計・電子回路）',
+    'ROS 2 連携'
   ]);
   futureItem.showOtherOption(true);
   futureItem.setRequired(false);
