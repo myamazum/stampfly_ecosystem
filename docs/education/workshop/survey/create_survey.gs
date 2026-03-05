@@ -1,6 +1,6 @@
 /**
  * StampFly Workshop Survey - Google Forms Auto-Generator
- * StampFly ワークショップ アンケート - Google Forms 自動生成スクリプト
+ * StampFly 勉強会 2026春 アンケート - Google Forms 自動生成スクリプト
  *
  * Usage / 使い方:
  * 1. Open https://script.google.com
@@ -12,10 +12,10 @@
  */
 
 function createWorkshopSurvey() {
-  var form = FormApp.create('StampFly ドローン制御工学ワークショップ 受講アンケート');
+  var form = FormApp.create('StampFly 勉強会 2026春 受講アンケート');
 
   form.setDescription(
-    'StampFly ドローン制御工学ワークショップにご参加いただきありがとうございました。\n' +
+    'StampFly 勉強会 2026春にご参加いただきありがとうございました。\n' +
     '今後の講義改善のため、アンケートにご協力ください（所要時間: 約5分）。\n' +
     '回答は匿名で処理され、講義改善の目的にのみ使用します。'
   );
@@ -32,13 +32,13 @@ function createWorkshopSurvey() {
   form.addPageBreakItem().setTitle('セクション 1: 全体評価');
 
   form.addScaleItem()
-    .setTitle('Q1. ワークショップ全体の満足度')
+    .setTitle('Q1. 勉強会全体の満足度')
     .setLabels('不満', '大変満足')
     .setBounds(1, 5)
     .setRequired(true);
 
   form.addScaleItem()
-    .setTitle('Q2. ワークショップの難易度は適切でしたか？')
+    .setTitle('Q2. 勉強会の難易度は適切でしたか？')
     .setHelpText('3が「ちょうどよい」です')
     .setLabels('簡単すぎる', '難しすぎる')
     .setBounds(1, 5)
@@ -152,7 +152,7 @@ function createWorkshopSurvey() {
     .setRequired(true);
 
   form.addScaleItem()
-    .setTitle('Q13. ワークショップ終了後も StampFly Ecosystem を使って開発を続けたいと思いますか？')
+    .setTitle('Q13. 勉強会終了後も StampFly Ecosystem を使って開発を続けたいと思いますか？')
     .setLabels('全く思わない', 'ぜひ続けたい')
     .setBounds(1, 5)
     .setRequired(true);
@@ -199,7 +199,7 @@ function createWorkshopSurvey() {
   ];
 
   var skillGrid = form.addGridItem();
-  skillGrid.setTitle('Q16. ワークショップ受講前と比べて、以下の知識・スキルはどの程度向上しましたか？');
+  skillGrid.setTitle('Q16. 勉強会受講前と比べて、以下の知識・スキルはどの程度向上しましたか？');
   skillGrid.setRows(skillAreas);
   skillGrid.setColumns(improvementLevels);
   skillGrid.setRequired(true);
@@ -217,7 +217,7 @@ function createWorkshopSurvey() {
   form.addPageBreakItem().setTitle('セクション 6: 自由記述');
 
   form.addParagraphTextItem()
-    .setTitle('Q18. ワークショップで最も印象に残ったこと・学んだことを教えてください')
+    .setTitle('Q18. 勉強会で最も印象に残ったこと・学んだことを教えてください')
     .setRequired(false);
 
   form.addParagraphTextItem()
