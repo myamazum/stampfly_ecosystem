@@ -169,7 +169,7 @@ function createWorkshopSurvey() {
   skillGrid.setRequired(true);
 
   form.addScaleItem()
-    .setTitle('Q13. 最終課題（精密着陸競技会）で、自分のチームの成果に満足していますか？')
+    .setTitle('Q13. 最終課題（精密着陸競技会）で、自分の成果に満足していますか？')
     .setLabels('不満', '大変満足')
     .setBounds(1, 5)
     .setRequired(false);
