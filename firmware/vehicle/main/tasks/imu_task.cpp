@@ -160,11 +160,18 @@ void IMUTask(void* pvParameters)
 
                     if (cal_state != last_cal_state) {
                         auto& sys_state_mgr = stampfly::SystemStateManager::getInstance();
+                        auto& led_mgr = stampfly::LEDManager::getInstance();
                         if (cal_state == stampfly::CalibrationState::CALIBRATING) {
                             // Transition to CALIBRATING state
                             // CALIBRATING状態に遷移
                             sys_state_mgr.setFlightState(stampfly::FlightState::CALIBRATING);
                             state.setFlightState(stampfly::FlightState::CALIBRATING);  // Legacy compatibility
+
+                            // LED: yellow slow blink = calibrating (stationary detection in progress)
+                            // LED: 黄色ゆっくり点滅 = キャリブレーション中（静止検出中）
+                            led_mgr.requestChannel(
+                                stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::FLIGHT_STATE,
+                                stampfly::LEDPattern::BLINK_SLOW, 0xFFAA00);
                         } else if (cal_state == stampfly::CalibrationState::COMPLETED) {
                             // If still disarmed, go back to IDLE
                             // まだdisarmならIDLEに戻る
@@ -172,6 +179,18 @@ void IMUTask(void* pvParameters)
                                 sys_state_mgr.setFlightState(stampfly::FlightState::IDLE);
                                 state.setFlightState(stampfly::FlightState::IDLE);  // Legacy compatibility
                             }
+
+                            // LED: green solid = calibration complete, ready to ARM
+                            // LED: 緑点灯 = キャリブレーション完了、ARM可能
+                            led_mgr.requestChannel(
+                                stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::FLIGHT_STATE,
+                                stampfly::LEDPattern::SOLID, 0x00FF00, 3000);
+                        } else if (cal_state == stampfly::CalibrationState::NOT_STARTED) {
+                            // LED: red slow blink = waiting for landing (ToF not detecting ground)
+                            // LED: 赤ゆっくり点滅 = 着陸待ち（ToFが地面を検出できていない）
+                            led_mgr.requestChannel(
+                                stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::FLIGHT_STATE,
+                                stampfly::LEDPattern::BLINK_SLOW, 0xFF0000);
                         }
                         last_cal_state = cal_state;
                     }

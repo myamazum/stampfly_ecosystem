@@ -16,6 +16,7 @@
 #include "level_calibrator.hpp"
 #include "stampfly_math.hpp"
 #include "system_state.hpp"
+#include "esp_log.h"
 
 namespace stampfly {
 
@@ -31,10 +32,12 @@ public:
     struct Config {
         float landing_altitude_threshold;
         int landing_hold_samples;
+        int tof_timeout_samples;
 
         Config()
             : landing_altitude_threshold(0.05f)  // [m] - altitude below this = landed
             , landing_hold_samples(80)           // 200ms @ 400Hz
+            , tof_timeout_samples(800)           // 2s @ 400Hz - fallback if ToF unresponsive
         {}
     };
 
@@ -61,6 +64,7 @@ public:
         calibration_state_ = CalibrationState::NOT_STARTED;
         is_landed_ = false;
         landing_count_ = 0;
+        tof_high_count_ = 0;
         just_landed_ = false;
         just_calibrated_ = false;
         stationary_detector_.reset();
@@ -98,13 +102,14 @@ public:
         bool altitude_low = (tof_altitude < config_.landing_altitude_threshold);
 
         if (altitude_low) {
+            // ToF detects ground nearby - normal landing path
+            // ToFが近い地面を検出 - 通常の着陸パス
             landing_count_++;
+            tof_high_count_ = 0;
             if (landing_count_ >= config_.landing_hold_samples && !is_landed_) {
-                // Just landed
                 is_landed_ = true;
                 just_landed_ = true;
 
-                // Start calibration if not already completed
                 if (calibration_state_ != CalibrationState::COMPLETED) {
                     calibration_state_ = CalibrationState::CALIBRATING;
                     stationary_detector_.reset();
@@ -112,11 +117,29 @@ public:
             }
         } else {
             landing_count_ = 0;
-            // If altitude increases while disarmed (picked up), restart calibration
-            if (is_landed_) {
+            tof_high_count_++;
+
+            // Fallback: if ToF consistently fails (low-reflectivity surface),
+            // assume landed and start calibration using accel/gyro only.
+            // フォールバック: ToFが継続的に失敗する場合（低反射面）、
+            // 着陸と仮定してaccel/gyroのみでキャリブレーション開始
+            if (tof_high_count_ >= config_.tof_timeout_samples && !is_landed_) {
+                is_landed_ = true;
+                just_landed_ = true;
+                if (calibration_state_ != CalibrationState::COMPLETED) {
+                    calibration_state_ = CalibrationState::CALIBRATING;
+                    stationary_detector_.reset();
+                    ESP_LOGW("LandingHandler",
+                             "ToF timeout (%d samples) - assuming landed (low-reflectivity surface?)",
+                             config_.tof_timeout_samples);
+                }
+            }
+
+            if (is_landed_ && tof_high_count_ < config_.tof_timeout_samples) {
+                // ToF suddenly reads high but hasn't timed out - might be picked up
+                // ToFが突然高くなったがタイムアウトしていない - 持ち上げられた可能性
                 is_landed_ = false;
                 if (calibration_state_ == CalibrationState::COMPLETED) {
-                    // Was calibrated but now lifted - need recalibration when put down
                     calibration_state_ = CalibrationState::NOT_STARTED;
                 }
             }
@@ -223,6 +246,8 @@ private:
     CalibrationState calibration_state_ = CalibrationState::NOT_STARTED;
     bool is_landed_ = false;
     int landing_count_ = 0;
+    int tof_high_count_ = 0;  // Counts consecutive ToF > threshold (for fallback)
+                               // ToFが閾値超の連続カウント（フォールバック用）
 
     // Event flags
     bool just_landed_ = false;
