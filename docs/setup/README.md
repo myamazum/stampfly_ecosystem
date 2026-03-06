@@ -11,8 +11,8 @@ StampFly Ecosystemの開発環境セットアップガイドです。
 | 項目 | 要件 |
 |------|------|
 | OS | macOS, Linux, Windows (WSL2推奨) |
-| Python | 3.9以上 |
-| ESP-IDF | v5.4以上（v5.5.2推奨） |
+| Python | 3.8以上 |
+| ESP-IDF | v5.5.2 |
 | Git | 最新版 |
 
 ## 3. クイックスタート
@@ -111,8 +111,8 @@ Setup guide for StampFly Ecosystem development environment.
 | Item | Requirement |
 |------|-------------|
 | OS | macOS, Linux, Windows (WSL2 recommended) |
-| Python | 3.9 or later |
-| ESP-IDF | v5.4 or later (v5.5.2 recommended) |
+| Python | 3.8 or later |
+| ESP-IDF | v5.5.2 |
 | Git | Latest version |
 
 ## 3. Quick Start

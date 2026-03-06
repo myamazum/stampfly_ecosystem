@@ -185,3 +185,17 @@ cd /mnt/c/path/to/stampfly_ecosystem
 # Run diagnostics
 sf doctor
 ```
+
+## 7. Troubleshooting
+
+### USB Device Not Recognized in WSL2
+
+```powershell
+# Reconnect on Windows side
+usbipd detach --busid <BUSID>
+usbipd attach --wsl --busid <BUSID>
+```
+
+### Slow Performance
+
+Working within the WSL2 Linux filesystem (`/home/user/`) is recommended. `/mnt/c/` has slower performance.

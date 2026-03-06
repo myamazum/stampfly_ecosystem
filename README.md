@@ -22,7 +22,7 @@
 | **シミュレータで練習** | 実機なしでドローン操縦を体験。制御アルゴリズムの検証にも |
 | **すぐに飛ばせる** | ファームウェアをビルドして、実機で飛行 |
 | **WiFi経由で制御** | PC/スマホから高レベルコマンド（jump, takeoff, land, hover）を実行 |
-| **制御を自作できる** | 角速度制御のスケルトンコードを提供。姿勢制御、位置制御を自分で実装 |
+| **制御を自作できる** | 4つの制御モード（ACRO/STABILIZE/高度維持/位置保持）を搭載。カスケード制御を学び、カスタマイズ可能 |
 | **センサーデータを見れる** | IMU、気圧、ToF、オプティカルフロー等のリアルタイムデータをCLI/WiFiで取得 |
 | **実験データを解析できる** | ログを記録し、Pythonで解析・可視化 |
 
@@ -115,6 +115,8 @@ stampfly_ecosystem/
 ├── analysis/       # 実験データ解析（構築中）
 ├── tools/          # 補助ツール（構築中）
 ├── simulator/      # 3Dフライトシミュレータ
+├── ros/            # ROS連携（構築中）
+├── examples/       # 学習用サンプル
 └── third_party/    # 外部依存
 ```
 
@@ -173,7 +175,8 @@ This ecosystem exists for you.
 |-----------|-------------|
 | **Practice in simulator** | Experience drone piloting without real hardware. Also for testing control algorithms |
 | **Fly immediately** | Build firmware and fly the real drone |
-| **Build your own control** | Rate control skeleton provided. Implement attitude/position control yourself |
+| **Control via WiFi** | Send high-level commands (jump, takeoff, land, hover) from PC/smartphone |
+| **Build your own control** | 4 flight modes (ACRO/STABILIZE/Altitude Hold/Position Hold) included. Learn and customize cascade control |
 | **View sensor data** | Real-time IMU, barometer, ToF, optical flow data via CLI/WiFi |
 | **Analyze experiments** | Record flight logs and analyze with Python |
 
@@ -266,6 +269,8 @@ stampfly_ecosystem/
 ├── analysis/       # Experiment data analysis (WIP)
 ├── tools/          # Utility tools (WIP)
 ├── simulator/      # 3D flight simulator
+├── ros/            # ROS integration (WIP)
+├── examples/       # Learning examples
 └── third_party/    # External dependencies
 ```
 

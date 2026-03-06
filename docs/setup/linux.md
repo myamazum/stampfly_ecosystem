@@ -193,3 +193,21 @@ sf doctor
 # Check serial ports
 ls /dev/ttyUSB* /dev/ttyACM*
 ```
+
+## 8. Troubleshooting
+
+### Serial Port Not Found
+
+```bash
+# Check connection
+dmesg | tail -20
+
+# Check permissions
+ls -la /dev/ttyUSB0
+```
+
+### Python-related Errors
+
+```bash
+pip3 install pyserial
+```

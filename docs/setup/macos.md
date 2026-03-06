@@ -180,3 +180,16 @@ sf doctor
 # Check version
 sf version
 ```
+
+## 9. Troubleshooting
+
+### Python-related Errors
+
+```bash
+# Install pyserial
+pip3 install pyserial
+```
+
+### USB Permission Errors
+
+Usually not needed on macOS. If you encounter issues, check Security settings in System Preferences.

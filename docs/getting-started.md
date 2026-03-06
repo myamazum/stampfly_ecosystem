@@ -115,7 +115,7 @@ sf sim run vpython --seed 12345       # シード指定
 |-----|----------|------|
 | ESP-IDF | v5.5.2 | install.shで自動インストール可 |
 | Git | 最新版 | - |
-| Python | 3.10以上 | - |
+| Python | 3.8以上 | - |
 
 ## 2. インストール
 
@@ -322,14 +322,14 @@ StampFlyは2つの通信モードをサポートしています。
 
 ### 制御モード
 
-> **現在のファームウェアは ACRO モードのみで動作します。**
-> STABILIZE モードや高度維持機能は**意図的に未実装**です。
-> 制御理論を学びたい方は、ぜひ自分で実装してみてください！
-
 | モード | 説明 | 状態 |
 |-------|------|------|
-| ACRO | 角速度制御 | **現在有効** |
-| STABILIZE | 角度制御（自動水平） | 未実装 |
+| ACRO | 角速度制御 | **実装済み** |
+| STABILIZE | 角度制御（自動水平） | **実装済み** |
+| ALTITUDE_HOLD | 高度維持 | **実装済み** |
+| POSITION_HOLD | 位置保持 | **実装済み** |
+
+> **Tips:** コントローラの右ボタンで制御モード、左ボタンで高度モードを切り替えられます。
 
 ## 8. 開発者向け機能
 
@@ -472,7 +472,21 @@ sf sim run vpython
 # Genesis simulator (high-precision, separate install)
 sf setup genesis
 sf sim run genesis
+
+# World options
+sf sim run vpython --world ringworld  # Ring world
+sf sim run vpython --seed 12345       # Specify seed
 ```
+
+### Troubleshooting
+
+| Symptom | Solution |
+|---------|----------|
+| Controller not recognized | Check USB HID mode is enabled. Restart PC |
+| Stick drifting | Run "Calibration" from menu |
+| vpython not found | Run `sf setup sim` |
+
+Once comfortable with the simulator, try flying the real drone!
 
 ---
 
@@ -493,7 +507,7 @@ sf sim run genesis
 |------|---------|-------|
 | ESP-IDF | v5.5.2 | Auto-install via install.sh |
 | Git | Latest | - |
-| Python | 3.10+ | - |
+| Python | 3.8+ | - |
 
 ## 2. Installation
 
@@ -538,6 +552,22 @@ Connect StampFly via USB:
 sf flash vehicle
 ```
 
+Port is auto-detected. To specify manually:
+
+```bash
+sf flash vehicle -p /dev/ttyACM0    # Linux
+sf flash vehicle -p /dev/cu.usbmodem*  # macOS
+sf flash vehicle -p COM3            # Windows
+```
+
+### Serial Monitor
+
+```bash
+sf monitor
+```
+
+Exit with `Ctrl + ]`.
+
 ### Build → Flash → Monitor
 
 ```bash
@@ -565,10 +595,11 @@ StampFly supports two communication modes.
 For multi-vehicle formation or TDMA synchronization.
 
 **Pairing:**
-1. **Controller**: Hold M5 button while powering on
-2. LCD shows "Pairing mode..."
+1. **Controller**: Hold M5 button (under screen) while powering on
+2. LCD shows "Pairing mode..." and beeping starts
 3. **StampFly**: Long-press button (~2 sec) to enter pairing mode
 4. Both beep when pairing completes
+5. Pairing info is saved automatically and auto-connects next time
 
 ### UDP Mode (Recommended for single-vehicle)
 
@@ -587,33 +618,90 @@ For solo flights or development/debugging. Simple setup.
    - Select "UDP Mode"
    - Controller restarts and connects to Vehicle's WiFi AP
 
+**How it works:**
+```
+┌────────────┐      WiFi AP      ┌────────────┐
+│ Controller │ ←───────────────→ │  Vehicle   │
+│   (STA)    │   192.168.4.1     │   (AP)     │
+└────────────┘                   └────────────┘
+```
+
 **Note:** UDP mode does not require pairing. Auto-connects to Vehicle's WiFi AP.
 
 ## 6. Pre-Flight Checks
+
+### Checklist
 
 - [ ] Battery charged (3.7V+ recommended)
 - [ ] Propellers correctly attached
 - [ ] Clear surroundings (2m × 2m minimum)
 - [ ] Controller sticks in neutral
 
+### Stick Mode (Mode 2 / Mode 3)
+
+| Startup Method | Selected Mode |
+|----------------|---------------|
+| Normal startup | Mode 2 |
+| **Hold left button while starting** | **Mode 3 (recommended)** |
+
 ## 7. How to Fly
+
+### Stick Layout
+
+#### Mode 2
+
+```
+        Left Stick                Right Stick
+     ┌─────────────┐          ┌─────────────┐
+     │      ↑      │          │      ↑      │
+     │   Throttle   │          │    Pitch    │
+     │ ←Yaw    Yaw→ │          │←Roll   Roll→│
+     │      ↓      │          │      ↓      │
+     └─────────────┘          └─────────────┘
+```
+
+#### Mode 3 (Recommended)
+
+```
+        Left Stick                Right Stick
+     ┌─────────────┐          ┌─────────────┐
+     │      ↑      │          │      ↑      │
+     │    Pitch     │          │   Throttle  │
+     │←Roll   Roll→ │          │ ←Yaw    Yaw→│
+     │      ↓      │          │      ↓      │
+     └─────────────┘          └─────────────┘
+```
 
 ### Basic Operation
 
-1. **Arm**: Press throttle stick button
-2. **Takeoff**: Slowly raise throttle
-3. **Land**: Lower throttle, then disarm
+#### 1. Arm (Start Motors)
+
+1. Place the drone on a flat surface
+2. Set throttle to lowest position
+3. **Press the throttle stick button**
+4. Motors start spinning
+
+#### 2. Takeoff
+
+1. Slowly raise the throttle
+2. Once the drone lifts off, hold at hover position
+
+#### 3. Landing
+
+1. Slowly lower the throttle
+2. Once landed, set throttle to lowest
+3. **Press the throttle stick button** to disarm
 
 ### Control Modes
 
-> **Current firmware operates in ACRO mode only.**
-> STABILIZE mode and altitude hold are **intentionally not implemented**.
-> Implement them yourself to learn control theory!
-
 | Mode | Description | Status |
 |------|-------------|--------|
-| ACRO | Rate control | **Active** |
-| STABILIZE | Angle control | Not implemented |
+| ACRO | Rate control | **Implemented** |
+| STABILIZE | Angle control (auto-level) | **Implemented** |
+| ALTITUDE_HOLD | Altitude hold | **Implemented** |
+| POSITION_HOLD | Position hold | **Implemented** |
+
+> **Tips:** Use the right button on the controller to switch control modes, and the left button for altitude mode.
 
 ## 8. Developer Features
 
@@ -652,3 +740,4 @@ sf monitor
 
 - [Command Reference](commands/README.md) - All sf CLI commands
 - [firmware/vehicle/README.md](../firmware/vehicle/README.md) - Vehicle firmware details
+- [firmware/controller/README.md](../firmware/controller/README.md) - Controller details
