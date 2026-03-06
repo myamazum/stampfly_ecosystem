@@ -58,7 +58,7 @@ def _check_manifest(warnings: list, issues: list) -> None:
         return
 
     try:
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         lessons = data.get("lessons", [])
     except Exception as e:

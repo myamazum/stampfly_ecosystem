@@ -56,7 +56,7 @@ def _load_manifest() -> Optional[List[Dict[str, Any]]]:
         return None
     try:
         import yaml
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         return data.get("lessons", [])
     except ImportError:
