@@ -238,17 +238,7 @@ Workshop Lessons
 
 ---
 
-## 5. PPTX ジェネレータの対応
-
-### 方針
-
-- PPTXジェネレータも `lesson_manifest.yaml` を読み込み、レッスン番号・タイトルを統一
-- コードスニペットの抽出は同じ `extract_snippets.py` の Python API を使用
-- 個別PPTX生成は維持（配布用途が異なるため）
-
----
-
-## 6. 実装ステップ
+## 5. 実装ステップ
 
 ### Phase 1: ファイル構造の変更（破壊的変更なし）
 
@@ -279,13 +269,13 @@ Workshop Lessons
 ### Phase 4: クリーンアップ
 
 1. 旧 `lesson_XX.tex` ファイルを削除
-2. PPTXジェネレータを manifest 対応に改修
-3. `.gitignore` 更新（一時展開ファイルの除外）
-4. ドキュメント更新（DOCUMENT_INDEX.md、README等）
+2. `.gitignore` 更新（一時展開ファイルの除外）
+3. ドキュメント更新（DOCUMENT_INDEX.md、README等）
+4. PPTXジェネレータは現状維持（必要が生じた場合にのみ対応）
 
 ---
 
-## 7. リスクと対策
+## 6. リスクと対策
 
 | リスク | 影響 | 対策 |
 |--------|------|------|
@@ -296,7 +286,7 @@ Workshop Lessons
 
 ---
 
-## 8. 最終成果物
+## 7. 最終成果物
 
 | 成果物 | 説明 |
 |--------|------|
@@ -398,7 +388,7 @@ Firmware source files are annotated with `@@snippet` / `@@end-snippet` markers. 
 | 1 | File restructure | Create `chapters/`, `main.tex`, rename files, update Makefile |
 | 2 | Lesson manifest | Create YAML, update `sf lesson` command |
 | 3 | Code snippet sync | Create extractor, add markers, update slides |
-| 4 | Cleanup | Remove old files, update PPTX generator, update docs |
+| 4 | Cleanup | Remove old files, update docs. PPTX generator left as-is (update only when needed) |
 
 ---
 
