@@ -79,7 +79,7 @@ for %%p in (python3 python py) do (
         )
         if defined ver (
             for /f "tokens=1,2 delims=." %%a in ("!ver!") do (
-                if %%a geq 3 if %%b geq 10 (
+                if %%a geq 3 if %%b geq 8 (
                     set "PYTHON_CMD=%%p"
                     set "PYTHON_VERSION=!ver!"
                 )
@@ -90,7 +90,7 @@ for %%p in (python3 python py) do (
 )
 
 if not defined PYTHON_CMD (
-    echo [ERROR] Python 3.10+ is required but not found.
+    echo [ERROR] Python 3.8+ is required but not found.
     echo.
     echo   Install Python from:
     echo     https://www.python.org/downloads/

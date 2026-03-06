@@ -13,7 +13,7 @@ CMD を開いて以下を確認してください:
 | 確認コマンド | 期待される結果 | なければ |
 |-------------|---------------|---------|
 | `git --version` | git version 2.x | `winget install Git.Git` |
-| `python --version` | Python 3.10 以上 | `winget install Python.Python.3.12` |
+| `python --version` | Python 3.8 以上 | `winget install Python.Python.3.12` |
 
 ## 3. インストール
 
@@ -83,7 +83,7 @@ Open CMD and verify the following:
 | Command | Expected Result | If Missing |
 |---------|----------------|------------|
 | `git --version` | git version 2.x | `winget install Git.Git` |
-| `python --version` | Python 3.10+ | `winget install Python.Python.3.12` |
+| `python --version` | Python 3.8+ | `winget install Python.Python.3.12` |
 
 ## 3. Installation
 

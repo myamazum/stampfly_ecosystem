@@ -24,9 +24,9 @@ import shutil
 from pathlib import Path
 from typing import Optional, List, Tuple
 
-# Ensure we're running Python 3.10+
-if sys.version_info < (3, 10):
-    print(f"Error: Python 3.10+ required, found {sys.version_info.major}.{sys.version_info.minor}")
+# Ensure we're running Python 3.8+
+if sys.version_info < (3, 8):
+    print(f"Error: Python 3.8+ required, found {sys.version_info.major}.{sys.version_info.minor}")
     sys.exit(1)
 
 

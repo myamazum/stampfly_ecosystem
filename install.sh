@@ -2,7 +2,7 @@
 # StampFly Ecosystem Installer
 # Usage: ./install.sh [options]
 #
-# This script checks for Python 3.10+ and then runs the Python installer.
+# This script checks for Python 3.8+ and then runs the Python installer.
 
 set -e
 
@@ -165,7 +165,7 @@ check_python() {
         local minor
         minor=$("$cmd" -c 'import sys; print(sys.version_info.minor)' 2>/dev/null)
 
-        if [ "$major" -ge 3 ] && [ "$minor" -ge 10 ]; then
+        if [ "$major" -ge 3 ] && [ "$minor" -ge 8 ]; then
             echo "$cmd:$version"
             return 0
         fi
@@ -187,7 +187,7 @@ find_python() {
 # Install Python guidance
 install_python_guidance() {
     echo
-    error "Python 3.10+ is required but not found."
+    error "Python 3.8+ is required but not found."
     echo
 
     case "$(uname -s)" in

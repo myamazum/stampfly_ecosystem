@@ -47,7 +47,7 @@ if defined PYTHON_DIR (
 
 python.exe --version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Python not found. Install Python 3.10+ first.
+    echo [ERROR] Python not found. Install Python 3.8+ first.
     echo   https://www.python.org/downloads/
     exit /b 1
 )

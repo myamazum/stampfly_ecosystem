@@ -123,9 +123,9 @@ def run(args: argparse.Namespace) -> int:
     # Check Python version
     console.info("Checking Python...")
     py_version = sys.version_info
-    if py_version < (3, 10):
-        issues.append(f"Python 3.10+ required, found {py_version.major}.{py_version.minor}")
-        console.error(f"  Python {py_version.major}.{py_version.minor} - 3.10+ required")
+    if py_version < (3, 8):
+        issues.append(f"Python 3.8+ required, found {py_version.major}.{py_version.minor}")
+        console.error(f"  Python {py_version.major}.{py_version.minor} - 3.8+ required")
     else:
         console.success(f"  Python {py_version.major}.{py_version.minor}.{py_version.micro}")
 
