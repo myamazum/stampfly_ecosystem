@@ -807,6 +807,7 @@ def build_lesson_03() -> Presentation:
         "関数", "説明", "引数",
     ], [
         ["disable_led_task()", "システム LED 更新を無効化", "---"],
+        ["enable_led_task()", "システム LED 更新を再有効化", "---"],
         ["led_color(r, g, b)", "LED 色設定（裏表両方）", "各 0-255"],
         ["is_armed()", "ARM 状態確認", "true / false"],
         ["battery_voltage()", "バッテリー電圧", "3.0-4.2 V"],
@@ -1589,7 +1590,7 @@ def build_lesson_10() -> Presentation:
             ["Motor", "motor_set_duty(m, d), motor_mixer(t,r,p,y)", "モータ制御"],
             ["RC Input", "rc_throttle/roll/pitch/yaw()", "スティック値 [-1,1]"],
             ["Buttons", "rc_throttle_yaw_button(), rc_stabilize_acro_mode()", "ボタン/モード"],
-            ["LED", "led_color(r,g,b), disable_led_task()", "LED 制御"],
+            ["LED", "led_color(r,g,b), disable/enable_led_task()", "LED 制御"],
             ["IMU", "gyro_x/y/z(), accel_x/y/z()", "角速度, 加速度"],
             ["Env/Distance", "baro_altitude(), mag_x(), tof_bottom(), flow_vx()", "環境・距離 (10)"],
             ["Estimation", "estimated_roll/pitch/yaw/altitude()", "ESKF 推定値"],

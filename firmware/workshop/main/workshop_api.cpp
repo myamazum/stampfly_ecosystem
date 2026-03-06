@@ -215,6 +215,13 @@ void ws::disable_led_task()
     s_led_task_disabled = true;
 }
 
+void ws::enable_led_task()
+{
+    auto& led_mgr = stampfly::LEDManager::getInstance();
+    led_mgr.setSystemEventsEnabled(true);
+    s_led_task_disabled = false;
+}
+
 bool ws::is_led_task_disabled() { return s_led_task_disabled; }
 
 void ws::led_color(uint8_t r, uint8_t g, uint8_t b)

@@ -203,6 +203,16 @@ bool rc_pos_mode();
 void disable_led_task();
 
 /**
+ * @brief Re-enable system LED updates
+ *        システムLED更新を再有効化
+ *
+ * Restores automatic LED updates (flight state, battery, etc.)
+ * after disable_led_task() was called.
+ * disable_led_task() で無効化した後、自動LED更新を復元する。
+ */
+void enable_led_task();
+
+/**
  * @brief Set LED color (RGB)
  *        LEDカラーを設定
  * @param r Red (0-255)
