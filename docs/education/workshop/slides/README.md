@@ -6,7 +6,7 @@
 
 ### このディレクトリについて
 
-StampFly ワークショップ（Lesson 0--13）の講義スライドを LaTeX Beamer で提供します。全ダイアグラムは TikZ で作成しています。全レッスンは `beamer/main.tex` に統合された1つの PDF として配布します。
+StampFly ワークショップ（Lesson 0--13）の講義スライドを LaTeX Beamer で提供します。全ダイアグラムは TikZ で作成しています。全レッスンは `beamer/stampfly_workshop.tex` に統合された1つの PDF として配布します。
 
 ### ディレクトリ構成
 
@@ -14,7 +14,7 @@ StampFly ワークショップ（Lesson 0--13）の講義スライドを LaTeX B
 |------------|------|
 | `beamer/` | LaTeX Beamer スライド |
 | `beamer/chapters/` | レッスン別チャプターファイル（内容ベース命名） |
-| `beamer/main.tex` | 統合メインファイル（全チャプターを `\input`） |
+| `beamer/stampfly_workshop.tex` | 統合メインファイル（全チャプターを `\input`） |
 | `beamer/stampfly_slides.sty` | 共通スタイル |
 | `beamer/preamble.tex` | 追加プリアンブル設定 |
 | `tikz/` | TikZ ダイアグラムソース（.tex） |
@@ -32,11 +32,10 @@ lualatex --version
 ### ビルドコマンド
 
 ```bash
-make all       # 全ビルド（tikz + main）
-make main      # 統合PDF（全レッスン）
+make all       # 全ビルド（tikz + slides）
+make slides    # 統合PDF（全レッスン）
 make tikz      # TikZ → PDF → PNG のみ
 make chapter NAME=led_control  # 単一チャプター（高速イテレーション用）
-make beamer    # レガシー個別PDF
 make clean     # 中間ファイル削除
 ```
 
@@ -47,7 +46,7 @@ make clean     # 中間ファイル削除
 cd tikz && lualatex motor_layout.tex
 
 # 統合PDF
-cd beamer && lualatex main.tex && lualatex main.tex
+cd beamer && lualatex stampfly_workshop.tex && lualatex stampfly_workshop.tex
 ```
 
 ## 3. レッスン一覧
@@ -104,7 +103,7 @@ python3 tools/extract_snippets.py expand
 
 ### About This Directory
 
-Workshop slides for StampFly Lessons 0--13 in LaTeX Beamer format. All diagrams are created with TikZ. All lessons are unified into a single PDF via `beamer/main.tex`.
+Workshop slides for StampFly Lessons 0--13 in LaTeX Beamer format. All diagrams are created with TikZ. All lessons are unified into a single PDF via `beamer/stampfly_workshop.tex`.
 
 ## 2. Build Instructions
 
@@ -118,11 +117,10 @@ lualatex --version
 ### Build Commands
 
 ```bash
-make all       # Build everything (tikz + main)
-make main      # Unified PDF (all lessons)
+make all       # Build everything (tikz + slides)
+make slides    # Unified PDF (all lessons)
 make tikz      # TikZ → PDF → PNG only
 make chapter NAME=led_control  # Single chapter (fast iteration)
-make beamer    # Legacy individual PDFs
 make clean     # Remove build artifacts
 ```
 

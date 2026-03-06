@@ -1,13 +1,12 @@
 # StampFly Workshop Slides — Build Automation
 # Usage:
-#   make all       — Build everything (tikz + main)
+#   make all       — Build everything (tikz + slides)
 #   make tikz      — TikZ diagrams → PDF → PNG
-#   make main      — Unified Beamer PDF (all lessons)
-#   make beamer    — Individual lesson PDFs (legacy)
+#   make slides    — Unified Beamer PDF (all lessons)
 #   make chapter   — Single chapter: make chapter NAME=led_control
 #   make clean     — Remove build artifacts
 
-.PHONY: all tikz main beamer chapter clean
+.PHONY: all tikz slides chapter clean
 
 # ---------------------------------------------------------------------------
 # TikZ diagrams
@@ -35,12 +34,14 @@ $(IMAGES_DIR)/%.png: $(TIKZ_DIR)/%.pdf
 # ---------------------------------------------------------------------------
 
 BEAMER_DIR      := beamer
+SLIDES_TEX      := stampfly_workshop.tex
+SLIDES_PDF      := stampfly_workshop.pdf
 CHAPTER_SOURCES := $(wildcard $(BEAMER_DIR)/chapters/*.tex)
 
-main: $(BEAMER_DIR)/main.pdf
+slides: $(BEAMER_DIR)/$(SLIDES_PDF)
 
-$(BEAMER_DIR)/main.pdf: $(BEAMER_DIR)/main.tex $(BEAMER_DIR)/preamble.tex $(BEAMER_DIR)/stampfly_slides.sty $(CHAPTER_SOURCES)
-	cd $(BEAMER_DIR) && lualatex -interaction=nonstopmode main.tex && lualatex -interaction=nonstopmode main.tex
+$(BEAMER_DIR)/$(SLIDES_PDF): $(BEAMER_DIR)/$(SLIDES_TEX) $(BEAMER_DIR)/preamble.tex $(BEAMER_DIR)/stampfly_slides.sty $(CHAPTER_SOURCES)
+	cd $(BEAMER_DIR) && lualatex -interaction=nonstopmode $(SLIDES_TEX) && lualatex -interaction=nonstopmode $(SLIDES_TEX)
 
 # ---------------------------------------------------------------------------
 # Single chapter build (for fast iteration)
@@ -55,22 +56,10 @@ endif
 	@cd $(BEAMER_DIR) && lualatex -interaction=nonstopmode "\documentclass[aspectratio=169,14pt]{beamer}\usepackage{stampfly_slides}\input{preamble}\title{StampFly Workshop}\author{StampFly Workshop}\date{}\begin{document}\input{chapters/$(NAME)}\end{document}"
 
 # ---------------------------------------------------------------------------
-# Individual lesson PDFs (legacy, for backward compatibility)
-# ---------------------------------------------------------------------------
-
-BEAMER_SOURCES := $(wildcard $(BEAMER_DIR)/lesson_*.tex)
-BEAMER_PDFS    := $(BEAMER_SOURCES:.tex=.pdf)
-
-beamer: $(BEAMER_PDFS)
-
-$(BEAMER_DIR)/lesson_%.pdf: $(BEAMER_DIR)/lesson_%.tex $(BEAMER_DIR)/stampfly_slides.sty $(TIKZ_SOURCES)
-	cd $(BEAMER_DIR) && lualatex -interaction=nonstopmode $(notdir $<) && lualatex -interaction=nonstopmode $(notdir $<)
-
-# ---------------------------------------------------------------------------
 # All
 # ---------------------------------------------------------------------------
 
-all: tikz main
+all: tikz slides
 
 # ---------------------------------------------------------------------------
 # Clean
@@ -81,5 +70,5 @@ clean:
 	rm -f $(BEAMER_DIR)/*.aux $(BEAMER_DIR)/*.log $(BEAMER_DIR)/*.nav \
 	      $(BEAMER_DIR)/*.out $(BEAMER_DIR)/*.snm $(BEAMER_DIR)/*.toc \
 	      $(BEAMER_DIR)/*.vrb
-	rm -f $(BEAMER_DIR)/main.pdf
+	rm -f $(BEAMER_DIR)/$(SLIDES_PDF)
 	rm -f $(IMAGES_DIR)/*.png
