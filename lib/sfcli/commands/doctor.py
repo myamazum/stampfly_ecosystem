@@ -14,6 +14,8 @@ from ..utils import console, paths, platform
 COMMAND_NAME = "doctor"
 COMMAND_HELP = "Diagnose environment issues"
 
+MANIFEST_FILE = "lesson_manifest.yaml"
+
 
 def register(subparsers: argparse._SubParsersAction) -> None:
     """Register command with CLI"""
@@ -28,6 +30,86 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Attempt to fix issues automatically",
     )
     parser.set_defaults(func=run)
+
+
+def _check_manifest(warnings: list, issues: list) -> None:
+    """Validate lesson manifest against filesystem.
+
+    Checks:
+    1. Manifest file exists and is valid YAML
+    2. Each lesson's firmware_dir exists (if specified)
+    3. Each firmware_dir has student.cpp and solution.cpp
+    4. Each lesson's slide_file exists in chapters/
+    5. No orphan lesson directories (dirs not in manifest)
+    """
+    lessons_dir = paths.workshop() / "lessons"
+    manifest_path = lessons_dir / MANIFEST_FILE
+
+    if not manifest_path.exists():
+        warnings.append("Lesson manifest not found")
+        console.warning(f"  {MANIFEST_FILE}: NOT FOUND")
+        return
+
+    try:
+        import yaml
+    except ImportError:
+        warnings.append("PyYAML not installed — cannot validate manifest")
+        console.warning("  PyYAML: NOT INSTALLED (pip install pyyaml)")
+        return
+
+    try:
+        with open(manifest_path) as f:
+            data = yaml.safe_load(f)
+        lessons = data.get("lessons", [])
+    except Exception as e:
+        issues.append(f"Manifest parse error: {e}")
+        console.error(f"  {MANIFEST_FILE}: PARSE ERROR — {e}")
+        return
+
+    console.success(f"  {MANIFEST_FILE}: {len(lessons)} lessons")
+
+    # Slide chapters directory
+    chapters_dir = (paths.root() / "docs" / "education" / "workshop"
+                    / "slides" / "beamer" / "chapters")
+
+    # Track manifest firmware dirs for orphan check
+    manifest_fw_dirs = set()
+
+    for entry in lessons:
+        num = entry.get("number", "?")
+        lid = entry.get("id", "unknown")
+        fw_dir = entry.get("firmware_dir")
+        slide_file = entry.get("slide_file")
+
+        # Check firmware directory
+        if fw_dir is not None:
+            manifest_fw_dirs.add(fw_dir)
+            fw_path = lessons_dir / fw_dir
+            if not fw_path.exists():
+                issues.append(f"Lesson {num} ({lid}): firmware_dir '{fw_dir}' missing")
+                console.error(f"  Lesson {num}: firmware_dir '{fw_dir}' NOT FOUND")
+            else:
+                # Check for required files
+                for fname in ("student.cpp", "solution.cpp"):
+                    if not (fw_path / fname).exists():
+                        warnings.append(f"Lesson {num} ({lid}): {fname} missing")
+                        console.warning(f"  Lesson {num}: {fw_dir}/{fname} MISSING")
+
+        # Check slide file
+        if slide_file:
+            slide_path = chapters_dir / f"{slide_file}.tex"
+            if not slide_path.exists():
+                issues.append(f"Lesson {num} ({lid}): slide '{slide_file}.tex' missing")
+                console.error(f"  Lesson {num}: chapters/{slide_file}.tex NOT FOUND")
+
+    # Orphan check: lesson directories not in manifest
+    if lessons_dir.exists():
+        for d in sorted(lessons_dir.iterdir()):
+            if not d.is_dir() or not d.name.startswith("lesson_"):
+                continue
+            if d.name not in manifest_fw_dirs:
+                warnings.append(f"Orphan directory: {d.name} (not in manifest)")
+                console.warning(f"  Orphan: {d.name} (not in manifest)")
 
 
 def run(args: argparse.Namespace) -> int:
@@ -161,6 +243,12 @@ def run(args: argparse.Namespace) -> int:
             console.warning(f"  Windows PATH entries: {len(mnt_paths)} found")
             console.print("    These may cause issues with ESP-IDF tools.")
             console.print("    The installer filters these automatically during sfcli install.")
+
+    # Check lesson manifest
+    # レッスンマニフェスト検証
+    console.print()
+    console.info("Checking lesson manifest...")
+    _check_manifest(warnings, issues)
 
     # Check StampFly configuration
     console.print()
