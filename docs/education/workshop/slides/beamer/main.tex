@@ -1,0 +1,67 @@
+\documentclass[aspectratio=169, 14pt]{beamer}
+\usepackage{stampfly_slides}
+\input{preamble}
+
+\title{StampFly 勉強会 2026}
+\subtitle{ドローン制御工学ハンズオン ワークショップ}
+\author{伊藤 恒平}
+\date{2026/3/2 -- 3/6}
+
+\begin{document}
+
+% === Title page ===
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% === Cover: download links, repository info ===
+\input{chapters/cover}
+
+% === Day 1 ===
+\lessondivider{0}{環境セットアップ}{Environment Setup}
+\input{chapters/environment_setup}
+
+\lessondivider{1}{モータ制御}{Motor Control}
+\input{chapters/motor_control}
+
+\lessondivider{2}{コントローラ入力}{Controller Input}
+\input{chapters/controller_input}
+
+% === Day 2 ===
+\lessondivider{3}{LED制御}{LED Control}
+\input{chapters/led_control}
+
+\lessondivider{4}{IMUセンサー}{IMU Sensor}
+\input{chapters/imu_sensor}
+
+\lessondivider{5}{レートP制御 + 初フライト}{Rate P-Control + First Flight}
+\input{chapters/rate_p_control}
+
+% === Day 3 ===
+\lessondivider{6}{システムモデリング}{System Modeling}
+\input{chapters/system_modeling}
+
+\lessondivider{7}{システム同定}{System Identification}
+\input{chapters/system_identification}
+
+\lessondivider{8}{PID制御}{PID Control}
+\input{chapters/pid_control}
+
+% === Day 4 ===
+\lessondivider{9}{姿勢推定}{Attitude Estimation}
+\input{chapters/attitude_estimation}
+
+\lessondivider{10}{ws:: APIリファレンス}{ws:: API Reference}
+\input{chapters/api_reference}
+
+\lessondivider{11}{独自ファームウェア開発}{Custom Firmware Development}
+\input{chapters/custom_firmware}
+
+\lessondivider{12}{Python SDK プログラム飛行}{Python SDK Programmatic Flight}
+\input{chapters/python_sdk}
+
+% === Day 5 ===
+\lessondivider{13}{精密着陸競技会}{Precision Landing Competition}
+\input{chapters/precision_landing}
+
+\end{document}

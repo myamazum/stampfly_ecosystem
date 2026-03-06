@@ -5,10 +5,13 @@
 *.snm
 *.toc
 *.vrb
+*.log
 
 # Generated intermediate files (rebuild with `make all`)
 tikz/*.pdf
-pptx/output/*.pptx
 
-# Beamer PDFs are tracked (committed for distribution)
-# beamer/*.pdf
+# Unified PDF is tracked (committed for distribution)
+# beamer/main.pdf
+
+# Legacy individual PDFs are tracked
+# beamer/lesson_*.pdf

@@ -1,0 +1,277 @@
+% Frame 1: Title
+% ------------------------------------------------------------------
+
+% ------------------------------------------------------------------
+% Frame 2: Today's Goal
+% ------------------------------------------------------------------
+\begin{frame}{今日のゴール / Today's Goal}
+  \begin{block}{目標}
+    \texttt{sf app new} で独自プロジェクトを作り、ネイティブ API で全センサにアクセスする
+  \end{block}
+
+  \vspace{0.5em}
+
+  \begin{itemize}
+    \item \texttt{sf app new} で独自ファームウェアプロジェクトを作成
+    \item テンプレートの構造（\api{app\_main}, \api{ControlTask}）を理解
+    \item \api{StampFlyState} で全センサ・推定値に直接アクセス
+    \item Teleplot でセンサデータをリアルタイム可視化
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 3: Workflow Change
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{作業フローの変更}
+  \framesubtitle{このレッスンでは \texttt{sf lesson switch} は使いません}
+
+  \begin{alertblock}{注意: これまでのレッスンとやり方が変わります}
+    {\small
+    ワークショップ（\texttt{firmware/workshop/}）の外に、独立したプロジェクトを作ります。
+    }
+  \end{alertblock}
+
+  \vspace{0.3em}
+
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    & \textbf{L0\,--\,L10（これまで）} & \textbf{L11（このレッスン）} \\
+    \hline
+    開始 & \code{sf lesson switch N}
+         & \code{sf app new my\_drone} \\
+    編集先 & \texttt{firmware/workshop/main/}
+           & \texttt{firmware/my\_drone/main/} \\
+    ファイル & \texttt{user\_code.cpp}
+             & \texttt{main.cpp} \\
+    ビルド & \code{sf lesson build}
+           & \code{sf build my\_drone} \\
+    書き込み & \code{sf lesson flash}
+             & \code{sf flash my\_drone -m} \\
+    API & ws:: ラッパー & ネイティブ（StampFlyState） \\
+    \hline
+  \end{tabular}
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 4: Workshop -> Native API comparison
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{ワークショップ → ネイティブ開発}
+  \framesubtitle{ws:: API からネイティブ API への移行}
+  \begin{columns}[t]
+    \begin{column}{0.46\textwidth}
+      \begin{exampleblock}{ws:: ワークショップ}
+        {\scriptsize
+        \begin{itemize}
+          \item \api{ws::gyro\_x()}, \api{ws::alt()}
+          \item \api{ws::print(">tag:\%.2f", v)}
+          \item \api{setup()} / \api{loop\_400Hz(dt)}
+          \item 1 関数 = 1 センサ値
+        \end{itemize}
+        }
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \begin{block}{ネイティブ開発}
+        {\scriptsize
+        \begin{itemize}
+          \item \api{state.getIMUData(a, g)}
+          \item \api{printf(">tag:\%.2f\textbackslash n", v)}
+          \item \api{app\_main()} / \api{ControlTask()}
+          \item 構造体で複数値を一括取得
+        \end{itemize}
+        }
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.5em}
+  {\footnotesize
+    ネイティブ = vehicle ファームウェアと同じ構成。あらゆるアルゴリズムを実装可能。
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 5: sf app new
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{sf app new でプロジェクト作成}
+  \framesubtitle{vehicle と同じ環境を独自プロジェクトとして生成}
+  \begin{lstlisting}[style=sfbash]
+sf app new my_drone    # firmware/my_drone/ が生成
+sf build my_drone      # ビルド
+sf flash my_drone -m   # 書き込み + モニタ
+  \end{lstlisting}
+
+  \vspace{0.5em}
+
+  \begin{block}{テンプレートの特徴}
+    \begin{itemize}
+      \item vehicle と同じセンサタスク・初期化コードを再利用
+      \item \api{ControlTask()} のみを独自実装
+      \item IMU, 気圧, ToF, 光学フロー, モーター等すべて利用可能
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 6: Project File Structure
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{プロジェクト構成 / Project Structure}
+  \framesubtitle{\texttt{sf app new my\_drone} が生成するファイル}
+  \begin{lstlisting}[style=sfbash, basicstyle=\ttfamily\small]
+firmware/my_drone/
+  CMakeLists.txt        # ビルド設定
+  main/
+    CMakeLists.txt      # コンパイル対象の定義
+    main.cpp            # ← ここを編集
+  \end{lstlisting}
+
+  \vspace{0.3em}
+
+  {\footnotesize
+  \begin{tabular}{ll}
+    \hline
+    \textbf{ファイル} & \textbf{役割} \\
+    \hline
+    \texttt{CMakeLists.txt}      & vehicle/components と common を参照（全コンポーネント利用可能） \\
+    \texttt{main/CMakeLists.txt} & vehicle のタスク（IMU, Baro, ToF 等）と init.cpp を再利用 \\
+    \texttt{main/main.cpp}       & ユーザーが編集する唯一のファイル（ControlTask + コールバック） \\
+    \hline
+  \end{tabular}
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 7: main.cpp Overview
+% ------------------------------------------------------------------
+\begin{frame}{main.cpp の全体構造}
+  \framesubtitle{テンプレートの 3 要素}
+
+  \begin{block}{\texttt{app\_main()} — ブートシーケンス}
+    {\small NVS → センサ初期化 → ESKF 起動 → タスク起動（自動生成済み）}
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{alertblock}{\texttt{ControlTask()} — 400\,Hz ユーザーコード \textbf{← ここを編集}}
+    {\small センサ読み取り・制御計算・モーター出力を記述するメインループ}
+  \end{alertblock}
+
+  \vspace{0.3em}
+
+  \begin{exampleblock}{コールバック関数}
+    {\small
+    \begin{itemize}
+      \item \api{onButtonEvent()} — ボタン押下で ARM / DISARM
+      \item \api{handleControlInput()} — コントローラからの操縦入力を処理
+    \end{itemize}
+    }
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 8: ControlTask Detail
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{ControlTask の中身}
+  \framesubtitle{400\,Hz ループの処理フロー}
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+void ControlTask(void* pvParameters) {
+    while (true) {
+        xSemaphoreTake(g_control_semaphore, ...);
+        // --- 1. センサ読み取り ---
+        state.getIMUData(accel, gyro);    // 400 Hz
+        state.getAttitudeEuler(r, p, y);  // ESKF 推定値
+        state.getBaroData(alt, p);        // 50 Hz
+        state.getToFData(bot, fnt);       // 30 Hz
+        // --- 2. 制御計算（ユーザー実装） ---
+        // PID, モーターミキシング等
+        // --- 3. モーター出力 ---
+        // g_motor.setThrust(0, thrust);
+        // --- 4. Teleplot 出力（50 Hz） ---
+        if (tick % 8 == 0) printf(...);
+    }
+}
+  \end{lstlisting}
+
+  {\footnotesize
+    セマフォで IMU タイマー（2500\,$\mu$s）と同期。各センサは独立タスクで取得済み。
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 9: StampFlyState API Table
+% ------------------------------------------------------------------
+\begin{frame}{StampFlyState API}
+  \framesubtitle{全センサ + 推定値への直接アクセス}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{メソッド} & \textbf{ソース} & \textbf{取得データ} \\
+    \hline
+    \texttt{getIMUData(a, g)}           & BMI270          & 加速度 + ジャイロ \\
+    \texttt{getBaroData(alt, p)}        & BMP280          & 高度 [m], 気圧 [Pa] \\
+    \texttt{getMagData(mag)}            & BMM150          & 磁気 x,y,z [$\mu$T] \\
+    \texttt{getToFData(b, f)}           & VL53L3CX        & 下方/前方距離 [m] \\
+    \texttt{getFlowData(vx, vy)}        & PMW3901         & 速度 vx,vy [m/s] \\
+    \texttt{getAttitudeEuler(r, p, y)}  & ESKF            & roll, pitch, yaw [rad] \\
+    \texttt{getPowerData(v, i)}         & INA3221         & 電圧 [V], 電流 [A] \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.5em}
+  {\footnotesize
+    \api{StampFlyState::getInstance()} でシングルトンを取得し、各メソッドを呼び出す。
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 10: Hands-on
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{実習: 全センサ Teleplot 可視化 / Hands-on}
+  \framesubtitle{%
+    編集ファイル: \texttt{firmware/my\_viz/main/main.cpp} の ControlTask 内}
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+auto& state = stampfly::StampFlyState::getInstance();
+stampfly::Vec3 accel, gyro;
+state.getIMUData(accel, gyro);
+float alt, p;
+state.getBaroData(alt, p);
+float roll, pitch, yaw;
+state.getAttitudeEuler(roll, pitch, yaw);
+
+static uint32_t tick = 0; tick++;
+if (tick % 8 == 0) {  // 50 Hz
+    printf(">baro_alt:%.2f\n", alt);
+    printf(">roll_deg:%.1f\n", roll * 57.3f);
+    printf(">gyro_x:%.3f\n", gyro.x);
+}
+  \end{lstlisting}
+
+  {\footnotesize
+    \textbf{手順:} \texttt{sf app new my\_viz} → \texttt{firmware/my\_viz/main/main.cpp} の
+    ControlTask を編集 → \texttt{sf build my\_viz} → \texttt{sf flash my\_viz -m} → Teleplot
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+% Frame 11: Checkpoint
+% ------------------------------------------------------------------
+\begin{frame}{チェックポイント / Checkpoint}
+  \begin{alertblock}{確認事項}
+    \begin{itemize}
+      \item[$\square$] \api{sf app new} でプロジェクトを作成しビルドできた
+      \item[$\square$] プロジェクト構成（3 ファイルの役割）を理解した
+      \item[$\square$] \api{app\_main()} と \api{ControlTask()} の役割を理解した
+      \item[$\square$] StampFlyState で全センサ値を直接取得できた
+      \item[$\square$] Teleplot でリアルタイムグラフを確認した
+    \end{itemize}
+  \end{alertblock}
+
+  \vspace{0.5em}
+
+  \begin{block}{次のレッスン}
+    Lesson 12: Python SDK プログラム飛行
+  \end{block}
+\end{frame}

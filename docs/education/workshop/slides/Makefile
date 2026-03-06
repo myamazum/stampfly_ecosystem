@@ -1,12 +1,13 @@
 # StampFly Workshop Slides — Build Automation
 # Usage:
-#   make all     — Build everything (tikz + beamer + pptx)
-#   make tikz    — TikZ diagrams → PDF → PNG
-#   make beamer  — LaTeX Beamer slides → PDF
-#   make pptx    — Python-pptx → PPTX
-#   make clean   — Remove build artifacts
+#   make all       — Build everything (tikz + main)
+#   make tikz      — TikZ diagrams → PDF → PNG
+#   make main      — Unified Beamer PDF (all lessons)
+#   make beamer    — Individual lesson PDFs (legacy)
+#   make chapter   — Single chapter: make chapter NAME=led_control
+#   make clean     — Remove build artifacts
 
-.PHONY: all tikz beamer pptx clean
+.PHONY: all tikz main beamer chapter clean
 
 # ---------------------------------------------------------------------------
 # TikZ diagrams
@@ -30,10 +31,33 @@ $(IMAGES_DIR)/%.png: $(TIKZ_DIR)/%.pdf
 	pdftoppm -png -r $(TIKZ_DPI) -singlefile $< $(IMAGES_DIR)/$*
 
 # ---------------------------------------------------------------------------
-# LaTeX Beamer slides
+# Unified Beamer PDF (all lessons in one document)
 # ---------------------------------------------------------------------------
 
-BEAMER_DIR     := beamer
+BEAMER_DIR      := beamer
+CHAPTER_SOURCES := $(wildcard $(BEAMER_DIR)/chapters/*.tex)
+
+main: $(BEAMER_DIR)/main.pdf
+
+$(BEAMER_DIR)/main.pdf: $(BEAMER_DIR)/main.tex $(BEAMER_DIR)/preamble.tex $(BEAMER_DIR)/stampfly_slides.sty $(CHAPTER_SOURCES)
+	cd $(BEAMER_DIR) && lualatex -interaction=nonstopmode main.tex && lualatex -interaction=nonstopmode main.tex
+
+# ---------------------------------------------------------------------------
+# Single chapter build (for fast iteration)
+# Usage: make chapter NAME=led_control
+# ---------------------------------------------------------------------------
+
+chapter:
+ifndef NAME
+	$(error Usage: make chapter NAME=<chapter_name> (e.g., make chapter NAME=led_control))
+endif
+	@echo "Building single chapter: $(NAME)"
+	@cd $(BEAMER_DIR) && lualatex -interaction=nonstopmode "\documentclass[aspectratio=169,14pt]{beamer}\usepackage{stampfly_slides}\input{preamble}\title{StampFly Workshop}\author{StampFly Workshop}\date{}\begin{document}\input{chapters/$(NAME)}\end{document}"
+
+# ---------------------------------------------------------------------------
+# Individual lesson PDFs (legacy, for backward compatibility)
+# ---------------------------------------------------------------------------
+
 BEAMER_SOURCES := $(wildcard $(BEAMER_DIR)/lesson_*.tex)
 BEAMER_PDFS    := $(BEAMER_SOURCES:.tex=.pdf)
 
@@ -43,20 +67,10 @@ $(BEAMER_DIR)/lesson_%.pdf: $(BEAMER_DIR)/lesson_%.tex $(BEAMER_DIR)/stampfly_sl
 	cd $(BEAMER_DIR) && lualatex -interaction=nonstopmode $(notdir $<) && lualatex -interaction=nonstopmode $(notdir $<)
 
 # ---------------------------------------------------------------------------
-# PowerPoint slides (python-pptx)
-# ---------------------------------------------------------------------------
-
-PPTX_SCRIPT := pptx/generate_slides.py
-PPTX_OUTPUT := pptx/output
-
-pptx: tikz
-	python3 $(PPTX_SCRIPT)
-
-# ---------------------------------------------------------------------------
 # All
 # ---------------------------------------------------------------------------
 
-all: tikz beamer pptx
+all: tikz main
 
 # ---------------------------------------------------------------------------
 # Clean
@@ -66,6 +80,6 @@ clean:
 	rm -f $(TIKZ_DIR)/*.aux $(TIKZ_DIR)/*.log $(TIKZ_DIR)/*.pdf
 	rm -f $(BEAMER_DIR)/*.aux $(BEAMER_DIR)/*.log $(BEAMER_DIR)/*.nav \
 	      $(BEAMER_DIR)/*.out $(BEAMER_DIR)/*.snm $(BEAMER_DIR)/*.toc \
-	      $(BEAMER_DIR)/*.pdf $(BEAMER_DIR)/*.vrb
+	      $(BEAMER_DIR)/*.vrb
+	rm -f $(BEAMER_DIR)/main.pdf
 	rm -f $(IMAGES_DIR)/*.png
-	rm -f $(PPTX_OUTPUT)/*.pptx

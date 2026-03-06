@@ -1,0 +1,453 @@
+% ------------------------------------------------------------------
+\begin{frame}{今日のゴール / Today's Goal}
+  \begin{block}{目標}
+    ws:: API 全 43 関数をカテゴリ別に理解し、各関数の使い方を把握する
+  \end{block}
+
+  \vspace{0.5em}
+
+  \begin{itemize}
+    \item ws:: API 全 43 関数をカテゴリ別に理解
+    \item 各 API の使い方をコード例で確認
+    \item 環境・距離センサ API で全センサに直接アクセス
+  \end{itemize}
+\end{frame}
+
+% ==================================================================
+%   ws:: API Category Pages
+% ==================================================================
+
+% ------------------------------------------------------------------
+\begin{frame}{ws:: API 概要 / API Overview}
+  \centering
+  {\small
+  \begin{tabular}{llr}
+    \hline
+    \textbf{カテゴリ} & \textbf{概要} & \textbf{関数数} \\
+    \hline
+    Motor Control   & モータ制御・Arm/Disarm    & 7 \\
+    RC Input        & コントローラスティック入力 & 4 \\
+    RC Buttons      & ボタン・飛行モード         & 5 \\
+    IMU Sensor      & ジャイロ・加速度センサ     & 6 \\
+    Env / Distance  & 気圧・磁気・ToF・光学フロー & 10 \\
+    Estimation      & ESKF 姿勢・高度推定        & 4 \\
+    LED             & LED 色制御                 & 3 \\
+    Utility         & 時刻・電圧・通信・出力     & 4 \\
+    \hline
+    \multicolumn{2}{l}{\textbf{合計}} & \textbf{43} \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.5em}
+  {\footnotesize
+    \texttt{\#include "workshop\_api.hpp"} で全関数を使用可能。
+    全関数は \texttt{ws::} 名前空間に属する。\\
+    より深いアクセスには \textbf{StampFlyState} を使用（後半で解説）。
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Motor Control API（1/2）}
+  \framesubtitle{モータ制御: デューティ設定とミキサー}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{引数} & \textbf{説明} \\
+    \hline
+    \texttt{motor\_set\_duty(id, duty)} & id: 1--4, duty: 0--1 & 個別モータ duty 設定 \\
+    \texttt{motor\_set\_all(duty)}      & duty: 0--1           & 全モータ同一 duty \\
+    \texttt{motor\_stop\_all()}         & ---                   & 全モータ即時停止 \\
+    \texttt{motor\_mixer(t, r, p, y)}   & 各 float             & スラスト+姿勢ミキシング \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+// Individual motor control
+ws::motor_set_duty(1, 0.3f);  // Motor 1 (FR) = 30%
+ws::motor_stop_all();          // Emergency stop
+
+// Mixer: thrust + attitude corrections
+ws::motor_mixer(0.5f, 0.0f, 0.0f, 0.0f);  // Hover
+  \end{lstlisting}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Motor Control API（2/2）}
+  \framesubtitle{Arm / Disarm: モータ出力の有効化・無効化}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{戻り値} & \textbf{説明} \\
+    \hline
+    \texttt{arm()}       & void & モータ出力を有効化（Arm） \\
+    \texttt{disarm()}    & void & モータ出力を無効化（Disarm） \\
+    \texttt{is\_armed()} & bool & Arm 状態を返す（\texttt{true} = Armed） \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+if (ws::rc_throttle() < 0.05f) ws::arm();
+
+if (ws::is_armed()) {
+    ws::motor_mixer(ws::rc_throttle(),
+        ws::rc_roll(), ws::rc_pitch(), ws::rc_yaw());
+} else {
+    ws::motor_stop_all();
+}
+  \end{lstlisting}
+
+  \vspace{0.2em}
+  {\footnotesize \warn{注意:} \api{arm()} 前はモータコマンドを送っても回転しない}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{RC Input API}
+  \framesubtitle{コントローラスティック入力}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{範囲} & \textbf{説明} \\
+    \hline
+    \texttt{rc\_throttle()} & $[0.0, 1.0]$   & スロットル（上がプラス） \\
+    \texttt{rc\_roll()}     & $[-1.0, 1.0]$  & ロール（右がプラス） \\
+    \texttt{rc\_pitch()}    & $[-1.0, 1.0]$  & ピッチ（前がプラス） \\
+    \texttt{rc\_yaw()}      & $[-1.0, 1.0]$  & ヨー（右回転がプラス） \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+void loop_400Hz(float dt) {
+    float thr = ws::rc_throttle();  // 0.0 - 1.0
+    float rol = ws::rc_roll();      // -1.0 - 1.0
+    float pit = ws::rc_pitch();
+    float yaw = ws::rc_yaw();
+    ws::motor_mixer(thr, rol, pit, yaw);  // ACRO mode
+}
+  \end{lstlisting}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{RC Buttons / Mode API}
+  \framesubtitle{ボタン入力と飛行モード判定}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{戻り値} & \textbf{説明} \\
+    \hline
+    \texttt{rc\_throttle\_yaw\_button()}  & bool & 左スティック押し込みボタン \\
+    \texttt{rc\_roll\_pitch\_button()}    & bool & 右スティック押し込みボタン \\
+    \texttt{rc\_stabilize\_acro\_mode()}  & bool & ACRO モード判定（\texttt{true} = ACRO） \\
+    \texttt{rc\_alt\_mode()}             & bool & 高度保持モード判定 \\
+    \texttt{rc\_pos\_mode()}             & bool & 位置保持モード判定 \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+void loop_400Hz(float dt) {
+    if (ws::rc_stabilize_acro_mode()) {
+        acro_control(dt);       // ACRO: rate control
+    } else {
+        stabilize_control(dt);  // Stabilize: angle control
+    }
+}
+  \end{lstlisting}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{IMU Sensor API}
+  \framesubtitle{ジャイロ・加速度センサ（BMI270）}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{単位} & \textbf{説明} \\
+    \hline
+    \texttt{gyro\_x/y/z()}  & rad/s   & R/P/Y 角速度（BMI270） \\
+    \texttt{accel\_x/y/z()} & m/s$^2$ & X/Y/Z 加速度（NED座標系） \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+void loop_400Hz(float dt) {
+    float gx = ws::gyro_x();    // [rad/s] roll rate
+    float gy = ws::gyro_y();    // [rad/s] pitch rate
+    float gz = ws::gyro_z();    // [rad/s] yaw rate
+    float az = ws::accel_z();   // [m/s^2] ~9.81 at rest
+
+    ws::print(">gyro_x:%.3f", gx);
+    ws::print(">accel_z:%.2f", az);
+}
+  \end{lstlisting}
+
+  \vspace{0.2em}
+  {\footnotesize 静止時: \texttt{accel\_z()} $\approx$ 9.81（NED 座標系、下向き正）}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Estimation API}
+  \framesubtitle{ESKF 姿勢・高度推定}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{単位} & \textbf{説明} \\
+    \hline
+    \texttt{estimated\_roll()}     & rad & ESKF ロール推定角 \\
+    \texttt{estimated\_pitch()}    & rad & ESKF ピッチ推定角 \\
+    \texttt{estimated\_yaw()}      & rad & ESKF ヨー推定角 \\
+    \texttt{estimated\_altitude()} & m   & ESKF 推定高度（正 = 上） \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+void loop_400Hz(float dt) {
+    float roll  = ws::estimated_roll();     // [rad]
+    float pitch = ws::estimated_pitch();
+    float alt   = ws::estimated_altitude(); // [m]
+    // P control: level the drone
+    ws::motor_mixer(ws::rc_throttle(),
+        (0.0f-roll)*0.5f, (0.0f-pitch)*0.5f, ws::rc_yaw());
+}
+  \end{lstlisting}
+
+  \vspace{0.2em}
+  {\footnotesize ESKF はジャイロ+加速度+気圧+ToF+磁気+光学フローを統合（L09 参照）}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{環境センサ API（1/2）}
+  \framesubtitle{気圧・磁気センサ}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{単位} & \textbf{説明} \\
+    \hline
+    \texttt{baro\_altitude()} & m   & 気圧高度（BMP280） \\
+    \texttt{baro\_pressure()} & Pa  & 気圧値（BMP280） \\
+    \texttt{mag\_x()}         & $\mu$T & 磁気 X 成分（BMM150） \\
+    \texttt{mag\_y()}         & $\mu$T & 磁気 Y 成分（BMM150） \\
+    \texttt{mag\_z()}         & $\mu$T & 磁気 Z 成分（BMM150） \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+float alt = ws::baro_altitude();  // [m]
+float p   = ws::baro_pressure();  // [Pa]
+float mx  = ws::mag_x();          // [uT]
+ws::print(">baro_alt:%.2f", alt);
+  \end{lstlisting}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{環境センサ API（2/2）}
+  \framesubtitle{ToF・光学フローセンサ}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{単位} & \textbf{説明} \\
+    \hline
+    \texttt{tof\_bottom()}   & m     & 下方 ToF 距離（VL53L3CX, 0--2\,m） \\
+    \texttt{tof\_front()}    & m     & 前方 ToF 距離（$-1$ = 未接続） \\
+    \texttt{flow\_vx()}      & m/s   & 光学フロー速度 X（PMW3901） \\
+    \texttt{flow\_vy()}      & m/s   & 光学フロー速度 Y（PMW3901） \\
+    \texttt{flow\_quality()} & 0--255 & 光学フロー品質（高い = 良好） \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+float dist = ws::tof_bottom();    // [m] ground distance
+float vx   = ws::flow_vx();       // [m/s]
+uint8_t sq = ws::flow_quality();   // 0-255
+ws::print(">tof_bottom:%.3f", dist);
+  \end{lstlisting}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{LED Control API}
+  \framesubtitle{LED 色制御}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{引数/戻り値} & \textbf{説明} \\
+    \hline
+    \texttt{led\_color(r, g, b)}      & r,g,b: 0--255 & LED 色を RGB 設定 \\
+    \texttt{disable\_led\_task()}     & void           & システム LED タスク停止 \\
+    \texttt{enable\_led\_task()}      & void           & システム LED タスク再開 \\
+    \texttt{is\_led\_task\_disabled()} & bool          & LED タスク停止中か確認 \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+void setup() {
+    ws::disable_led_task();  // Take over LED control
+}
+void loop_400Hz(float dt) {
+    float v = ws::battery_voltage();
+    if (v > 3.8f)      ws::led_color(0, 255, 0);   // Green
+    else if (v > 3.5f) ws::led_color(255, 165, 0); // Orange
+    else                ws::led_color(255, 0, 0);   // Red
+}
+  \end{lstlisting}
+
+  \vspace{0.2em}
+  {\footnotesize \warn{注意:} \api{disable\_led\_task()} を先に呼ぶこと（LED 上書き防止）}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Utility API}
+  \framesubtitle{時刻・電圧・通信・出力}
+  {\small
+  \begin{tabular}{lll}
+    \hline
+    \textbf{関数} & \textbf{戻り値} & \textbf{説明} \\
+    \hline
+    \texttt{millis()}           & uint32\_t (ms) & 起動からの経過時間 \\
+    \texttt{battery\_voltage()} & float (V)      & バッテリー電圧 \\
+    \texttt{print(fmt, ...)}    & void           & printf 形式でデバッグ出力 \\
+    \texttt{set\_channel(ch)}   & void           & WiFi チャネル設定（1, 6, 11） \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+void setup() { ws::set_channel(6); }
+void loop_400Hz(float dt) {
+    static uint32_t last = 0;
+    uint32_t now = ws::millis();
+    if (now - last >= 20) {  // 50 Hz decimation
+        last = now;
+        ws::print(">battery:%.2f", ws::battery_voltage());
+    }
+}
+  \end{lstlisting}
+\end{frame}
+
+% ==================================================================
+%   Advanced: StampFlyState
+% ==================================================================
+
+% ------------------------------------------------------------------
+\begin{frame}{ハードウェアセンサ仕様 / Hardware Sensors}
+  \centering
+
+  {\small
+  \begin{tabular}{llll}
+    \hline
+    \textbf{センサ} & \textbf{型番} & \textbf{サンプルレート} & \textbf{測定量} \\
+    \hline
+    IMU        & BMI270  & 400\,Hz  & 加速度 + ジャイロ \\
+    気圧       & BMP280  & 50\,Hz   & 気圧 → 高度 \\
+    磁気       & BMM150  & 10--30\,Hz & 磁気ベクトル \\
+    ToF（下方） & VL53L3CX & 30\,Hz  & 対地距離（0--2\,m） \\
+    ToF（前方） & VL53L3CX & 30\,Hz  & 前方距離（0--2\,m） \\
+    光学フロー  & PMW3901 & 100\,Hz  & 対地速度 \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{1em}
+
+  {\footnotesize
+    ws:: API で全センサに直接アクセス可能（\api{baro\_altitude()}, \api{tof\_bottom()} 等）。\\
+    より低レベルなアクセスには \textbf{StampFlyState} を使用。\\
+    ESKF は全センサを統合して姿勢・位置・速度を推定（Lesson 9 参照）。
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Teleplot}
+  \framesubtitle{シリアル出力をリアルタイムグラフ化}
+  {\small Teleplot 形式 (\texttt{>name:value}) でシリアル出力すると、\\
+  VS Code 拡張 Teleplot がリアルタイムグラフを描画する。}
+
+  \vspace{0.3em}
+
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+void loop_400Hz(float dt) {
+    static uint32_t tick = 0; tick++;
+    if (tick % 8 != 0) return;  // 50 Hz decimation
+
+    // Teleplot output (>name:value format)
+    ws::print(">baro_alt:%.2f", ws::baro_altitude());
+    ws::print(">tof_bottom:%.3f", ws::tof_bottom());
+    ws::print(">eskf_alt:%.2f", ws::estimated_altitude());
+}
+  \end{lstlisting}
+
+  \vspace{0.2em}
+  {\footnotesize
+    \textbf{セットアップ:} VSCode 拡張 \texttt{alexnesnes.teleplot} をインストール
+    → Teleplot パネルでシリアルポートを選択 → 自動グラフ化
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{実習: 全センサ Teleplot 出力 / Hands-on}
+  \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
+#include "workshop_api.hpp"
+void setup() { ws::print("Lesson 10: Sensor API"); }
+void loop_400Hz(float dt) {
+    static uint32_t tick = 0; tick++;
+    if (tick % 8 != 0) return;  // 50 Hz decimation
+    // Environmental sensors (ws:: API)
+    ws::print(">baro_alt:%.2f", ws::baro_altitude());
+    ws::print(">mag_x:%.1f", ws::mag_x());
+    ws::print(">tof_bottom:%.3f", ws::tof_bottom());
+    ws::print(">flow_vx:%.3f", ws::flow_vx());
+    // ESKF estimation
+    ws::print(">eskf_alt:%.2f", ws::estimated_altitude());
+    ws::print(">eskf_roll:%.1f", ws::estimated_roll()*57.3f);
+}
+  \end{lstlisting}
+
+  \vspace{0.2em}
+  {\footnotesize
+    Teleplot パネルでシリアルポートを選択し確認（前ページ参照）
+  }
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{チェックポイント / Checkpoint}
+  \begin{alertblock}{確認事項}
+    \begin{itemize}
+      \item[$\square$] ws:: API 全 43 関数のカテゴリと役割を把握した
+      \item[$\square$] Motor / RC / IMU / Sensor / Estimation の使い方を理解した
+      \item[$\square$] 気圧・磁気・ToF・光学フロー API で値を取得できた
+      \item[$\square$] Teleplot で複数センサのグラフを同時表示した
+    \end{itemize}
+  \end{alertblock}
+
+  \vspace{0.5em}
+
+  \begin{block}{次のレッスン}
+    Lesson 11: 独自ファームウェア開発
+  \end{block}
+\end{frame}
