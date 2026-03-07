@@ -310,9 +310,39 @@ def _check_vpython_available(python_cmd: str) -> bool:
         result = subprocess.run(
             [python_cmd, "-c", "import vpython"],
             capture_output=True,
+            text=True,
             timeout=10,
         )
-        return result.returncode == 0
+        if result.returncode == 0:
+            return True
+
+        # Detect pkg_resources issue (setuptools 82+ removed it)
+        # pkg_resources問題を検出（setuptools 82+で削除された）
+        if "pkg_resources" in result.stderr:
+            console.warning(
+                "vpython failed: setuptools 82+ removed pkg_resources"
+            )
+            console.print("  Attempting auto-fix: pip install 'setuptools>=68,<81'...")
+            fix = subprocess.run(
+                [python_cmd, "-m", "pip", "install", "setuptools>=68,<81"],
+                capture_output=True,
+                timeout=60,
+            )
+            if fix.returncode == 0:
+                # Retry import after fix
+                # 修復後にインポートを再試行
+                retry = subprocess.run(
+                    [python_cmd, "-c", "import vpython"],
+                    capture_output=True,
+                    timeout=10,
+                )
+                if retry.returncode == 0:
+                    console.info("setuptools fixed, vpython is now available")
+                    return True
+            console.error("Auto-fix failed. Run manually:")
+            console.print("    pip install 'setuptools>=68,<81'")
+
+        return False
     except Exception:
         return False
 

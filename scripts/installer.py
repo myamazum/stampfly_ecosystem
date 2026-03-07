@@ -635,6 +635,12 @@ class Installer:
         success("StampFly CLI installed!")
         print()
 
+        # Fix setuptools: ESP-IDF install.sh may upgrade to 82+ which removes
+        # pkg_resources, breaking vpython. Pin back to <81.
+        # setuptools修正: ESP-IDFが82+にアップグレードするとpkg_resourcesが
+        # 削除されvpythonが壊れる。<81に固定する。
+        self._fix_setuptools(idf_path)
+
         # Save configuration
         self._save_config(idf_path)
 
@@ -700,6 +706,17 @@ class Installer:
 
         # Re-run installation
         return self.run(idf_path=idf_path, force=True)
+
+    def _fix_setuptools(self, idf_path: Path) -> None:
+        """Pin setuptools<81 to keep pkg_resources for vpython.
+        vpythonのためにpkg_resourcesを維持するようsetuptools<81に固定"""
+        info("Checking setuptools version (vpython compatibility)...")
+        rc = _run_in_idf_env(idf_path, ["install", "setuptools>=68.0,<81"])
+        if rc == 0:
+            success("setuptools pinned to <81 (pkg_resources available)")
+        else:
+            warn("Failed to pin setuptools. vpython may not work.")
+            warn("Manual fix: pip install 'setuptools>=68.0,<81'")
 
     def _save_config(self, idf_path: Path) -> None:
         """Save configuration file"""
