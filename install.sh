@@ -6,6 +6,16 @@
 
 set -e
 
+# Detect if script is being sourced (which would apply set -e to the user's shell)
+# sourceで実行された場合を検出（set -eがユーザーのシェルに影響するのを防ぐ）
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+    echo -e "\033[0;31m[ERROR]\033[0m Do not 'source' this script. Run it directly:"
+    echo "    ./install.sh"
+    echo "  or:"
+    echo "    bash install.sh"
+    return 1 2>/dev/null || true
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Colors
