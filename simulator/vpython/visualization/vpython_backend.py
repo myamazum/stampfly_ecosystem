@@ -719,60 +719,77 @@ class render():
         self.scene.fov = 2*atan2(scene_range, d)
 
 
-    @staticmethod
-    def _wrap_angle(angle):
-        """Wrap angle to [-pi, pi]
-        角度を[-π, π]に正規化"""
-        from math import pi
-        while angle > pi:
-            angle -= 2 * pi
-        while angle < -pi:
-            angle += 2 * pi
-        return angle
-
-    def _smooth_angle(self, current, target, alpha):
-        """Smooth angle with proper wrapping to avoid discontinuity snap.
-        角度の不連続点（±π境界）を考慮したスムージング"""
-        diff = self._wrap_angle(target - current)
-        return self._wrap_angle(current + alpha * diff)
-
     def follow_camera_setting(self, drone, t):
-        # 3rd-person chase camera using VPython's native camera API
-        # VPythonのカメラAPI（center/forward/range）で3人称追従カメラを実現
-        #
-        # scene.center  = カメラの注視点（ドローンの位置）
-        # scene.forward = カメラの向き（Yaw方向 → カメラはドローンの後方に配置）
-        # scene.range   = カメラとドローンの距離
-
-        xf = drone.body.position[0][0]
-        yf = drone.body.position[1][0]
-        zf = drone.body.position[2][0]
+        #Cameraの設定
+        #カメラの見たい場所（目標）
+        xf_target = drone.body.position[0][0]
+        yf_target = drone.body.position[1][0]
+        zf_target = drone.body.position[2][0]
         direction = drone.body.euler[2][0]
 
-        # Yaw角のスムージング（±π境界でのジャンプ防止のみ）
-        # Smooth yaw only to prevent snap at ±π boundary
-        alpha_yaw = 0.9
-        if not hasattr(self, '_smoothed_yaw'):
-            self._smoothed_yaw = direction
-        else:
-            self._smoothed_yaw = self._smooth_angle(
-                self._smoothed_yaw, direction, alpha_yaw)
+        #カメラの位置（目標）
+        pattern = 0
+        if pattern == 0:
+            #後ろから追いかける
+            xc_target = xf_target - 1*cos(direction)
+            yc_target = yf_target - 1*sin(direction)
+            zc_target = zf_target - 0.15
+        elif pattern == 1:
+            #上から追いかける
+            xc_target = xf_target - 5
+            yc_target = yf_target - 0.00
+            zc_target = zf_target - 5
 
-        self.scene.autoscale = False
-        # 注視点：ドローンの位置
-        # Look-at point: drone position
-        self.scene.center = vector(xf, yf, zf)
-        # カメラの向き：Yaw方向（少し下向き）→ カメラは自動的にドローンの後方に配置
-        # Camera direction: yaw direction (slightly downward)
-        # VPython places camera at center - forward * range
-        self.scene.forward = vector(
-            cos(self._smoothed_yaw),
-            sin(self._smoothed_yaw),
-            0.15)
-        # カメラ距離（ドローンからの距離）
-        # Camera distance from drone
-        self.scene.range = 1.0
-        self.scene.up = vector(0, 0, -1)
+        # カメラ位置と注視点のスムージング（ローパスフィルタ）
+        # Smooth camera position and look-at point (low-pass filter)
+        alpha_pos = 0.08  # カメラ位置用（小さいほど滑らか）
+        alpha_look = 0.15  # 注視点用（少し速く追従）
+        if not hasattr(self, '_cam_initialized'):
+            self.xc = xc_target
+            self.yc = yc_target
+            self.zc = zc_target
+            self._xf = xf_target
+            self._yf = yf_target
+            self._zf = zf_target
+            self._cam_initialized = True
+        else:
+            # カメラ位置のスムージング
+            self.xc = self.xc + alpha_pos * (xc_target - self.xc)
+            self.yc = self.yc + alpha_pos * (yc_target - self.yc)
+            self.zc = self.zc + alpha_pos * (zc_target - self.zc)
+            # 注視点のスムージング
+            self._xf = self._xf + alpha_look * (xf_target - self._xf)
+            self._yf = self._yf + alpha_look * (yf_target - self._yf)
+            self._zf = self._zf + alpha_look * (zf_target - self._zf)
+
+        # スムージングされた注視点を使用
+        xf = self._xf
+        yf = self._yf
+        zf = self._zf
+
+        #カメラの向き
+        axis_x = xf - self.xc
+        axis_y = yf - self.yc
+        axis_z = zf - self.zc
+        d = sqrt(axis_x**2 + axis_y**2 + axis_z**2)
+        
+        #見える奥行き範囲を延長するための処理
+        axis_x = axis_x*20
+        axis_y = axis_y*20
+        axis_z = axis_z*20
+        xf = self.xc + axis_x
+        yf = self.yc + axis_y
+        zf = self.zc + axis_z
+
+        self.scene.autoscale = False  # オートスケールを無効
+        self.scene.center = vector(xf, yf, zf)  # カメラの注視点
+        self.scene.camera.pos = vector(self.xc, self.yc, self.zc)  # カメラの位置
+        self.scene.camera.axis = vector(axis_x, axis_y, axis_z)  # カメラの向き
+        self.scene.up=vector(0,0,-1)
+
+        #FOVの設定
+        scene_range = 0.2
+        self.scene.fov = 2*atan2(scene_range, d)
 
 
     def fix_human_setting(self, drone, t):
