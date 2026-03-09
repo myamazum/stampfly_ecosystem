@@ -656,14 +656,15 @@ class render():
         if d < 1e-6:
             d = 1e-6
 
+        scene_range = 0.2
         self.scene.autoscale = False
         self.scene.center = vector(xf, yf, zf)
         self.scene.forward = vector(fwd_x / d, fwd_y / d, fwd_z / d)
-        self.scene.range = d
+        self.scene.range = scene_range
         self.scene.up = vector(0, 1, 0)
-        self.scene.fov = 2 * atan2(0.2, d)
+        self.scene.fov = 2 * atan2(scene_range, d)
 
-        
+
     def fix_camera_setting(self, drone, t):
         # Fixed camera position using PRIMARY properties only
         # 固定カメラ位置（プライマリプロパティのみ使用）
@@ -685,7 +686,7 @@ class render():
         self.scene.autoscale = False
         self.scene.center = vector(xf, yf, zf)
         self.scene.forward = vector(fwd_x / d, fwd_y / d, fwd_z / d)
-        self.scene.range = d
+        self.scene.range = 0.2
         self.scene.up = vector(0, 0, -1)
 
         if t < 1000.0:
@@ -750,12 +751,18 @@ class render():
 
         # Use PRIMARY properties only (no camera.pos/axis setters)
         # プライマリプロパティのみ使用（camera.pos/axisセッターは使わない）
+        #
+        # Camera distance from center = range / tan(fov/2)
+        # range=0.2, fov=2*atan2(0.2,d) → tan(fov/2)=0.2/d → distance=d
+        scene_range = 0.2
         self.scene.autoscale = False
+        self.scene.userspin = False
+        self.scene.userzoom = False
         self.scene.center = vector(self._xf, self._yf, self._zf)
         self.scene.forward = vector(fwd_x / d, fwd_y / d, fwd_z / d)
-        self.scene.range = d
+        self.scene.range = scene_range
         self.scene.up = vector(0, 0, -1)
-        self.scene.fov = 2 * atan2(0.2, d)
+        self.scene.fov = 2 * atan2(scene_range, d)
 
 
     def fix_human_setting(self, drone, t):
@@ -779,12 +786,13 @@ class render():
         if d < 1e-6:
             d = 1e-6
 
+        fov = radians(40)
         self.scene.autoscale = False
         self.scene.center = vector(xf, yf, zf)
         self.scene.forward = vector(fwd_x / d, fwd_y / d, fwd_z / d)
-        self.scene.range = d
+        self.scene.range = d * tan(fov / 2)
         self.scene.up = vector(0, 0, -1)
-        self.scene.fov = radians(40)
+        self.scene.fov = fov
 
 
 
