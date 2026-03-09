@@ -18,22 +18,30 @@
 
 % ------------------------------------------------------------------
 \begin{frame}{StampFly ハードウェア / Hardware}
-  \begin{table}
-    \centering
-    \begin{tabular}{ll}
-      \hline
-      \textbf{項目} & \textbf{仕様} \\
-      \hline
-      MCU    & ESP32-S3 (M5Stamp S3) \\
-      IMU    & BMI270 (6軸 400\,Hz) \\
-      気圧   & BMP280 \\
-      ToF    & VL53L3CX \\
-      質量   & 37\,g（バッテリ含む） \\
-      通信   & ESP-NOW + WiFi \\
-      バッテリ & LiPo 1S 3.7\,V \\
-      \hline
-    \end{tabular}
-  \end{table}
+  \begin{columns}[c]
+    \begin{column}{0.45\textwidth}
+      \centering
+      \includegraphics[width=\columnwidth]{Stampfly_onhand.jpg}
+    \end{column}
+    \begin{column}{0.52\textwidth}
+      \begin{table}
+        \centering\small
+        \begin{tabular}{ll}
+          \hline
+          \textbf{項目} & \textbf{仕様} \\
+          \hline
+          MCU    & ESP32-S3 (M5Stamp S3) \\
+          IMU    & BMI270 (6軸 400\,Hz) \\
+          気圧   & BMP280 \\
+          ToF    & VL53L3CX \\
+          質量   & 37\,g（バッテリ含む） \\
+          通信   & ESP-NOW + WiFi \\
+          バッテリ & LiPo 1S 3.7\,V \\
+          \hline
+        \end{tabular}
+      \end{table}
+    \end{column}
+  \end{columns}
 \end{frame}
 
 % ------------------------------------------------------------------
