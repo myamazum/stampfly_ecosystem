@@ -82,6 +82,7 @@ tools/log_analyzer/*.png
 *.so
 *.elf
 *.bin
+!firmware/legacy/*.bin
 *.hex
 *.map
 
