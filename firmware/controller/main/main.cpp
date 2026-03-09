@@ -752,10 +752,10 @@ static void render_menu_screen(void)
         if (item_index < item_count) {
             if (item_index == selected) {
                 M5.Display.setTextColor(SF_BLACK, SF_WHITE);
-                M5.Display.printf("> %-12s", menu_get_item_label(item_index));
+                M5.Display.printf("> %-14s", menu_get_item_label(item_index));
             } else {
                 M5.Display.setTextColor(SF_WHITE, SF_BLACK);
-                M5.Display.printf("  %-12s", menu_get_item_label(item_index));
+                M5.Display.printf("  %-14s", menu_get_item_label(item_index));
             }
         } else {
             // 空行をクリア
