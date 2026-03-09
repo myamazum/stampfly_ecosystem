@@ -1,0 +1,16 @@
+# StampFly Controller USB HID access for non-root users
+# StampFlyコントローラのUSB HIDアクセスを一般ユーザーに許可
+#
+# Install / インストール:
+#   sudo cp 99-stampfly.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+#
+# Espressif VID=0x303a, StampFly Controller PID=0x8001
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="8001", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="8001", MODE="0666"
+
+# ESP32-S3 USB-JTAG/Serial (for flashing and monitoring)
+# ESP32-S3 USB-JTAG/シリアル（書き込みとモニタ用）
+SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", MODE="0666"

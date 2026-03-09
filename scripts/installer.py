@@ -641,6 +641,11 @@ class Installer:
         # 削除されvpythonが壊れる。<81に固定する。
         self._fix_setuptools(idf_path)
 
+        # Install udev rules on Linux (for USB HID access without root)
+        # Linux: udevルールをインストール（root不要でUSB HIDアクセス）
+        if sys.platform == "linux" and not is_wsl():
+            self._install_udev_rules()
+
         # Save configuration
         self._save_config(idf_path)
 
@@ -706,6 +711,54 @@ class Installer:
 
         # Re-run installation
         return self.run(idf_path=idf_path, force=True)
+
+    def _install_udev_rules(self) -> None:
+        """Install udev rules for StampFly USB devices on Linux.
+        Linux用のudevルールをインストール"""
+        rules_src = self.root / "tools" / "udev" / "99-stampfly.rules"
+        rules_dst = Path("/etc/udev/rules.d/99-stampfly.rules")
+
+        if not rules_src.exists():
+            warn("udev rules file not found, skipping")
+            return
+
+        if rules_dst.exists():
+            # Check if already up to date
+            # 既にインストール済みか確認
+            try:
+                if rules_dst.read_text() == rules_src.read_text():
+                    success("udev rules already installed")
+                    return
+            except PermissionError:
+                pass
+
+        info("Installing udev rules for USB device access...")
+        print("  sudo permission is required to copy rules to /etc/udev/rules.d/")
+        print("  USB デバイスアクセスに sudo 権限が必要です")
+        print()
+
+        try:
+            rc = subprocess.run(
+                ["sudo", "cp", str(rules_src), str(rules_dst)],
+            ).returncode
+            if rc != 0:
+                warn("Failed to install udev rules. Install manually:")
+                warn(f"  sudo cp {rules_src} /etc/udev/rules.d/")
+                warn("  sudo udevadm control --reload-rules && sudo udevadm trigger")
+                return
+
+            subprocess.run(
+                ["sudo", "udevadm", "control", "--reload-rules"],
+            )
+            subprocess.run(
+                ["sudo", "udevadm", "trigger"],
+            )
+            success("udev rules installed (reconnect USB devices to apply)")
+        except Exception as e:
+            warn(f"Failed to install udev rules: {e}")
+            warn("Install manually:")
+            warn(f"  sudo cp {rules_src} /etc/udev/rules.d/")
+            warn("  sudo udevadm control --reload-rules && sudo udevadm trigger")
 
     def _fix_setuptools(self, idf_path: Path) -> None:
         """Pin setuptools<81 to keep pkg_resources for vpython.

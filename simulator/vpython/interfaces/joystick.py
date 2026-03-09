@@ -87,6 +87,8 @@ class Joystick:
     def _print_troubleshooting(self):
         """Print troubleshooting info when connection fails
         接続失敗時のトラブルシューティング情報を表示"""
+        import sys as _sys
+
         print("  --- トラブルシューティング / Troubleshooting ---")
 
         # Show which package is in use
@@ -113,3 +115,14 @@ class Joystick:
             print("  デバイスが見つかりません / Device not found")
             print("  コントローラが接続されているか確認してください")
             print("  Check that the controller is plugged in")
+
+        # Linux-specific: suggest udev rules
+        # Linux固有: udevルールを案内
+        if _sys.platform == "linux":
+            print()
+            print("  Linux: udevルールが必要です / udev rules required:")
+            print("    sudo cp tools/udev/99-stampfly.rules /etc/udev/rules.d/")
+            print("    sudo udevadm control --reload-rules")
+            print("    sudo udevadm trigger")
+            print("  その後、コントローラを再接続してください")
+            print("  Then reconnect the controller")
