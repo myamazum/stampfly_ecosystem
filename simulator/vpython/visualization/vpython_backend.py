@@ -737,28 +737,18 @@ class render():
         return self._wrap_angle(current + alpha * diff)
 
     def follow_camera_setting(self, drone, t):
-        # Camera follows drone tightly (drone stays centered, scenery moves)
-        # カメラはドローンに密着追従（機体は画面中央、風景が動く）
+        # Original camera: direct follow, no smoothing
+        # オリジナルカメラ：直結追従、スムージングなし（stampfly_simと同一）
 
-        # ドローンの位置と向き
+        #カメラの見たい場所
         xf = drone.body.position[0][0]
         yf = drone.body.position[1][0]
         zf = drone.body.position[2][0]
         direction = drone.body.euler[2][0]
 
-        # Yaw角のスムージング（±π境界でのジャンプ防止のみ）
-        # Smooth yaw only to prevent snap at ±π boundary
-        alpha_yaw = 0.9  # ほぼ即追従、境界保護のみ
-        if not hasattr(self, '_smoothed_yaw'):
-            self._smoothed_yaw = direction
-        else:
-            self._smoothed_yaw = self._smooth_angle(
-                self._smoothed_yaw, direction, alpha_yaw)
-
-        # カメラ位置：ドローンの後方1m、少し上（スムージングなし＝直結）
-        # Camera position: 1m behind drone, slightly above (no smoothing = direct)
-        self.xc = xf - 1*cos(self._smoothed_yaw)
-        self.yc = yf - 1*sin(self._smoothed_yaw)
+        #カメラの位置（ドローンの後方1m、少し上）
+        self.xc = xf - 1*cos(direction)
+        self.yc = yf - 1*sin(direction)
         self.zc = zf - 0.15
 
         #カメラの向き
