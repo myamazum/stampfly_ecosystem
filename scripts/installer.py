@@ -641,6 +641,10 @@ class Installer:
         # 削除されvpythonが壊れる。<81に固定する。
         self._fix_setuptools(idf_path)
 
+        # Check hidapi native library for joystick support
+        # ジョイスティック用のhidapiネイティブライブラリを確認
+        self._check_hidapi()
+
         # Install udev rules on Linux (for USB HID access without root)
         # Linux: udevルールをインストール（root不要でUSB HIDアクセス）
         if sys.platform == "linux" and not is_wsl():
@@ -770,6 +774,30 @@ class Installer:
         else:
             warn("Failed to pin setuptools. vpython may not work.")
             warn("Manual fix: pip install 'setuptools>=68.0,<81'")
+
+    def _check_hidapi(self) -> None:
+        """Check if hidapi native library is available (needed for joystick).
+        ジョイスティック用のhidapiネイティブライブラリの存在を確認"""
+        if sys.platform == "darwin":
+            # macOS: check for libhidapi via Homebrew
+            # macOS: Homebrewのlibhidapiを確認
+            brew_lib = Path("/opt/homebrew/lib/libhidapi.dylib")
+            brew_lib_intel = Path("/usr/local/lib/libhidapi.dylib")
+            if brew_lib.exists() or brew_lib_intel.exists():
+                success("hidapi native library found (Homebrew)")
+            else:
+                warn("hidapi native library not found (needed for joystick)")
+                warn("Install with: brew install hidapi")
+        elif sys.platform == "linux":
+            # Linux: check for libhidapi-hidraw.so
+            # Linux: libhidapi-hidraw.soを確認
+            import ctypes.util
+            lib = ctypes.util.find_library("hidapi-hidraw") or ctypes.util.find_library("hidapi-libusb")
+            if lib:
+                success("hidapi native library found")
+            else:
+                warn("hidapi native library not found (needed for joystick)")
+                warn("Install with: sudo apt install libhidapi-dev")
 
     def _save_config(self, idf_path: Path) -> None:
         """Save configuration file"""

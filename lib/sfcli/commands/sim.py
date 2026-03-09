@@ -204,6 +204,15 @@ def run_sim(args: argparse.Namespace) -> int:
     if not python_cmd:
         return 1
 
+    # Check hidapi native library for joystick support
+    # ジョイスティック用のhidapiネイティブライブラリを確認
+    no_joystick = hasattr(args, 'no_joystick') and args.no_joystick
+    if not no_joystick and not _check_hidapi_available(python_cmd):
+        console.print()
+        console.print("  Continuing without joystick (--no-joystick)...")
+        console.print()
+        no_joystick = True
+
     console.info(f"Starting {backend['name']} simulator...")
     console.print(f"  Backend: {backend_id}")
     console.print(f"  Script: {script_path}")
@@ -219,7 +228,7 @@ def run_sim(args: argparse.Namespace) -> int:
         cmd.extend(["--seed", str(args.seed)])
     if hasattr(args, 'mode') and args.mode:
         cmd.extend(["--mode", args.mode])
-    if hasattr(args, 'no_joystick') and args.no_joystick:
+    if no_joystick:
         cmd.append("--no-joystick")
 
     console.print("Controls:")
@@ -341,6 +350,46 @@ def _check_vpython_available(python_cmd: str) -> bool:
                     return True
             console.error("Auto-fix failed. Run manually:")
             console.print("    pip install 'setuptools>=68,<81'")
+
+        return False
+    except Exception:
+        return False
+
+
+def _check_hidapi_available(python_cmd: str) -> bool:
+    """Check if hidapi native library is available for the hid package.
+    hidパッケージのネイティブライブラリが利用可能か確認"""
+    try:
+        result = subprocess.run(
+            [python_cmd, "-c", "import hid; hid.enumerate()"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return True
+
+        # Check if this is a missing native library issue
+        # ネイティブライブラリの欠如を検出
+        if "libhidapi" in result.stderr or "Unable to load" in result.stderr:
+            if sys.platform == "darwin":
+                console.warning(
+                    "hid package requires libhidapi native library"
+                )
+                console.print("  Install with Homebrew:")
+                console.print("    brew install hidapi")
+                console.print()
+                console.print("  Or use --no-joystick to run without controller")
+            elif sys.platform == "linux":
+                console.warning(
+                    "hid package requires libhidapi native library"
+                )
+                console.print("  Install with package manager:")
+                console.print("    sudo apt install libhidapi-dev  # Debian/Ubuntu")
+                console.print("    sudo dnf install hidapi-devel   # Fedora")
+                console.print()
+                console.print("  Or use --no-joystick to run without controller")
+            return False
 
         return False
     except Exception:

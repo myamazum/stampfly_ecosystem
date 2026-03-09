@@ -187,6 +187,26 @@ def run(args: argparse.Namespace) -> int:
             warnings.append(f"Missing package: {package_name}")
             console.warning(f"  {package_name}: NOT INSTALLED")
 
+    # Check hidapi native library (for joystick / simulator)
+    # hidapiネイティブライブラリの確認（ジョイスティック／シミュレータ用）
+    console.print()
+    console.info("Checking hidapi (joystick support)...")
+    try:
+        import hid
+        hid.enumerate()
+        console.success("  hidapi native library available")
+    except ImportError:
+        warnings.append("hid package not installed")
+        console.warning("  hid package: NOT INSTALLED")
+        console.print("    pip install hid")
+    except OSError:
+        warnings.append("hidapi native library not found")
+        console.warning("  hidapi native library: NOT FOUND")
+        if sys.platform == "darwin":
+            console.print("    Install with: brew install hidapi")
+        elif sys.platform == "linux":
+            console.print("    Install with: sudo apt install libhidapi-dev")
+
     # Check serial ports
     console.print()
     console.info("Checking serial ports...")
