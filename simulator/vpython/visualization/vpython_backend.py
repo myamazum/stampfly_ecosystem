@@ -754,19 +754,29 @@ class render():
         # Use PRIMARY properties only (no camera.pos/axis setters)
         # プライマリプロパティのみ使用（camera.pos/axisセッターは使わない）
         #
-        # Camera distance from center = range / tan(fov/2)
-        # range=0.2, fov=2*atan2(0.2,d) → tan(fov/2)=0.2/d → distance=d
-        scene_range = 0.2
+        # Extend center point far ahead to increase depth rendering range.
+        # 描画の奥行きを確保するため、centerを前方に延長する。
+        # Camera position, FOV, and apparent drone size are unchanged:
+        #   cam_to_center = d + depth_ext ≈ 21
+        #   range = 0.2 * cam_to_center / d ≈ 4.2
+        #   fov = 2*atan2(range, cam_to_center) = 2*atan2(0.2, d) (same)
+        #   camera = center - forward * (range/tan(fov/2)) = drone - forward*d
+        depth_ext = 20
         fwd_nx, fwd_ny, fwd_nz = fwd_x / d, fwd_y / d, fwd_z / d
+        cam_to_center = d + depth_ext
+        scene_range = 0.2 * cam_to_center / d
 
         self.scene.autoscale = False
         self.scene.userspin = False
         self.scene.userzoom = False
-        self.scene.center = vector(self._xf, self._yf, self._zf)
+        self.scene.center = vector(
+            self._xf + fwd_nx * depth_ext,
+            self._yf + fwd_ny * depth_ext,
+            self._zf + fwd_nz * depth_ext)
         self.scene.forward = vector(fwd_nx, fwd_ny, fwd_nz)
         self.scene.range = scene_range
         self.scene.up = vector(0, 0, -1)
-        self.scene.fov = 2 * atan2(scene_range, d)
+        self.scene.fov = 2 * atan2(scene_range, cam_to_center)
 
 
     def fix_human_setting(self, drone, t):

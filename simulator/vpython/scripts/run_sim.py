@@ -756,6 +756,11 @@ def flight_sim_2000hz(world_type='voxel', seed=None, control_mode='rate'):
         plt.tight_layout()
         plt.show()
 
+    # Force exit to terminate VPython's WebSocket server thread
+    # VPythonのWebSocketサーバースレッドを終了するため強制終了
+    # (VPython's server thread is non-daemon and keeps the process alive on macOS)
+    os._exit(0)
+
 
 if __name__ == "__main__":
     import argparse
