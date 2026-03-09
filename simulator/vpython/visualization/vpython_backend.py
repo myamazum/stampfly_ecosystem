@@ -744,9 +744,9 @@ class render():
         zf_target = drone.body.position[2][0]
         direction = drone.body.euler[2][0]
 
-        # Yaw角のスムージング（±π境界でのカメラジャンプを防止）
-        # Smooth yaw angle to prevent camera snap at ±π boundary
-        alpha_yaw = 0.15  # Yaw用（小さいほど滑らか、大きいほど速く追従）
+        # Yaw角のスムージング（±π境界でのカメラジャンプ防止のみが目的）
+        # Smooth yaw angle only to prevent snap at ±π boundary
+        alpha_yaw = 0.7  # 高めに設定（境界スナップ防止が目的、追従は速く）
         if not hasattr(self, '_smoothed_yaw'):
             self._smoothed_yaw = direction
         else:
@@ -768,8 +768,8 @@ class render():
 
         # カメラ位置と注視点のスムージング（ローパスフィルタ）
         # Smooth camera position and look-at point (low-pass filter)
-        alpha_pos = 0.08  # カメラ位置用（小さいほど滑らか）
-        alpha_look = 0.15  # 注視点用（少し速く追従）
+        alpha_pos = 0.2   # カメラ位置用（小さいほど滑らか）
+        alpha_look = 0.25  # 注視点用（少し速く追従）
         if not hasattr(self, '_cam_initialized'):
             self.xc = xc_target
             self.yc = yc_target
