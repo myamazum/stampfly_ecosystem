@@ -78,8 +78,8 @@
 
   % simulator → control (refine design)
   % シミュレーション結果をもとに制御を改善
-  \draw[arr=csimulator] (sim.north) -- (ctrl.west)
-    node[arrlabel, pos=0.45, above left=2mm and 4mm, align=center] {設計を\\改善};
+  \draw[arr=csimulator, rounded corners=5mm] (sim.north) |- (ctrl.west)
+    node[arrlabel, pos=0.25, right=3mm] {設計を改善};
 
   % firmware → analysis (telemetry data)
   % フライトデータを解析に送る
@@ -88,8 +88,8 @@
 
   % analysis → control (insights feed back)
   % 解析結果から制御を改善
-  \draw[arr=canalysis] (ana.north) -- (ctrl.east)
-    node[arrlabel, pos=0.45, above right=2mm and 4mm, align=center] {改善点を\\フィードバック};
+  \draw[arr=canalysis, rounded corners=5mm] (ana.north) |- (ctrl.east)
+    node[arrlabel, pos=0.25, left=3mm] {改善点をFB};
 
   % === Infrastructure (below main cycle) ===
   \node[infra=ctools] (tools) at (-2.5, -2.8) {\texttt{tools/}\\[-2pt]{\scriptsize sf CLI}};
