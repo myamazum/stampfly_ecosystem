@@ -639,111 +639,90 @@ class render():
         #sleep(100)
 
     def camera_init(self):
-        #Cameraの設定
-        #カメラの見たい場所
+        # Camera initialization using PRIMARY properties only
+        # プライマリプロパティのみでカメラを初期化
         xf = 0.0
         yf = 0.0
         zf = 0.0
-        
-        #カメラの位置
-        self.xc =  xf - 0.00 #scene.upが(0,0,-1)のためこれがうまく表示されない。(0,1,0)に変更するとうまくいく
-        self.yc =  yf - 0.2
-        self.zc =  zf - 0.0
 
-        #カメラの向き
-        axis_x = xf - self.xc
-        axis_y = yf - self.yc
-        axis_z = zf - self.zc
-        d = sqrt(axis_x**2 + axis_y**2 + axis_z**2)
-        
-        #見える奥行き範囲を延長するための処理
-        axis_x = axis_x
-        axis_y = axis_y
-        axis_z = axis_z
-        xf = self.xc + axis_x
-        yf = self.yc + axis_y
-        zf = self.zc + axis_z
+        self.xc = xf
+        self.yc = yf - 0.2
+        self.zc = zf
 
-        self.scene.autoscale = False  # オートスケールを無効
-        self.scene.center = vector(xf, yf, zf)  # カメラの注視点
-        self.scene.camera.pos = vector(self.xc, self.yc, self.zc)  # カメラの位置
-        self.scene.camera.axis = vector(axis_x, axis_y, axis_z)  # カメラの向き
-        self.scene.up=vector(0,1,0)
-        
-        #FOVの設定
-        scene_range = 0.2
-        self.scene.fov = 2*atan2(scene_range, d)
+        fwd_x = xf - self.xc
+        fwd_y = yf - self.yc
+        fwd_z = zf - self.zc
+        d = sqrt(fwd_x**2 + fwd_y**2 + fwd_z**2)
+        if d < 1e-6:
+            d = 1e-6
+
+        self.scene.autoscale = False
+        self.scene.center = vector(xf, yf, zf)
+        self.scene.forward = vector(fwd_x / d, fwd_y / d, fwd_z / d)
+        self.scene.range = d
+        self.scene.up = vector(0, 1, 0)
+        self.scene.fov = 2 * atan2(0.2, d)
 
         
     def fix_camera_setting(self, drone, t):
-        #Cameraの設定
-        #カメラの見たい場所
+        # Fixed camera position using PRIMARY properties only
+        # 固定カメラ位置（プライマリプロパティのみ使用）
         xf = drone.body.position[0][0]
         yf = drone.body.position[1][0]
         zf = drone.body.position[2][0]
-        
-        #カメラの位置
-        self.xc =  -2#xf - 0.00 #scene.upが(0,0,-1)のためこれがうまく表示されない。(0,1,0)に変更するとうまくいく
-        self.yc =  0#yf - 0.00
-        self.zc =  -5
 
-        #カメラの向き
-        axis_x = xf - self.xc
-        axis_y = yf - self.yc
-        axis_z = zf - self.zc
-        d = sqrt(axis_x**2 + axis_y**2 + axis_z**2)
-        
-        #見える奥行き範囲を延長するための処理
-        axis_x = axis_x*4
-        axis_y = axis_y*4
-        axis_z = axis_z*4
-        xf = self.xc + axis_x
-        yf = self.yc + axis_y
-        zf = self.zc + axis_z
+        self.xc = -2
+        self.yc = 0
+        self.zc = -5
 
-        self.scene.autoscale = False  # オートスケールを無効
-        self.scene.center = vector(xf, yf, zf)  # カメラの注視点
-        self.scene.camera.pos = vector(self.xc, self.yc, self.zc)  # カメラの位置
-        self.scene.camera.axis = vector(axis_x, axis_y, axis_z)  # カメラの向き
-        self.scene.up=vector(0,0,-1)
+        fwd_x = xf - self.xc
+        fwd_y = yf - self.yc
+        fwd_z = zf - self.zc
+        d = sqrt(fwd_x**2 + fwd_y**2 + fwd_z**2)
+        if d < 1e-6:
+            d = 1e-6
 
-        #FOVの設定
+        self.scene.autoscale = False
+        self.scene.center = vector(xf, yf, zf)
+        self.scene.forward = vector(fwd_x / d, fwd_y / d, fwd_z / d)
+        self.scene.range = d
+        self.scene.up = vector(0, 0, -1)
+
         if t < 1000.0:
             scene_range = 0.2
         else:
-            scene_range = 0.5 + (4.0 * t/16.0)
-        #if scene_range > 3.0:
-        #    scene_range = 3.0
-        #    scene_range = 0.3
-        d = sqrt(2**2 + 0**2 + 5**2)
-        self.scene.fov = 2*atan2(scene_range, d)
+            scene_range = 0.5 + (4.0 * t / 16.0)
+        d_ref = sqrt(2**2 + 0**2 + 5**2)
+        self.scene.fov = 2 * atan2(scene_range, d_ref)
 
 
     def follow_camera_setting(self, drone, t):
-        #Cameraの設定
-        #カメラの見たい場所（目標）
+        # Camera settings using VPython PRIMARY properties only
+        # VPythonのプライマリプロパティのみ使用（camera.pos/axisは派生プロパティ
+        # であり、セッター内で相互干渉するため使用しない）
+        #
+        # Primary: scene.center, scene.forward, scene.range, scene.up, scene.fov
+        # Derived (DO NOT USE): scene.camera.pos, scene.camera.axis
+
+        # Drone position and heading
+        # ドローンの位置とヘディング
         xf_target = drone.body.position[0][0]
         yf_target = drone.body.position[1][0]
         zf_target = drone.body.position[2][0]
         direction = drone.body.euler[2][0]
 
-        #カメラの位置（目標）
-        pattern = 0
-        if pattern == 0:
-            #後ろから追いかける
-            xc_target = xf_target - 1*cos(direction)
-            yc_target = yf_target - 1*sin(direction)
-            zc_target = zf_target - 0.15
-        elif pattern == 1:
-            #上から追いかける
-            xc_target = xf_target - 5
-            yc_target = yf_target - 0.00
-            zc_target = zf_target - 5
+        # Camera offset behind drone (chase camera)
+        # ドローンの後方にカメラを配置（チェイスカメラ）
+        cam_distance = 1.0   # distance behind drone / ドローンからの距離
+        cam_height = -0.15   # height offset (Z-down) / 高さオフセット
+        xc_target = xf_target - cam_distance * cos(direction)
+        yc_target = yf_target - cam_distance * sin(direction)
+        zc_target = zf_target + cam_height
 
-        # カメラ位置と注視点のスムージング（ローパスフィルタ）
         # Smooth camera position and look-at point (low-pass filter)
-        alpha_pos = 0.08  # カメラ位置用（小さいほど滑らか）
-        alpha_look = 0.15  # 注視点用（少し速く追従）
+        # カメラ位置と注視点のスムージング（ローパスフィルタ）
+        alpha_pos = 0.08   # camera position (smaller = smoother)
+        alpha_look = 0.15  # look-at point (faster tracking)
         if not hasattr(self, '_cam_initialized'):
             self.xc = xc_target
             self.yc = yc_target
@@ -753,86 +732,59 @@ class render():
             self._zf = zf_target
             self._cam_initialized = True
         else:
-            # カメラ位置のスムージング
-            self.xc = self.xc + alpha_pos * (xc_target - self.xc)
-            self.yc = self.yc + alpha_pos * (yc_target - self.yc)
-            self.zc = self.zc + alpha_pos * (zc_target - self.zc)
-            # 注視点のスムージング
-            self._xf = self._xf + alpha_look * (xf_target - self._xf)
-            self._yf = self._yf + alpha_look * (yf_target - self._yf)
-            self._zf = self._zf + alpha_look * (zf_target - self._zf)
+            self.xc += alpha_pos * (xc_target - self.xc)
+            self.yc += alpha_pos * (yc_target - self.yc)
+            self.zc += alpha_pos * (zc_target - self.zc)
+            self._xf += alpha_look * (xf_target - self._xf)
+            self._yf += alpha_look * (yf_target - self._yf)
+            self._zf += alpha_look * (zf_target - self._zf)
 
-        # スムージングされた注視点を使用
-        xf = self._xf
-        yf = self._yf
-        zf = self._zf
+        # Forward direction: from camera position to look-at point
+        # 前方方向: カメラ位置から注視点への方向
+        fwd_x = self._xf - self.xc
+        fwd_y = self._yf - self.yc
+        fwd_z = self._zf - self.zc
+        d = sqrt(fwd_x**2 + fwd_y**2 + fwd_z**2)
+        if d < 1e-6:
+            d = 1e-6
 
-        #カメラの向き
-        axis_x = xf - self.xc
-        axis_y = yf - self.yc
-        axis_z = zf - self.zc
-        d = sqrt(axis_x**2 + axis_y**2 + axis_z**2)
-        
-        #見える奥行き範囲を延長するための処理
-        axis_x = axis_x*20
-        axis_y = axis_y*20
-        axis_z = axis_z*20
-        xf = self.xc + axis_x
-        yf = self.yc + axis_y
-        zf = self.zc + axis_z
-
-        self.scene.autoscale = False  # オートスケールを無効
-        self.scene.center = vector(xf, yf, zf)  # カメラの注視点
-        self.scene.camera.pos = vector(self.xc, self.yc, self.zc)  # カメラの位置
-        self.scene.camera.axis = vector(axis_x, axis_y, axis_z)  # カメラの向き
-        self.scene.up=vector(0,0,-1)
-
-        #FOVの設定
-        scene_range = 0.2
-        self.scene.fov = 2*atan2(scene_range, d)
+        # Use PRIMARY properties only (no camera.pos/axis setters)
+        # プライマリプロパティのみ使用（camera.pos/axisセッターは使わない）
+        self.scene.autoscale = False
+        self.scene.center = vector(self._xf, self._yf, self._zf)
+        self.scene.forward = vector(fwd_x / d, fwd_y / d, fwd_z / d)
+        self.scene.range = d
+        self.scene.up = vector(0, 0, -1)
+        self.scene.fov = 2 * atan2(0.2, d)
 
 
     def fix_human_setting(self, drone, t):
-        #Cameraの設定
-        #カメラの見たい場所（ドローンの位置）
+        # Human pilot viewpoint using PRIMARY properties only
+        # 操縦者視点（プライマリプロパティのみ使用）
         xf = drone.body.position[0][0]
         yf = drone.body.position[1][0]
         zf = drone.body.position[2][0]
-        
-        #カメラの位置（操縦者の固定位置）
-        self.xc = 0.0  # 操縦者のX座標（固定）
-        self.yc = 0.0  # 操縦者のY座標（固定）
-        self.zc = -1.5  # 操縦者のZ座標（固定）
 
-        #カメラの向き（操縦者がドローンを見る方向）
-        axis_x = xf - self.xc
-        axis_y = yf - self.yc
-        axis_z = zf - self.zc
-        d = sqrt(axis_x**2 + axis_y**2 + axis_z**2)
-        
-        # 操縦者の体の向きを計算（ドローンの方向に体を向ける）
-        # XY平面での角度を計算
-        angle_xy = atan2(axis_y, axis_x)
-        
-        # 体の向きを表すupベクトルを計算
-        # 基本的には上向き（Z軸負方向）だが、ドローンの位置によって少し傾ける
-        # ドローンが高いところにあれば上を向き、低いところにあれば下を向く
-        tilt_factor = 0.0  # 体の傾き具合を調整
-        up_x = tilt_factor * sin(angle_xy)
-        up_y = -tilt_factor * cos(angle_xy)
-        up_z = -1.0  # 基本的には上向き
-        
-        # 視線の方向を設定
-        self.scene.autoscale = False  # オートスケールを無効
-        self.scene.camera.pos = vector(self.xc, self.yc, self.zc)  # カメラの位置（操縦者の位置）
-        self.scene.camera.axis = vector(axis_x, axis_y, axis_z)  # カメラの向き（操縦者の視線）
-        self.scene.center = vector(xf, yf, zf)  # カメラの注視点（ドローンの位置）
-        self.scene.up = vector(up_x, up_y, up_z)  # 操縦者の体の向き
+        # Pilot fixed position / 操縦者の固定位置
+        self.xc = 0.0
+        self.yc = 0.0
+        self.zc = -1.5
 
-        #FOVの設定（固定値）
-        # 距離に応じてズームしないように固定のFOV値を使用
-        # 人間の視野角に近い値（約60度）を使用
-        self.scene.fov = radians(40)  # 60度の固定FOV
+        # Forward direction: pilot looking at drone
+        # 前方方向: 操縦者がドローンを見る方向
+        fwd_x = xf - self.xc
+        fwd_y = yf - self.yc
+        fwd_z = zf - self.zc
+        d = sqrt(fwd_x**2 + fwd_y**2 + fwd_z**2)
+        if d < 1e-6:
+            d = 1e-6
+
+        self.scene.autoscale = False
+        self.scene.center = vector(xf, yf, zf)
+        self.scene.forward = vector(fwd_x / d, fwd_y / d, fwd_z / d)
+        self.scene.range = d
+        self.scene.up = vector(0, 0, -1)
+        self.scene.fov = radians(40)
 
 
 

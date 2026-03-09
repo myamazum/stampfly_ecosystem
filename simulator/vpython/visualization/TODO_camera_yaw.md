@@ -4,38 +4,53 @@
 
 ## 1. 状態
 
-- **未解決**（2026-03-09 revert済み、コミット c2cf8bb）
-- 対象ファイル: `vpython_backend.py` の `follow_camera_setting()`
+- **修正済み**（2026-03-09）
+- 対象ファイル: `vpython_backend.py` の `follow_camera_setting()`, `camera_init()`, `fix_camera_setting()`, `fix_human_setting()`
 
-## 2. 症状
+## 2. 症状（修正前）
 
 - ドローンが Yaw 回転しても風景が動かない（カメラが追従しない）
 - ±π 境界を跨いだときだけカメラアングルが急に切り替わる
 - 画面上でドローンが回転しているのが見える（本来は機体中央固定で風景が流れるべき）
-- Windows/Mac では以前動いていた
 
-## 3. 試したアプローチ（全て効果なし）
+## 3. 根本原因
 
-| # | アプローチ | 結果 |
-|---|-----------|------|
-| 1 | `scene.camera.pos` / `scene.camera.axis` を毎フレーム設定 | VPython が上書きしている可能性、効果なし |
-| 2 | `scene.center` / `scene.forward` / `scene.range` に切替 | 同様に効果なし、画角も変わった |
-| 3 | Yaw スムージング（alpha_yaw 0.05〜0.9） | 根本原因ではない |
-| 4 | オリジナル stampfly_sim コード（スムージングなし）に完全復元 | それでも動かない |
+VPython のカメラには**プライマリプロパティ**と**派生プロパティ**がある:
 
-## 4. 考察
+| 種別 | プロパティ | 用途 |
+|------|-----------|------|
+| プライマリ | `scene.center`, `scene.forward`, `scene.range`, `scene.up`, `scene.fov` | カメラを直接制御 |
+| 派生 | `scene.camera.pos`, `scene.camera.axis` | プライマリから計算される |
 
-- オリジナル（stampfly_sim）のコードでも動かないため、VPython のバージョンまたは環境依存の問題
-- VPython 7.6.5 のカメラ制御が `scene.camera.pos/axis` 設定を無視している疑い
-- ブラウザレンダリング（WebGL）側の問題の可能性
+`camera.axis` のセッターが `camera.pos` の**古い値**を参照して `scene.center` を上書きする:
 
-## 5. 次のステップ
+```python
+# VPython 内部コード (vpython.py line ~2865)
+@axis.setter
+def axis(self, value):
+    c.center = self.pos + value   # ← 古い pos を使う！
+    c.axis = norm(value)
+    c.range = mag(value) * tan(c.fov / 2)
+```
 
-- 実機でシミュレータを動かしながら print デバッグ
-  - `scene.camera.pos` が設定後に実際に反映されているか確認
-  - `scene.forward` の値が毎フレーム変わっているか確認
-- VPython のバージョン差異（Win/Mac vs Ubuntu）を確認
-- Genesis シミュレータ（pygame ベース）のカメラ実装を参考に別アプローチを検討
+`camera.pos` → `camera.axis` の順で設定すると **依存関係ループ** が発生し、yaw 方向の変化が正しく反映されなかった。
+
+## 4. 修正内容
+
+全カメラ関数で `camera.pos` / `camera.axis`（派生プロパティ）の使用をやめ、プライマリプロパティのみを使用:
+
+```python
+# 修正後
+self.scene.center = vector(...)    # 注視点
+self.scene.forward = vector(...)   # カメラ方向（正規化）
+self.scene.range = d               # カメラ距離
+self.scene.up = vector(0, 0, -1)   # 上方向
+self.scene.fov = ...               # 視野角
+```
+
+## 5. 要確認
+
+- 実機で yaw 操作時にカメラが追従するか目視確認
 
 ---
 
@@ -43,33 +58,50 @@
 
 ## 1. Status
 
-- **Unresolved** (reverted on 2026-03-09, commit c2cf8bb)
-- Target file: `follow_camera_setting()` in `vpython_backend.py`
+- **Fixed** (2026-03-09)
+- Target files: `follow_camera_setting()`, `camera_init()`, `fix_camera_setting()`, `fix_human_setting()` in `vpython_backend.py`
 
-## 2. Symptoms
+## 2. Symptoms (before fix)
 
-- Scenery does not move when drone yaws (camera does not follow)
-- Camera angle snaps only when crossing ±π boundary
-- Drone visibly rotates on screen (should stay centered with scenery flowing)
-- Previously worked on Windows/Mac
+- Scenery did not move when drone yawed (camera did not follow)
+- Camera angle snapped only when crossing ±π boundary
+- Drone visibly rotated on screen (should stay centered with scenery flowing)
 
-## 3. Approaches Tried (all ineffective)
+## 3. Root Cause
 
-| # | Approach | Result |
-|---|----------|--------|
-| 1 | Set `scene.camera.pos` / `scene.camera.axis` every frame | VPython likely overrides, no effect |
-| 2 | Switch to `scene.center` / `scene.forward` / `scene.range` | Also no effect, FOV changed |
-| 3 | Yaw smoothing (alpha_yaw 0.05–0.9) | Not the root cause |
-| 4 | Full revert to original stampfly_sim code (no smoothing) | Still does not work |
+VPython camera has **primary properties** and **derived properties**:
 
-## 4. Analysis
+| Type | Properties | Purpose |
+|------|-----------|---------|
+| Primary | `scene.center`, `scene.forward`, `scene.range`, `scene.up`, `scene.fov` | Direct camera control |
+| Derived | `scene.camera.pos`, `scene.camera.axis` | Computed from primary |
 
-- Original stampfly_sim code also fails → VPython version or environment issue
-- VPython 7.6.5 camera control may ignore `scene.camera.pos/axis` settings
-- Possible browser rendering (WebGL) issue
+The `camera.axis` setter references the **old** `camera.pos` value to overwrite `scene.center`:
 
-## 5. Next Steps
+```python
+# VPython internal code (vpython.py line ~2865)
+@axis.setter
+def axis(self, value):
+    c.center = self.pos + value   # ← uses OLD pos!
+    c.axis = norm(value)
+    c.range = mag(value) * tan(c.fov / 2)
+```
 
-- Debug with simulator running, print `scene.camera.pos` / `scene.forward` values
-- Compare VPython versions across Win/Mac/Ubuntu
-- Consider alternative approach based on Genesis simulator (pygame camera)
+Setting `camera.pos` then `camera.axis` creates a **dependency loop**, preventing yaw changes from being reflected correctly.
+
+## 4. Fix
+
+All camera functions now use primary properties only (no `camera.pos` / `camera.axis` setters):
+
+```python
+# After fix
+self.scene.center = vector(...)    # look-at point
+self.scene.forward = vector(...)   # camera direction (normalized)
+self.scene.range = d               # camera distance
+self.scene.up = vector(0, 0, -1)   # up direction
+self.scene.fov = ...               # field of view
+```
+
+## 5. Verification needed
+
+- Visual confirmation that camera follows yaw during live simulation
