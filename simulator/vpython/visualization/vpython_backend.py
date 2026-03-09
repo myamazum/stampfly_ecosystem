@@ -737,61 +737,29 @@ class render():
         return self._wrap_angle(current + alpha * diff)
 
     def follow_camera_setting(self, drone, t):
-        #Cameraの設定
-        #カメラの見たい場所（目標）
-        xf_target = drone.body.position[0][0]
-        yf_target = drone.body.position[1][0]
-        zf_target = drone.body.position[2][0]
+        # Camera follows drone tightly (drone stays centered, scenery moves)
+        # カメラはドローンに密着追従（機体は画面中央、風景が動く）
+
+        # ドローンの位置と向き
+        xf = drone.body.position[0][0]
+        yf = drone.body.position[1][0]
+        zf = drone.body.position[2][0]
         direction = drone.body.euler[2][0]
 
-        # Yaw角のスムージング（±π境界でのカメラジャンプ防止のみが目的）
-        # Smooth yaw angle only to prevent snap at ±π boundary
-        alpha_yaw = 0.7  # 高めに設定（境界スナップ防止が目的、追従は速く）
+        # Yaw角のスムージング（±π境界でのジャンプ防止のみ）
+        # Smooth yaw only to prevent snap at ±π boundary
+        alpha_yaw = 0.9  # ほぼ即追従、境界保護のみ
         if not hasattr(self, '_smoothed_yaw'):
             self._smoothed_yaw = direction
         else:
             self._smoothed_yaw = self._smooth_angle(
                 self._smoothed_yaw, direction, alpha_yaw)
 
-        #カメラの位置（目標）
-        pattern = 0
-        if pattern == 0:
-            #後ろから追いかける（スムージング済みYawを使用）
-            xc_target = xf_target - 1*cos(self._smoothed_yaw)
-            yc_target = yf_target - 1*sin(self._smoothed_yaw)
-            zc_target = zf_target - 0.15
-        elif pattern == 1:
-            #上から追いかける
-            xc_target = xf_target - 5
-            yc_target = yf_target - 0.00
-            zc_target = zf_target - 5
-
-        # カメラ位置と注視点のスムージング（ローパスフィルタ）
-        # Smooth camera position and look-at point (low-pass filter)
-        alpha_pos = 0.2   # カメラ位置用（小さいほど滑らか）
-        alpha_look = 0.25  # 注視点用（少し速く追従）
-        if not hasattr(self, '_cam_initialized'):
-            self.xc = xc_target
-            self.yc = yc_target
-            self.zc = zc_target
-            self._xf = xf_target
-            self._yf = yf_target
-            self._zf = zf_target
-            self._cam_initialized = True
-        else:
-            # カメラ位置のスムージング
-            self.xc = self.xc + alpha_pos * (xc_target - self.xc)
-            self.yc = self.yc + alpha_pos * (yc_target - self.yc)
-            self.zc = self.zc + alpha_pos * (zc_target - self.zc)
-            # 注視点のスムージング
-            self._xf = self._xf + alpha_look * (xf_target - self._xf)
-            self._yf = self._yf + alpha_look * (yf_target - self._yf)
-            self._zf = self._zf + alpha_look * (zf_target - self._zf)
-
-        # スムージングされた注視点を使用
-        xf = self._xf
-        yf = self._yf
-        zf = self._zf
+        # カメラ位置：ドローンの後方1m、少し上（スムージングなし＝直結）
+        # Camera position: 1m behind drone, slightly above (no smoothing = direct)
+        self.xc = xf - 1*cos(self._smoothed_yaw)
+        self.yc = yf - 1*sin(self._smoothed_yaw)
+        self.zc = zf - 0.15
 
         #カメラの向き
         axis_x = xf - self.xc
