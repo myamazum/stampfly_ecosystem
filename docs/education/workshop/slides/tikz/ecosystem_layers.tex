@@ -69,27 +69,27 @@
   % control → firmware (design parameters flow down)
   % 制御パラメータを実装に渡す
   \draw[arr=ccontrol] (ctrl.south) -- (fw.north)
-    node[arrlabel, midway, right=2mm] {PIDパラメータ};
+    node[arrlabel, midway, right=4mm] {PIDパラメータ};
 
   % firmware → simulator (test before flight)
   % 実装をシミュレータで事前テスト
   \draw[arr=cfirmware] (fw.west) -- (sim.east)
-    node[arrlabel, midway, above=1mm] {仮想テスト};
+    node[arrlabel, midway, above=2.5mm] {仮想テスト};
 
   % simulator → control (refine design)
   % シミュレーション結果をもとに制御を改善
   \draw[arr=csimulator] (sim.north) -- (ctrl.west)
-    node[arrlabel, midway, left=2mm, align=center] {設計を\\改善};
+    node[arrlabel, pos=0.45, above left=2mm and 4mm, align=center] {設計を\\改善};
 
   % firmware → analysis (telemetry data)
   % フライトデータを解析に送る
   \draw[arr=cfirmware] (fw.east) -- (ana.west)
-    node[arrlabel, midway, above=1mm] {テレメトリ};
+    node[arrlabel, midway, above=2.5mm] {テレメトリ};
 
   % analysis → control (insights feed back)
   % 解析結果から制御を改善
   \draw[arr=canalysis] (ana.north) -- (ctrl.east)
-    node[arrlabel, midway, right=2mm, align=center] {改善点を\\フィードバック};
+    node[arrlabel, pos=0.45, above right=2mm and 4mm, align=center] {改善点を\\フィードバック};
 
   % === Infrastructure (below main cycle) ===
   \node[infra=ctools] (tools) at (-2.5, -2.8) {\texttt{tools/}\\[-2pt]{\scriptsize sf CLI}};
