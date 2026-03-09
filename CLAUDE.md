@@ -223,29 +223,41 @@ ASCII アートを活用する：
 
 ### 画像化による目視確認手順
 
-テキストベースのレビューでは検出できない問題（はみ出し、重なり、切れ）を発見するため、**必ず PDF を画像化して全ページ確認する**。
+テキストベースのレビューでは検出できない問題（はみ出し、重なり、切れ）を発見するため、**必ず PDF を画像化して目視確認する**。
 
-```bash
-# 1. TikZ standalone をコンパイル・画像化
-cd docs/education/workshop/slides/tikz
-pdflatex -interaction=nonstopmode <file>.tex
-magick -density 200 <file>.pdf -quality 95 /tmp/tikz_<file>.png
+**重要: サブエージェント方式を使うこと。** 画像の Read はコンテキストを大きく消費し、rate limit に抵触する原因になる。サブエージェント内で画像確認を完結させ、メインコンテキストにはテキストの指摘事項だけを返す。
 
-# 2. Beamer をコンパイル・全ページ画像化
-cd docs/education/workshop/slides/beamer
-lualatex -interaction=nonstopmode <lesson>.tex
-magick -density 200 "<lesson>.pdf[0]" -quality 95 /tmp/beamer_<lesson>_p1.png
-magick -density 200 "<lesson>.pdf[1]" -quality 95 /tmp/beamer_<lesson>_p2.png
-# ... 全ページ分
+#### サブエージェントによる目視確認（推奨）
 
-# 3. Read ツールで各画像を確認（マルチモーダル対応）
+Agent ツールで以下のようなプロンプトのサブエージェントを起動する:
+
+```
+スライドの目視確認を行ってください。
+
+1. TikZ をコンパイル・画像化して Read で確認:
+   cd docs/education/workshop/slides/tikz
+   lualatex -interaction=nonstopmode <file>.tex
+   magick -density 150 <file>.pdf -quality 85 /tmp/tikz_<file>.png
+
+2. Beamer をコンパイル・画像化して各ページを Read で確認:
+   cd docs/education/workshop/slides/beamer
+   lualatex -interaction=nonstopmode stampfly_workshop.tex
+   magick -density 150 "stampfly_workshop.pdf[<page>]" -quality 85 /tmp/beamer_p<N>.png
+
+3. 以下のチェックリストで各ページを確認し、問題があれば報告:
+   - 図・テキストがスライド端で切れていないか
+   - ノード・ラベルが重なっていないか
+   - resizebox のスケーリングで横幅・縦幅が収まっているか
+   - フッターにコンテンツが被っていないか
+
+問題がなければ「問題なし」、問題があれば該当ページ番号・チェック項目ID・具体的な内容を報告してください。
+コードの修正は行わず、レビュー結果の報告のみ行ってください。
 ```
 
-**確認ポイント:**
-- 図・テキストがスライド端で切れていないか
-- ノード・ラベルが重なっていないか
-- `\resizebox` のスケーリングで横幅・縦幅が収まっているか
-- フッターにコンテンツが被っていないか
+**ポイント:**
+- 解像度は 150dpi、品質 85 で十分（200dpi より軽量）
+- 変更したページ付近のみ確認すればよい（全156ページを毎回確認しない）
+- サブエージェントの結果を受けて、メイン側で修正→再度サブエージェントで確認のサイクルを回す
 
 ### チェック項目
 
