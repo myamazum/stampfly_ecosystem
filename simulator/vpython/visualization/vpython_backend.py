@@ -710,7 +710,9 @@ class render():
         xf_target = drone.body.position[0][0]
         yf_target = drone.body.position[1][0]
         zf_target = drone.body.position[2][0]
-        direction = drone.body.euler[2][0]
+        # Compute yaw from DCM (euler[2][0] is unreliable in step_fast)
+        # DCMからyawを計算（step_fastではeuler[2][0]が正しく更新されない場合がある）
+        direction = atan2(drone.body.DCM[1,0], drone.body.DCM[0,0])
 
         # Camera offset behind drone (chase camera)
         # ドローンの後方にカメラを配置（チェイスカメラ）
@@ -755,11 +757,13 @@ class render():
         # Camera distance from center = range / tan(fov/2)
         # range=0.2, fov=2*atan2(0.2,d) → tan(fov/2)=0.2/d → distance=d
         scene_range = 0.2
+        fwd_nx, fwd_ny, fwd_nz = fwd_x / d, fwd_y / d, fwd_z / d
+
         self.scene.autoscale = False
         self.scene.userspin = False
         self.scene.userzoom = False
         self.scene.center = vector(self._xf, self._yf, self._zf)
-        self.scene.forward = vector(fwd_x / d, fwd_y / d, fwd_z / d)
+        self.scene.forward = vector(fwd_nx, fwd_ny, fwd_nz)
         self.scene.range = scene_range
         self.scene.up = vector(0, 0, -1)
         self.scene.fov = 2 * atan2(scene_range, d)
