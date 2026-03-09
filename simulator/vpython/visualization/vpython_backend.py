@@ -746,7 +746,7 @@ class render():
 
         # Yaw角のスムージング（±π境界でのカメラジャンプを防止）
         # Smooth yaw angle to prevent camera snap at ±π boundary
-        alpha_yaw = 0.05  # Yaw用（小さいほど滑らか）
+        alpha_yaw = 0.15  # Yaw用（小さいほど滑らか、大きいほど速く追従）
         if not hasattr(self, '_smoothed_yaw'):
             self._smoothed_yaw = direction
         else:
