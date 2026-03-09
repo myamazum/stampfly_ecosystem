@@ -39,6 +39,11 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Baud rate (default: 460800)",
     )
     parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Flash factory legacy firmware (PlatformIO merged binary)",
+    )
+    parser.add_argument(
         "--build",
         action="store_true",
         help="Build before flashing",
@@ -51,8 +56,72 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     parser.set_defaults(func=run)
 
 
+def _flash_legacy(args: argparse.Namespace) -> int:
+    """Flash legacy factory firmware (PlatformIO merged binary)
+    レガシーファクトリーファームウェアを書き込む"""
+    legacy_bin = paths.firmware() / "legacy" / "merged.bin"
+    if not legacy_bin.exists():
+        console.error(f"Legacy binary not found: {legacy_bin}")
+        return 1
+
+    # Detect or use specified port
+    # シリアルポートの検出または指定ポートの使用
+    port = args.port
+    if not port:
+        port = platform.default_serial_port()
+        if not port:
+            console.error("No serial port detected. Please specify with -p/--port")
+            available = platform.serial_ports()
+            if available:
+                console.print("Available ports:")
+                for p in available:
+                    console.print(f"  {p}")
+            return 1
+        console.info(f"Auto-detected port: {port}")
+
+    # Check ESP-IDF for esptool
+    idf_path = platform.esp_idf_path()
+    if not idf_path:
+        console.error("ESP-IDF not found. esptool.py is required.")
+        return 1
+
+    env = espidf.prepare_idf_env(idf_path)
+
+    # Use esptool.py to write merged binary at offset 0x0
+    # esptool.py でマージ済みバイナリをオフセット0x0に書き込む
+    cmd = [
+        "python", "-m", "esptool",
+        "--chip", "esp32s3",
+        "--port", port,
+        "--baud", str(args.baud),
+        "write_flash", "0x0", str(legacy_bin),
+    ]
+
+    console.info("Flashing legacy factory firmware...")
+    console.print(f"  Binary: {legacy_bin}")
+    console.print(f"  Port:   {port}")
+    console.print(f"  Baud:   {args.baud}")
+    console.print()
+
+    result = subprocess.run(cmd, env=env)
+
+    if result.returncode == 0:
+        console.print()
+        console.success("Legacy firmware flashed successfully")
+        return 0
+    else:
+        console.print()
+        console.error("Legacy firmware flash failed")
+        return result.returncode
+
+
 def run(args: argparse.Namespace) -> int:
     """Execute flash command"""
+    # Legacy firmware shortcut
+    # レガシーファームウェアの書き込み
+    if args.legacy:
+        return _flash_legacy(args)
+
     # Determine target directory
     # 動的ターゲット検出: firmware/ 配下の CMakeLists.txt を持つディレクトリ
     target_dir = paths.firmware_target_dir(args.target)
