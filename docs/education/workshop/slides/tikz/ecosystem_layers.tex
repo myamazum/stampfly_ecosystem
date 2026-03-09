@@ -60,10 +60,10 @@
   \node[box=cfirmware] (fw) at (0, 0) {\texttt{firmware/}\\[-2pt]{\normalsize 実装して飛ばす}};
 
   % Left: simulator/
-  \node[box=csimulator] (sim) at (-5.5, 0) {\texttt{simulator/}\\[-2pt]{\normalsize 安全に検証}};
+  \node[box=csimulator] (sim) at (-6.8, 0) {\texttt{simulator/}\\[-2pt]{\normalsize 安全に検証}};
 
   % Right: analysis/
-  \node[box=canalysis] (ana) at (5.5, 0) {\texttt{analysis/}\\[-2pt]{\normalsize データ解析}};
+  \node[box=canalysis] (ana) at (6.8, 0) {\texttt{analysis/}\\[-2pt]{\normalsize データ解析}};
 
   % === Cycle arrows ===
   % control → firmware (design parameters flow down)
@@ -74,7 +74,7 @@
   % firmware → simulator (test before flight)
   % 実装をシミュレータで事前テスト
   \draw[arr=cfirmware] (fw.west) -- (sim.east)
-    node[arrlabel, pos=0.5, below=12mm] {仮想テスト};
+    node[arrlabel, midway, above=2mm] {仮想テスト};
 
   % simulator → control (refine design)
   % シミュレーション結果をもとに制御を改善
@@ -84,7 +84,7 @@
   % firmware → analysis (telemetry data)
   % フライトデータを解析に送る
   \draw[arr=cfirmware] (fw.east) -- (ana.west)
-    node[arrlabel, pos=0.5, below=12mm] {テレメトリ};
+    node[arrlabel, midway, above=2mm] {テレメトリ};
 
   % analysis → control (insights feed back)
   % 解析結果から制御を改善
