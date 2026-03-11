@@ -51,8 +51,8 @@ Serial:
 ### ESP-IDF が見つからない
 
 ```bash
-# ESP-IDF環境をアクティブ化
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 ```
 
 ### pyserial がインストールされていない

@@ -15,9 +15,9 @@
 ### ESP-IDFバージョン
 - **使用バージョン**: ESP-IDF v5.4.1
 - **対象MCU**: ESP32-S3 (M5StampS3)
-- **開発環境セットアップ**:
+- **開発環境のセットアップ**:
   ```bash
-  source ~/esp/esp-idf/export.sh
+  source setup_env.sh
   ```
 
 ### 必要なヘッダーファイル

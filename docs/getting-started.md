@@ -33,8 +33,8 @@ cd stampfly_ecosystem
 #### Step 2: コントローラのファームウェア書き込み（初回のみ）
 
 ```bash
-# ESP-IDF環境をアクティブ化
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 
 # コントローラファームウェアをビルド・書き込み
 sf build controller
@@ -140,10 +140,8 @@ cd stampfly_ecosystem
 ### Step 3: 環境をアクティブ化
 
 ```bash
-source ~/esp/esp-idf/export.sh
+source setup_env.sh
 ```
-
-> **Tips**: `~/.bashrc` または `~/.zshrc` に `alias get_idf='source ~/esp/esp-idf/export.sh'` を追加すると便利です。
 
 ### Step 4: インストール確認
 
@@ -431,8 +429,8 @@ The installer also guides ESP-IDF installation if needed.
 #### Step 2: Flash Controller Firmware (First time only)
 
 ```bash
-# Activate ESP-IDF environment
-source ~/esp/esp-idf/export.sh
+# Activate development environment
+source setup_env.sh
 
 # Build and flash controller
 sf build controller
@@ -527,7 +525,7 @@ cd stampfly_ecosystem
 ### Step 3: Activate Environment
 
 ```bash
-source ~/esp/esp-idf/export.sh
+source setup_env.sh
 ```
 
 ### Step 4: Verify Installation

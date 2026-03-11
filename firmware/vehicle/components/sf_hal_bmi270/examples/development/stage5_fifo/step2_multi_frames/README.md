@@ -125,10 +125,10 @@ uint8_t fifo_config_1 = 0xD0;
 
 ## ビルド＆実行
 
-### 1. 環境セットアップ
+### 1. 開発環境のセットアップ
 
 ```bash
-source ~/esp/esp-idf/export.sh
+source setup_env.sh
 ```
 
 ### 2. ターゲット設定（初回のみ）

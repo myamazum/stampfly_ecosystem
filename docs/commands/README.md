@@ -11,7 +11,7 @@
 ```bash
 cd stampfly_ecosystem
 ./install.sh
-source ~/esp/esp-idf/export.sh
+source setup_env.sh
 ```
 
 ### 基本構文
@@ -112,7 +112,7 @@ sf version                 # バージョン情報
 ```bash
 cd stampfly_ecosystem
 ./install.sh
-source ~/esp/esp-idf/export.sh
+source setup_env.sh
 ```
 
 ### Basic Syntax

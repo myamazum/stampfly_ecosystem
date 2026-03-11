@@ -44,8 +44,8 @@ WiFi STAモードは、StampFlyがWiFiルーター（アクセスポイント）
 WiFi STA機能を含むファームウェアを書き込みます：
 
 ```bash
-# ESP-IDF環境をアクティブ化
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 
 # ビルドと書き込み
 sf build vehicle
@@ -551,8 +551,8 @@ WiFi STA mode allows StampFly to connect to a WiFi router (access point). This e
 Flash firmware with WiFi STA feature:
 
 ```bash
-# Activate ESP-IDF environment
-source ~/esp/esp-idf/export.sh
+# Activate development environment
+source setup_env.sh
 
 # Build and flash
 sf build vehicle

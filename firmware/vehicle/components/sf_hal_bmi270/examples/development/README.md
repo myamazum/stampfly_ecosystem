@@ -76,8 +76,8 @@ SOFTWARE.
 各ステージは独立してビルド可能です：
 
 ```bash
-# 環境セットアップ
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 
 # Stage 1をビルド
 cd stage1_spi_basic

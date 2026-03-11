@@ -39,7 +39,7 @@
 ### 手順
 
 ```bash
-source ~/esp/esp-idf/export.sh
+source setup_env.sh
 sf build vehicle
 sf flash vehicle -m   # シリアルモニタでブートログ確認
 ```
@@ -524,7 +524,7 @@ Verify that firmware compiles and boots correctly.
 ### Procedure
 
 ```bash
-source ~/esp/esp-idf/export.sh
+source setup_env.sh
 sf build vehicle
 sf flash vehicle -m   # Check boot log via serial monitor
 ```

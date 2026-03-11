@@ -39,13 +39,7 @@ cd esp-idf
 source ~/esp/esp-idf/export.sh
 ```
 
-### シェル設定への追加（推奨）
-
-`~/.bashrc` に以下を追加:
-
-```bash
-alias get_idf='source ~/esp/esp-idf/export.sh'
-```
+> **Note**: ESP-IDF自体のインストール手順では `source ~/esp/esp-idf/export.sh` を使いますが、StampFly Ecosystem での日常的な開発では `source setup_env.sh` を使用してください。
 
 ## 5. シリアルポートの権限設定
 
@@ -74,8 +68,8 @@ sudo udevadm trigger
 ## 7. 動作確認
 
 ```bash
-# ESP-IDF環境をアクティブ化
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 
 # プロジェクトディレクトリに移動
 cd path/to/stampfly_ecosystem
@@ -146,13 +140,7 @@ cd esp-idf
 source ~/esp/esp-idf/export.sh
 ```
 
-### Add to Shell Config (Recommended)
-
-Add to `~/.bashrc`:
-
-```bash
-alias get_idf='source ~/esp/esp-idf/export.sh'
-```
+> **Note**: The ESP-IDF installation step uses `source ~/esp/esp-idf/export.sh`, but for day-to-day StampFly Ecosystem development, use `source setup_env.sh` instead.
 
 ## 5. Serial Port Permissions
 
@@ -181,8 +169,8 @@ sudo udevadm trigger
 ## 7. Verify Installation
 
 ```bash
-# Activate ESP-IDF environment
-source ~/esp/esp-idf/export.sh
+# Activate development environment
+source setup_env.sh
 
 # Navigate to project
 cd path/to/stampfly_ecosystem

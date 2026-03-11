@@ -68,8 +68,8 @@ BMI270のDATA_RDY割り込みを使用して、効率的にセンサーデータ
 ## ビルド＆実行
 
 ```bash
-# 環境セットアップ
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 
 # ターゲット設定（初回のみ）
 cd examples/basic_interrupt

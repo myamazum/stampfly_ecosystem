@@ -220,10 +220,10 @@ static void fifo_read_task(void *arg)
 
 ## ビルド＆実行
 
-### 1. 環境セットアップ
+### 1. 開発環境のセットアップ
 
 ```bash
-source ~/esp/esp-idf/export.sh
+source setup_env.sh
 ```
 
 ### 2. ターゲット設定（初回のみ）

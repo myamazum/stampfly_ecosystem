@@ -24,8 +24,8 @@
 各学生の PC で以下を確認:
 
 ```bash
-# 1. ESP-IDF インストール確認
-source ~/esp/esp-idf/export.sh
+# 1. 開発環境のセットアップ
+source setup_env.sh
 idf.py --version    # v5.4 以上
 
 # 2. sf CLI 動作確認
@@ -214,7 +214,7 @@ sf log analyze <logfile>
 
 | 症状 | 原因 | 対処 |
 |------|------|------|
-| ビルドエラー | ESP-IDF 未初期化 | `source ~/esp/esp-idf/export.sh` |
+| ビルドエラー | 開発環境未初期化 | `source setup_env.sh` |
 | ポート未検出 | USB ケーブル | データ対応ケーブルに交換 |
 | フラッシュ失敗 | Boot モード | BOOT ボタン押しながらリセット |
 | モータ不安定 | PID ゲイン過大 | P ゲインを 50% に下げる |
@@ -245,7 +245,7 @@ This is the instructor's manual for the StampFly Workshop (4+1 days). It covers 
 ### Environment Checklist
 
 ```bash
-source ~/esp/esp-idf/export.sh
+source setup_env.sh
 sf doctor
 sf lesson switch 0 && sf lesson build
 ```

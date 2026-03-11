@@ -41,8 +41,8 @@ cd stampfly_ecosystem
 ### ステップ 3: sf CLIの確認
 
 ```bash
-# ESP-IDF環境をアクティブ化
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 
 # sf CLIが利用可能か確認
 sf version
@@ -57,8 +57,8 @@ sf doctor
 ## 4. 基本的なワークフロー
 
 ```bash
-# 1. ESP-IDF環境をアクティブ化
-source ~/esp/esp-idf/export.sh
+# 1. 開発環境のセットアップ
+source setup_env.sh
 
 # 2. ファームウェアをビルド
 sf build vehicle
@@ -141,8 +141,8 @@ This installs:
 ### Step 3: Verify sf CLI
 
 ```bash
-# Activate ESP-IDF environment
-source ~/esp/esp-idf/export.sh
+# Activate development environment
+source setup_env.sh
 
 # Verify sf CLI is available
 sf version
@@ -157,8 +157,8 @@ sf doctor
 ## 4. Basic Workflow
 
 ```bash
-# 1. Activate ESP-IDF environment
-source ~/esp/esp-idf/export.sh
+# 1. Activate development environment
+source setup_env.sh
 
 # 2. Build firmware
 sf build vehicle

@@ -140,8 +140,8 @@ I (13456) BMI270_STAGE4: Interrupt count: 200
 # Navigate to this example
 cd examples/stage4_interrupt
 
-# Set up ESP-IDF environment
-source ~/esp/esp-idf/export.sh
+# Set up development environment
+source setup_env.sh
 
 # Build
 idf.py build

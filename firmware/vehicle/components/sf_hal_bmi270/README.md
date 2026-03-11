@@ -48,8 +48,8 @@ idf.py build
 ### 2. サンプルを試す
 
 ```bash
-# 環境セットアップ
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 
 # 最もシンプルなポーリングサンプルを実行
 cd examples/basic_polling

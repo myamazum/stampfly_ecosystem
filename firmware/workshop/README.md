@@ -37,8 +37,8 @@ firmware/workshop/
 ### 環境準備
 
 ```bash
-# ESP-IDF 環境を有効化
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 
 # 環境診断
 sf doctor
@@ -186,8 +186,8 @@ Workshop Skeleton is a simplified firmware for the StampFly workshop. It hides t
 ## 2. Quick Start
 
 ```bash
-# Activate ESP-IDF
-source ~/esp/esp-idf/export.sh
+# Activate development environment
+source setup_env.sh
 
 # Switch to a lesson
 sf lesson switch 1

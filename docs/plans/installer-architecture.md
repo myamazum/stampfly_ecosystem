@@ -189,8 +189,8 @@ default_target = "vehicle"
 ## 9. 使用方法（インストール後）
 
 ```bash
-# ESP-IDF環境をアクティベート
-source ~/esp/esp-idf/export.sh
+# 開発環境のセットアップ
+source setup_env.sh
 
 # StampFly CLIを使用
 sf --help
@@ -306,8 +306,8 @@ Therefore, the StampFly Ecosystem installer checks in this order:
 ## 5. Usage (After Installation)
 
 ```bash
-# Activate ESP-IDF environment
-source ~/esp/esp-idf/export.sh
+# Activate development environment
+source setup_env.sh
 
 # Use StampFly CLI
 sf --help
