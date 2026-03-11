@@ -94,10 +94,6 @@
 % Frame 5: sf app new
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{プロジェクト作成 / Create Project}
-  {\small \texttt{sf app new} で vehicle と同じ環境を独自プロジェクトとして生成:}
-
-  \vspace{0.3em}
-
   \begin{lstlisting}[style=sfbash]
 sf app new my_drone    # firmware/my_drone/ が生成
 sf build my_drone      # ビルド
@@ -119,10 +115,6 @@ sf flash my_drone -m   # 書き込み + モニタ
 % Frame 6: Project File Structure
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{プロジェクト構成 / Project Structure}
-  {\small \texttt{sf app new my\_drone} が生成するファイル:}
-
-  \vspace{0.3em}
-
   \begin{lstlisting}[style=sfbash, basicstyle=\ttfamily\small]
 firmware/my_drone/
   CMakeLists.txt        # ビルド設定
@@ -231,10 +223,6 @@ void ControlTask(void* pvParameters) {
 % Frame 10: Hands-on
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{実習: 全センサ Teleplot 可視化 / Hands-on}
-  {\small 編集ファイル: \texttt{firmware/my\_viz/main/main.cpp} の ControlTask 内}
-
-  \vspace{0.3em}
-
   \begin{lstlisting}[style=sfcpp, basicstyle=\ttfamily\scriptsize]
 auto& state = stampfly::StampFlyState::getInstance();
 stampfly::Vec3 accel, gyro;
