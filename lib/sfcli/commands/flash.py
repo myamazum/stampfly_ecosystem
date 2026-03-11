@@ -65,8 +65,8 @@ LEGACY_BINARIES = {
         "label": "StampFly Vehicle (factory)",
     },
     "controller": {
-        "file": "StampFlyController_V1.0.0_20240802_offset_0x10000.bin",
-        "offset": "0x10000",
+        "file": "StampFlyController_V1.0.0_merged_0x0.bin",
+        "offset": "0x0",
         "label": "StampFly Controller (factory)",
     },
 }
