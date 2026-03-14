@@ -148,7 +148,6 @@
   \begin{sflisting}{user\_code.cpp --- setup}
 #include "workshop_api.hpp"
 static uint32_t tick = 0;
-
 void setup() {
     ws::print("L2: Open-Loop Control");
     ws::arm();              // Enable motor output
@@ -156,8 +155,7 @@ void setup() {
 }
   \end{sflisting}
 
-  \vspace{0.5em}
-
+  \vspace{0.3em}
   \begin{alertblock}{チャンネル番号}
     講師が指定した番号（1 / 6 / 11）に書き換えること！\\
     コントローラも同じチャンネルに設定する

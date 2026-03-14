@@ -151,20 +151,18 @@
 % Slide 8: Hands-on Step 1 -- Ideal PID
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{実習 Step\,1: 理想 PID / Ideal PID}
-  \begin{sflisting}{user\_code.cpp (roll axis excerpt)}
+  \begin{sflisting}[basicstyle=\ttfamily\scriptsize]{user\_code.cpp (roll axis excerpt)}
 float Kp=0.25f, Ti=1.67f, Td=0.01f;
 float integral=0, prev_err=0;
 // inside loop_400Hz(dt)
-float error = target - ws::gyro_x();
-float P = Kp * error;
-if (Ti > 0)  // I term (trapezoidal)
-    integral += (dt/(2*Ti)) * (error + prev_err);
+float err = target - ws::gyro_x();
+float P = Kp * err;
+if (Ti > 0) integral += (dt/(2*Ti))*(err+prev_err);
 float I = Kp * integral;
-float D = Kp*Td*(error - prev_err)/dt; // ideal D
-prev_err = error;
+float D = Kp*Td*(err - prev_err)/dt; // ideal D
+prev_err = err;
 float roll_out = P + I + D;
   \end{sflisting}
-
   \begin{exampleblock}{やってみよう}
     飛ばしてみて $\to$ 高周波振動に注目
   \end{exampleblock}

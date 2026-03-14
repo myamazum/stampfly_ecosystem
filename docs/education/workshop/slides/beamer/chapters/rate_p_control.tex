@@ -42,23 +42,20 @@
 
 % ------------------------------------------------------------------
 \begin{frame}[fragile]{実習: 3軸 P 制御 / Hands-on}
-  \begin{sflisting}{user\_code.cpp}
+  \begin{sflisting}[basicstyle=\ttfamily\scriptsize]{user\_code.cpp}
 #include "workshop_api.hpp"
 void setup() { ws::print("Lesson 5: Rate P-Control"); }
 void loop_400Hz(float dt) {
     if (!ws::is_armed()) {
-        ws::motor_stop_all();
-        ws::led_color(50, 0, 0);  // Red = DISARM
-        return;
+        ws::motor_stop_all(); ws::led_color(50,0,0); return;
     }
     ws::led_color(0, 50, 0);  // Green = ARM
-    float Kp_rp = 0.5f, Kp_yaw = 2.0f;
-    float rate_max = 1.0f, yaw_max = 5.0f;
-    float roll_e  = ws::rc_roll()*rate_max  - ws::gyro_x();
-    float pitch_e = ws::rc_pitch()*rate_max - ws::gyro_y();
-    float yaw_e   = ws::rc_yaw()*yaw_max   - ws::gyro_z();
+    float Kp_rp=0.5f, Kp_yaw=2.0f, rmax=1.0f, ymax=5.0f;
+    float re = ws::rc_roll()*rmax  - ws::gyro_x();
+    float pe = ws::rc_pitch()*rmax - ws::gyro_y();
+    float ye = ws::rc_yaw()*ymax   - ws::gyro_z();
     ws::motor_mixer(ws::rc_throttle(),
-        Kp_rp*roll_e, Kp_rp*pitch_e, Kp_yaw*yaw_e);
+        Kp_rp*re, Kp_rp*pe, Kp_yaw*ye);
 }
   \end{sflisting}
 \end{frame}

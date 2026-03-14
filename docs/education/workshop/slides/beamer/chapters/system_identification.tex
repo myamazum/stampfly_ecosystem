@@ -181,25 +181,18 @@ sf log wifi -o flight.csv
     \code{sf sysid fit flight.csv -{}-kp 0.5 -{}-plot}
   \end{block}
 
-  \vspace{0.3em}
-
-  \begin{sflisting}{出力例}
+  \begin{sflisting}[basicstyle=\ttfamily\scriptsize]{出力例}
 === Plant Model Identification ===
   Model: G_p(s) = K / (s * (tau_m * s + 1))
-
-  Roll   K =  98.5 (ref: 102.0, err: 3.4%)
-         tau_m = 0.019 (ref: 0.020, err: 5.0%)  R2 = 0.94
-  Pitch  K =  72.1 (ref:  70.0, err: 3.0%)
-         tau_m = 0.021 (ref: 0.020, err: 5.0%)  R2 = 0.91
+  Roll  K= 98.5 (ref:102.0, err:3.4%) tau_m=0.019 R2=0.94
+  Pitch K= 72.1 (ref: 70.0, err:3.0%) tau_m=0.021 R2=0.91
   \end{sflisting}
-
-  \vspace{0.3em}
-
-  {\small
+  \vspace{-0.3em}
+  {\scriptsize
   \begin{tabular}{ll}
     \code{-{}-kp 0.5} & 飛行時の $K_p$（\textbf{必須}） \\
     \code{-{}-axis roll} & 特定軸のみ分析 \\
-    \code{-{}-rate-max 1.0} & \code{rate\_max}（roll/pitch 既定=1.0, yaw=5.0） \\
+    \code{-{}-rate-max 1.0} & \code{rate\_max}（既定=1.0, yaw=5.0） \\
     \code{-o result.yaml} & 結果をファイルに保存 \\
   \end{tabular}
   }
