@@ -53,19 +53,23 @@
   \node[smallbox=apicolor, below=46mm of stampfly, xshift=22mm]
     (api4) {rc\_yaw()\\[-1pt]{\footnotesize\color{gray1} $\pm$1.0}};
 
-  % Arrows from StampFly to each API (no chaining, no penetration)
+  % Arrows from StampFly to each API (no chaining, no penetration, no edge overlap)
   % Coordinate verification:
   %   stampfly.south = (100, -9)
-  %   api1.north = (78, -15), api2.north = (122, -15)
-  %   api1 x-range [61,95], api2 x-range [105,139]  → gap at x=[95,105]
+  %   api1: center (78,-22), range x=[61,95], y=[-29,-15]
+  %   api2: center (122,-22), range x=[105,139], y=[-29,-15]
   %   api3.north = (78, -39), api4.north = (122, -39)
+  %   split = (100, -34): above api3/api4 top edge (-39), below api1/api2 bottom (-29)
+  %   Vertical trunk x=100 in gap [95,105] between api1/api2 ✓
+  %   Split-to-api3: (100,-34)→(78,-39) diagonal, no node overlap ✓
+  %   Split-to-api4: (100,-34)→(122,-39) diagonal, no node overlap ✓
   %
   % Upper row: direct diagonal lines from stampfly.south
   \draw[arr=apicolor] (stampfly.south) -- (api1.north);
   \draw[arr=apicolor] (stampfly.south) -- (api2.north);
   % Lower row: vertical trunk at x=100 (in 10mm gap between api1/api2),
-  % then horizontal branches to api3.north and api4.north
-  \coordinate (split) at (stampfly.south |- api3.north);  % (100, -39)
+  % split 5mm above api3/api4 top edge, then diagonal to each
+  \coordinate (split) at ([yshift=-25mm]stampfly.south);  % 5mm above api3/api4 top edge
   \draw[line width=1.5pt, apicolor] (stampfly.south) -- (split);
   \draw[arr=apicolor] (split) -- (api3.north);
   \draw[arr=apicolor] (split) -- (api4.north);
