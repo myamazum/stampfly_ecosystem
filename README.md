@@ -149,6 +149,25 @@ ESP-IDFのセットアップから、ファームウェアのビルド、
 
 ---
 
+## ワークショップで本格的に学ぶ
+
+Getting Started で初フライトができたら、次は**ワークショップ**で制御の仕組みをじっくり学びましょう。
+
+| レッスン | テーマ | 学べること |
+|---------|--------|-----------|
+| Lesson 1 | 環境構築 | ESP-IDF セットアップ、ビルド＆書き込み |
+| Lesson 2 | コントローラ入力 | ESP-NOW 通信、スティック値の読み取り |
+| Lesson 3 | LED 制御 | システム状態の可視化 |
+| Lesson 4 | IMU センサー | 加速度・ジャイロデータの取得と理解 |
+| Lesson 5 | モータ制御 | PWM によるモータ個別制御 |
+| Lesson 6 | 姿勢推定 | 相補フィルタによる姿勢角の算出 |
+| Lesson 7 | レート P 制御 | 角速度フィードバックによる安定化 |
+| Lesson 8 | PID 制御 | 姿勢角の PID 制御と飛行 |
+
+**→ [ワークショップスライド](docs/workshop/slides/README.md)** | **[ワークショップガイド](docs/workshop/)**
+
+---
+
 ## 技術仕様
 
 | 項目 | 仕様 |
@@ -317,6 +336,25 @@ stampfly_ecosystem/
 From ESP-IDF setup to firmware build,
 pairing vehicle and controller, and your first flight.
 All steps explained step-by-step.
+
+---
+
+## Learn Through the Workshop
+
+Once you've completed your first flight with Getting Started, dive deeper with the **Workshop** to learn how drone control really works.
+
+| Lesson | Topic | What You'll Learn |
+|--------|-------|-------------------|
+| Lesson 1 | Environment Setup | ESP-IDF setup, build & flash |
+| Lesson 2 | Controller Input | ESP-NOW communication, reading stick values |
+| Lesson 3 | LED Control | Visualizing system state |
+| Lesson 4 | IMU Sensor | Reading accelerometer & gyroscope data |
+| Lesson 5 | Motor Control | Individual motor control via PWM |
+| Lesson 6 | Attitude Estimation | Computing attitude angles with complementary filter |
+| Lesson 7 | Rate P Control | Stabilization via angular rate feedback |
+| Lesson 8 | PID Control | Attitude PID control and flight |
+
+**→ [Workshop Slides](docs/workshop/slides/README.md)** | **[Workshop Guide](docs/workshop/)**
 
 ---
 

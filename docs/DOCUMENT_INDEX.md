@@ -78,16 +78,16 @@
 
 | ファイル | 説明 |
 |---------|------|
-| [education/glossary.md](education/glossary.md) | 用語集 |
-| [education/safety_guide.md](education/safety_guide.md) | 安全ガイド |
-| [education/setup_guide.md](education/setup_guide.md) | 教育向けセットアップガイド |
-| [education/troubleshooting.md](education/troubleshooting.md) | トラブルシューティング |
-| [education/university/syllabus.md](education/university/syllabus.md) | 大学講義シラバス |
-| [education/university/assessment_rubric.md](education/university/assessment_rubric.md) | 評価ルーブリック |
-| [education/workshop/workshop_guide.md](education/workshop/workshop_guide.md) | ワークショップガイド |
-| [education/workshop/workshop_schedule.md](education/workshop/workshop_schedule.md) | ワークショップスケジュール |
-| [education/workshop/competition_rules.md](education/workshop/competition_rules.md) | 競技ルール |
-| [education/workshop/slides/README.md](education/workshop/slides/README.md) | スライド資料ガイド |
+| [glossary.md](glossary.md) | 用語集 |
+| [safety_guide.md](safety_guide.md) | 安全ガイド |
+| [setup_guide.md](setup_guide.md) | 教育向けセットアップガイド |
+| [troubleshooting.md](troubleshooting.md) | トラブルシューティング |
+| [university/syllabus.md](university/syllabus.md) | 大学講義シラバス |
+| [university/assessment_rubric.md](university/assessment_rubric.md) | 評価ルーブリック |
+| [workshop/workshop_guide.md](workshop/workshop_guide.md) | ワークショップガイド |
+| [workshop/workshop_schedule.md](workshop/workshop_schedule.md) | ワークショップスケジュール |
+| [workshop/competition_rules.md](workshop/competition_rules.md) | 競技ルール |
+| [workshop/slides/README.md](workshop/slides/README.md) | スライド資料ガイド |
 
 ### 開発計画 (`plans/`)
 
@@ -285,16 +285,16 @@
 
 | File | Description |
 |------|-------------|
-| [education/glossary.md](education/glossary.md) | Glossary |
-| [education/safety_guide.md](education/safety_guide.md) | Safety guide |
-| [education/setup_guide.md](education/setup_guide.md) | Education-oriented setup guide |
-| [education/troubleshooting.md](education/troubleshooting.md) | Troubleshooting |
-| [education/university/syllabus.md](education/university/syllabus.md) | University course syllabus |
-| [education/university/assessment_rubric.md](education/university/assessment_rubric.md) | Assessment rubric |
-| [education/workshop/workshop_guide.md](education/workshop/workshop_guide.md) | Workshop guide |
-| [education/workshop/workshop_schedule.md](education/workshop/workshop_schedule.md) | Workshop schedule |
-| [education/workshop/competition_rules.md](education/workshop/competition_rules.md) | Competition rules |
-| [education/workshop/slides/README.md](education/workshop/slides/README.md) | Slide materials guide |
+| [glossary.md](glossary.md) | Glossary |
+| [safety_guide.md](safety_guide.md) | Safety guide |
+| [setup_guide.md](setup_guide.md) | Education-oriented setup guide |
+| [troubleshooting.md](troubleshooting.md) | Troubleshooting |
+| [university/syllabus.md](university/syllabus.md) | University course syllabus |
+| [university/assessment_rubric.md](university/assessment_rubric.md) | Assessment rubric |
+| [workshop/workshop_guide.md](workshop/workshop_guide.md) | Workshop guide |
+| [workshop/workshop_schedule.md](workshop/workshop_schedule.md) | Workshop schedule |
+| [workshop/competition_rules.md](workshop/competition_rules.md) | Competition rules |
+| [workshop/slides/README.md](workshop/slides/README.md) | Slide materials guide |
 
 ### Development Plans (`plans/`)
 

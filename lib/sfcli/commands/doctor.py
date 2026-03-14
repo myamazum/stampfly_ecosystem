@@ -69,7 +69,7 @@ def _check_manifest(warnings: list, issues: list) -> None:
     console.success(f"  {MANIFEST_FILE}: {len(lessons)} lessons")
 
     # Slide chapters directory
-    chapters_dir = (paths.root() / "docs" / "education" / "workshop"
+    chapters_dir = (paths.root() / "docs" / "workshop"
                     / "slides" / "beamer" / "chapters")
 
     # Track manifest firmware dirs for orphan check

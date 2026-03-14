@@ -35,8 +35,11 @@ docs/
 ├── tools/                 # ツール・ユーティリティ
 │   └── tools-guide.md           # 開発ツール使用ガイド
 │
-├── education/             # 教育・学習資料
-│   └── (授業資料・実習ガイド)
+├── workshop/              # ワークショップ資料
+│   └── (実習ガイド・スライド・競技ルール)
+│
+├── university/            # 大学講義資料
+│   └── (シラバス・評価ルーブリック)
 │
 └── plans/                 # 開発計画・設計メモ
     └── (機能別の実装計画)
@@ -88,21 +91,26 @@ docs/
 
 **読者:** 開発者、ツールを使う人
 
-### education/
+### workshop/
 
-**目的:** 教育・学習用の資料を提供する
+**目的:** ワークショップ（実習形式の教育）の資料を提供する
 
 **置くべき内容:**
-- 制御工学の基礎解説
-- シミュレータを使った実習手順
-- 演習課題と評価観点
-- 学年・レベル別の学習指針
+- ワークショップガイド・スケジュール
+- Beamer スライド・TikZ 図
+- 競技ルール
 
 **読者:** 学生、初学者、教員
 
-**注意:** architecture/ との違い：
-- architecture/ = 「StampFlyはこう設計されている」（事実の記録）
-- education/ = 「制御を学ぶにはこうする」（学習の導線）
+### university/
+
+**目的:** 大学講義向けの資料を提供する
+
+**置くべき内容:**
+- シラバス
+- 評価ルーブリック
+
+**読者:** 教員、大学関係者
 
 ### plans/
 
@@ -123,7 +131,7 @@ docs/
 
 ```
 Q: 誰が読むか？
-├─ 学生・初学者 → education/
+├─ 学生・初学者 → workshop/ または university/
 ├─ 開発者・メンテナ → 次へ
 │
 Q: 何についてか？
@@ -177,8 +185,11 @@ docs/
 ├── tools/                 # Tools & utilities
 │   └── tools-guide.md           # Development tools guide
 │
-├── education/             # Educational materials
-│   └── (course materials, lab guides)
+├── workshop/              # Workshop materials
+│   └── (lab guides, slides, competition rules)
+│
+├── university/            # University course materials
+│   └── (syllabus, assessment rubric)
 │
 └── plans/                 # Development plans & design notes
     └── (feature implementation plans)
@@ -230,21 +241,26 @@ docs/
 
 **Audience:** Developers, tool users
 
-### education/
+### workshop/
 
-**Purpose:** Provide educational and learning materials
+**Purpose:** Provide workshop (hands-on education) materials
 
 **Content:**
-- Control engineering fundamentals
-- Simulator-based lab procedures
-- Exercises and evaluation criteria
-- Learning guidelines by level
+- Workshop guide & schedule
+- Beamer slides & TikZ diagrams
+- Competition rules
 
 **Audience:** Students, beginners, instructors
 
-**Note:** Difference from architecture/:
-- architecture/ = "This is how StampFly is designed" (factual record)
-- education/ = "This is how to learn control" (learning path)
+### university/
+
+**Purpose:** Provide university course materials
+
+**Content:**
+- Syllabus
+- Assessment rubric
+
+**Audience:** Instructors, university staff
 
 ### plans/
 
@@ -265,7 +281,7 @@ Decision flow for creating new documents:
 
 ```
 Q: Who is the reader?
-├─ Students/beginners → education/
+├─ Students/beginners → workshop/ or university/
 ├─ Developers/maintainers → continue
 │
 Q: What is it about?

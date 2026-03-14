@@ -52,7 +52,8 @@ docs/
 ├── getting-started.md
 ├── architecture/
 ├── protocol/
-└── education/
+├── workshop/
+└── university/
 ```
 
 ### docs/overview.md
@@ -76,10 +77,11 @@ docs/
 - 各フィールドの意味・単位・更新規則
 - 設計意図を人間向けに説明
 
-### docs/education/
-- 授業・実習用の資料
-- 課題、評価観点、チェックリスト
-- 学年・レベル別の利用指針
+### docs/workshop/
+- ワークショップ資料（スライド・実習ガイド・競技ルール）
+
+### docs/university/
+- 大学講義資料（シラバス・評価ルーブリック）
 
 ---
 
