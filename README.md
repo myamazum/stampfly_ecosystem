@@ -2,7 +2,7 @@
 
 > **Note:** [English version follows after the Japanese section.](#english) / 日本語の後に英語版があります。
 
-## 自分の手で、ドローンを飛ばす制御を作りたいあなたへ
+## 自分の手で、ドローンの飛行制御を作りたいあなたへ
 
 **StampFly Ecosystem** は、ドローン制御を**学び、実装し、実験する**ための
 教育・研究プラットフォームです。
