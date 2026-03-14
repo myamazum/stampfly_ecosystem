@@ -16,7 +16,7 @@
     },
     smallbox/.style={
       rectangle, rounded corners=2pt, draw=#1, line width=1pt,
-      fill=#1!6, minimum width=32mm, minimum height=12mm,
+      fill=#1!6, minimum width=32mm, minimum height=14mm,
       font=\bfseries, text=#1, align=center
     },
     arr/.style={-{Stealth[length=3mm]}, line width=1.5pt, #1},
@@ -27,22 +27,26 @@
   \node[box=ctrlcolor] (ctrl) at (0, 0) {Controller};
 
   % Sticks (2x2 grid with axis labels inside)
-  \coordinate (stickcenter) at ([yshift=-38mm]ctrl.south);
-  \node[smallbox=ctrlcolor, minimum height=14mm, left=6mm of stickcenter, yshift=12mm]
-    (lstick) {Throttle\\[-1pt]{\scriptsize\color{gray1} Left Stick Y}};
-  \node[smallbox=ctrlcolor, minimum height=14mm, right=6mm of stickcenter, yshift=12mm]
-    (rstick_r) {Roll\\[-1pt]{\scriptsize\color{gray1} Right Stick X}};
-  \node[smallbox=ctrlcolor, minimum height=14mm, left=6mm of stickcenter, yshift=-12mm]
-    (lstick_y) {Yaw\\[-1pt]{\scriptsize\color{gray1} Left Stick X}};
-  \node[smallbox=ctrlcolor, minimum height=14mm, right=6mm of stickcenter, yshift=-12mm]
-    (rstick_p) {Pitch\\[-1pt]{\scriptsize\color{gray1} Right Stick Y}};
+  \coordinate (stickcenter) at ([yshift=-48mm]ctrl.south);
+  \node[smallbox=ctrlcolor, left=6mm of stickcenter, yshift=16mm]
+    (s_thr) {Throttle\\[-1pt]{\scriptsize\color{gray1} Left Stick Y}};
+  \node[smallbox=ctrlcolor, right=6mm of stickcenter, yshift=16mm]
+    (s_roll) {Roll\\[-1pt]{\scriptsize\color{gray1} Right Stick X}};
+  \node[smallbox=ctrlcolor, left=6mm of stickcenter, yshift=-16mm]
+    (s_yaw) {Yaw\\[-1pt]{\scriptsize\color{gray1} Left Stick X}};
+  \node[smallbox=ctrlcolor, right=6mm of stickcenter, yshift=-16mm]
+    (s_pitch) {Pitch\\[-1pt]{\scriptsize\color{gray1} Right Stick Y}};
 
-  \draw[arr=ctrlcolor] (lstick) -- (ctrl);
-  \draw[arr=ctrlcolor] (rstick_r) -- (ctrl);
-  \coordinate (ctap) at ([yshift=-10mm]ctrl.south);
-  \draw[arr=ctrlcolor] (lstick_y.north) |- (ctap) -- (ctrl.south);
-  \draw[arr=ctrlcolor] (rstick_p.north) |- (ctap);
-  \fill[ctrlcolor] (ctap) circle (2pt);
+  % Arrows: all sticks -> Controller via single tap point
+  \coordinate (ctap) at ([yshift=-12mm]ctrl.south);
+  \draw[line width=1.5pt, ctrlcolor] (ctrl.south) -- (ctap);
+  \fill[ctrlcolor] (ctap) circle (2.5pt);
+  % Upper row: direct vertical to tap horizontal line
+  \draw[arr=ctrlcolor] (s_thr.north) -- (s_thr.north |- ctap) -- (ctap);
+  \draw[arr=ctrlcolor] (s_roll.north) -- (s_roll.north |- ctap) -- (ctap);
+  % Lower row: vertical up then horizontal to tap
+  \draw[arr=ctrlcolor] (s_yaw.north) |- (ctap);
+  \draw[arr=ctrlcolor] (s_pitch.north) |- (ctap);
 
   % ESP-NOW wireless
   \node[box=espcolor, right=30mm of ctrl] (espnow) {ESP-NOW\\2.4\,GHz};
@@ -54,22 +58,24 @@
   \draw[arr=apicolor] (espnow) -- (stampfly);
 
   % API outputs (2x2 grid with range inside)
-  \coordinate (apicenter) at ([yshift=-38mm]stampfly.south);
-  \node[smallbox=apicolor, minimum height=14mm, left=6mm of apicenter, yshift=12mm]
+  \coordinate (apicenter) at ([yshift=-48mm]stampfly.south);
+  \node[smallbox=apicolor, left=6mm of apicenter, yshift=16mm]
     (api1) {rc\_throttle()\\[-1pt]{\scriptsize\color{gray1} 0.0\,--\,1.0}};
-  \node[smallbox=apicolor, minimum height=14mm, right=6mm of apicenter, yshift=12mm]
+  \node[smallbox=apicolor, right=6mm of apicenter, yshift=16mm]
     (api2) {rc\_roll()\\[-1pt]{\scriptsize\color{gray1} -1.0\,--\,+1.0}};
-  \node[smallbox=apicolor, minimum height=14mm, left=6mm of apicenter, yshift=-12mm]
+  \node[smallbox=apicolor, left=6mm of apicenter, yshift=-16mm]
     (api3) {rc\_pitch()\\[-1pt]{\scriptsize\color{gray1} -1.0\,--\,+1.0}};
-  \node[smallbox=apicolor, minimum height=14mm, right=6mm of apicenter, yshift=-12mm]
+  \node[smallbox=apicolor, right=6mm of apicenter, yshift=-16mm]
     (api4) {rc\_yaw()\\[-1pt]{\scriptsize\color{gray1} -1.0\,--\,+1.0}};
 
-  \draw[arr=apicolor] (stampfly) -- (api1.north);
-  \draw[arr=apicolor] (stampfly) -- (api2.north);
-  \coordinate (tap) at ([yshift=-10mm]stampfly.south);
-  \draw[arr=apicolor] (stampfly.south) -- (tap) -| (api3.north);
-  \draw[arr=apicolor] (tap) -| (api4.north);
-  \fill[apicolor] (tap) circle (2pt);
+  % Arrows: StampFly -> all APIs via single tap point
+  \coordinate (atap) at ([yshift=-12mm]stampfly.south);
+  \draw[line width=1.5pt, apicolor] (stampfly.south) -- (atap);
+  \fill[apicolor] (atap) circle (2.5pt);
+  \draw[arr=apicolor] (atap) -- (atap |- api1.north) -- (api1.north);
+  \draw[arr=apicolor] (atap) -- (atap |- api2.north) -- (api2.north);
+  \draw[arr=apicolor] (atap) -| (api3.north);
+  \draw[arr=apicolor] (atap) -| (api4.north);
 
 \end{tikzpicture}
 \end{document}
