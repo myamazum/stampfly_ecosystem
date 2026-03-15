@@ -515,6 +515,7 @@ def run_flash(args: argparse.Namespace) -> int:
         target="workshop",
         port=args.port,
         baud=args.baud,
+        legacy=False,
         build=False,
         monitor=not args.no_monitor,
     )
