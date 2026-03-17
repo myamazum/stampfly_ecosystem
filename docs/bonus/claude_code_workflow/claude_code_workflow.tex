@@ -418,11 +418,11 @@ Next steps:                  ← 次にやるべきこと
                   font=\scriptsize, align=center},
       arr/.style={-{Stealth[length=2mm]}, sfblue, thick},
     ]
-      \node[box] (branch) {作業用の枝を\\作成};
+      \node[box] (branch) {ブランチを\\作成};
       \node[box, right=of branch] (impl) {実装 +\\変更を記録};
       \node[box, right=of impl] (pr) {PR を作成\\（レビュー依頼）};
       \node[box, right=of pr] (review) {チームが\\確認};
-      \node[box, right=of review] (merge) {承認 →\\本流に統合};
+      \node[box, right=of review] (merge) {承認 →\\mainに統合};
 
       \draw[arr] (branch) -- (impl);
       \draw[arr] (impl) -- (pr);
@@ -438,10 +438,10 @@ Next steps:                  ← 次にやるべきこと
 
 % ------------------------------------------------------------------
 % === P11: ブランチ戦略と安全運用 ===
-\begin{frame}{安全な運用 — 本流を直接触らない}
-  \begin{alertblock}{本流（main）を直接変更しない}
-    {\small Git では「本流」と「作業用の枝」を分けられる。AI に本流を直接変更させると、
-    レビューなしで反映されてしまう。必ず作業枝 → レビュー → 統合の流れを守る}
+\begin{frame}{安全な運用 — main ブランチを直接触らない}
+  \begin{alertblock}{main（main）を直接変更しない}
+    {\small Git では「main」と「ブランチ」を分けられる。AI にmainを直接変更させると、
+    レビューなしで反映されてしまう。必ずブランチ → レビュー → 統合の流れを守る}
   \end{alertblock}
 
   \vspace{0.2em}
@@ -450,11 +450,11 @@ Next steps:                  ← 次にやるべきこと
     \begin{column}{0.48\textwidth}
       \begin{block}{推奨フロー}
         {\scriptsize
-        \textbf{1.} 作業用の枝を作成 \\
+        \textbf{1.} ブランチを作成 \\
         \textbf{2.} その枝で実装・テスト・記録 \\
         \textbf{3.} レビュー依頼を作成 \\
-        \textbf{4.} 確認・承認後に本流へ統合 \\
-        \textbf{5.} 作業枝を削除
+        \textbf{4.} 確認・承認後にmainへ統合 \\
+        \textbf{5.} ブランチを削除
         }
       \end{block}
     \end{column}
@@ -463,9 +463,9 @@ Next steps:                  ← 次にやるべきこと
         {\scriptsize
         設定ファイルで制御:
         \begin{itemize}
-          \item 本流への直接書き込みをブロック
+          \item mainへの直接書き込みをブロック
           \item 使えるコマンドを制限
-          \item GitHub 側でも本流を保護できる
+          \item GitHub 側でもmainを保護できる
         \end{itemize}
         }
       \end{block}
@@ -879,10 +879,10 @@ allowed-tools:
 
 % ------------------------------------------------------------------
 % === P22: コンテキスト管理 ===
-\begin{frame}{会話の長さを管理する}
-  \begin{alertblock}{AI が一度に覚えていられる量には上限がある}
-    {\small 会話が長くなると、AI は古い指示を忘れたり、精度が落ちたりする。\\
-    これを「コンテキスト（文脈）の限界」と呼ぶ。上手に管理することが大事}
+\begin{frame}{コンテキスト管理}
+  \begin{alertblock}{コンテキスト（AI が一度に扱える情報量）には上限がある}
+    {\small 会話が長くなると、AI は古い指示を忘れたり精度が落ちたりする。
+    コンテキストを上手に管理することが大事}
   \end{alertblock}
 
   \vspace{0.2em}
@@ -925,7 +925,7 @@ allowed-tools:
         AI の変更を追えない → 戻せない \\
       指示書ファイルを書かない &
         毎回同じ指示を繰り返す → 非効率 \\
-      本流に直接変更を送る &
+      mainに直接変更を送る &
         レビューなしで本番反映 → 障害リスク \\
       自動化を使わず手作業を繰り返す &
         書式チェック忘れ・整形崩れが頻発 \\
@@ -946,7 +946,7 @@ allowed-tools:
   \begin{enumerate}\small
     \item \textbf{計画してから書かせる} — 5分の計画で1時間の手戻りを防ぐ
     \item \textbf{変更は必ず Git で記録} — こまめに記録、Next steps を含める
-    \item \textbf{作業枝 → レビュー → 本流} — 本流を直接触らない
+    \item \textbf{ブランチ → レビュー → main} — mainを直接触らない
     \item \textbf{指示書（CLAUDE.md）は AI への教育投資} — 書くほど賢くなる
     \item \textbf{「やるな」は「やれ」より効果的} — 禁止事項を明記する
     \item \textbf{記憶機能で同じミスを防ぐ} — 一度伝えれば以降ずっと従う
