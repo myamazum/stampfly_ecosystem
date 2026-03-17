@@ -987,4 +987,55 @@ allowed-tools: [Bash, Read]
   \end{block}
 \end{frame}
 
+% =====================================================================
+% 付録
+% =====================================================================
+
+% ------------------------------------------------------------------
+% === 付録: Claude Code と Codex の違い ===
+\begin{frame}{付録: Claude Code と Codex（OpenAI）の違い}
+  \begin{block}{どちらも「コーディングエージェント」だが、設計思想が異なる}
+    {\small 学校や個人で Codex を使っている人向けに、主な違いを整理する}
+  \end{block}
+
+  \vspace{0.2em}
+
+  \begin{table}
+    \centering\tiny
+    \begin{tabular}{lp{38mm}p{38mm}}
+      \hline
+      & \textbf{Claude Code} & \textbf{Codex (OpenAI)} \\
+      \hline
+      動作環境 &
+        ローカル PC のターミナルで動く &
+        クラウド上のサンドボックスで動く \\
+      ファイルアクセス &
+        PC 上の全ファイルに直接アクセス &
+        アップロードしたファイルのみ \\
+      対話スタイル &
+        リアルタイムで会話しながら作業 &
+        タスクを投げて結果を待つ \\
+      Git 連携 &
+        ローカルの Git を直接操作、PR 作成可 &
+        GitHub 連携あり、PR 作成可 \\
+      知識の蓄積 &
+        CLAUDE.md + Memory で成長する &
+        対応する仕組みなし \\
+      拡張性 &
+        Hooks / Skills / MCP で自由にカスタマイズ &
+        限定的 \\
+      料金 &
+        API 従量課金（またはサブスク）&
+        ChatGPT Pro に含まれる \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{0.1em}
+
+  {\scriptsize \textbf{どちらを使うべきか:}
+    ローカル環境で深く開発するなら Claude Code、
+    手軽にタスクを投げたいなら Codex。併用も可能}
+\end{frame}
+
 \end{document}
