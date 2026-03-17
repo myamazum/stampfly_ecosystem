@@ -1,0 +1,628 @@
+% ==================================================================
+% Claude Code Workflow — AI-Driven Development in Practice
+% Claude Code ワークフロー — AI駆動開発の実践
+%
+% This is a standalone slide deck, independent of the workshop slides.
+% Delete this entire directory (docs/bonus/) to remove it.
+% ==================================================================
+\documentclass[aspectratio=169, 14pt]{beamer}
+
+% --- Theme ---
+\usetheme{Madrid}
+\usecolortheme{default}
+
+% --- Brand colors ---
+\definecolor{sfblue}{RGB}{0, 120, 200}
+\definecolor{sfdark}{RGB}{0, 60, 100}
+\definecolor{sflight}{RGB}{220, 240, 255}
+\definecolor{sfgray}{RGB}{80, 80, 80}
+\definecolor{sfred}{RGB}{220, 50, 30}
+\definecolor{sfgreen}{RGB}{40, 160, 40}
+
+\setbeamercolor{palette primary}{bg=sfblue, fg=white}
+\setbeamercolor{palette secondary}{bg=sfdark, fg=white}
+\setbeamercolor{palette tertiary}{bg=sfdark, fg=white}
+\setbeamercolor{structure}{fg=sfblue}
+\setbeamercolor{title}{fg=white, bg=sfblue}
+\setbeamercolor{frametitle}{fg=white, bg=sfblue}
+\setbeamercolor{block title}{bg=sfblue!90, fg=white}
+\setbeamercolor{block body}{bg=sflight}
+\setbeamercolor{block title alerted}{bg=sfred!90, fg=white}
+\setbeamercolor{block body alerted}{bg=sfred!8}
+\setbeamercolor{block title example}{bg=sfgreen!80, fg=white}
+\setbeamercolor{block body example}{bg=sfgreen!8}
+\setbeamercolor{item}{fg=sfblue}
+
+\setbeamerfont{title}{size=\Large, series=\bfseries}
+\setbeamerfont{frametitle}{size=\large, series=\bfseries}
+
+% --- Navigation & footer ---
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{%
+  \leavevmode\hbox{%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,center]{palette primary}%
+      \usebeamerfont{author in head/foot}\insertshortauthor
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.34\paperwidth,ht=2.5ex,dp=1ex,center]{palette secondary}%
+      \usebeamerfont{title in head/foot}\insertshorttitle
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,right]{palette tertiary}%
+      \usebeamerfont{date in head/foot}%
+      \insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
+    \end{beamercolorbox}%
+  }\vskip0pt%
+}
+
+% --- Japanese support (LuaLaTeX) ---
+\usepackage{luatexja}
+\usepackage[match]{luatexja-fontspec}
+\usepackage{ifthen}
+\newboolean{jfontset}\setboolean{jfontset}{false}
+\IfFontExistsTF{Hiragino Kaku Gothic ProN}{%
+  \setmainjfont{Hiragino Kaku Gothic ProN}%
+  \setsansjfont{Hiragino Kaku Gothic ProN}%
+  \setboolean{jfontset}{true}}{}
+\ifthenelse{\boolean{jfontset}}{}{%
+  \IfFontExistsTF{Yu Gothic}{%
+    \setmainjfont{Yu Gothic}%
+    \setsansjfont{Yu Gothic}%
+    \setboolean{jfontset}{true}}{}}
+\ifthenelse{\boolean{jfontset}}{}{%
+  \IfFontExistsTF{Noto Sans CJK JP}{%
+    \setmainjfont{Noto Sans CJK JP}%
+    \setsansjfont{Noto Sans CJK JP}}{}}
+
+% --- Packages ---
+\usepackage{listings}
+\usepackage{url}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+
+% --- Code listing style ---
+\lstdefinestyle{cccode}{
+  basicstyle=\ttfamily\tiny,
+  keywordstyle=\color{sfblue}\bfseries,
+  commentstyle=\color{sfgray}\itshape,
+  stringstyle=\color{sfgreen},
+  frame=single,
+  framerule=0.5pt,
+  rulecolor=\color{sfblue!40},
+  backgroundcolor=\color{sflight},
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=2,
+}
+\lstset{style=cccode}
+
+% --- Useful macros ---
+\newcommand{\api}[1]{\texttt{\color{sfblue}#1}}
+\newcommand{\warn}[1]{\textcolor{sfred}{\textbf{#1}}}
+
+% === Document ===
+\title{Claude Code ワークフロー}
+\subtitle{AI駆動開発の実践}
+\author{伊藤 恒平}
+\date{2026}
+
+\begin{document}
+
+% === Title ===
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{このスライドについて / Purpose}
+  \begin{block}{概要}
+    StampFly Ecosystem のスライド・ファームウェア・ツールは
+    すべて \textbf{Claude Code}（Anthropic の CLI エージェント）と人間の協働で開発された
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{itemize}
+    \item 817 コミット / 70 日間 — アクティブ日平均 20 コミット
+    \item fix 329 件、feat 225 件、docs 140 件
+    \item CLAUDE.md の継続的改善で品質を担保
+  \end{itemize}
+
+  \vspace{0.3em}
+
+  \begin{exampleblock}{ゴール}
+    {\small 実プロジェクトで得た Claude Code のワークフローと Tips を共有する}
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Claude Code とは / What is Claude Code?}
+  \begin{block}{概要}
+    Anthropic 公式の CLI エージェント。ターミナルから Claude を呼び出し、
+    コード読み書き・ビルド・テスト・Git 操作を自律的に実行する
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{table}
+    \centering\small
+    \begin{tabular}{ll}
+      \hline
+      \textbf{機能} & \textbf{説明} \\
+      \hline
+      CLAUDE.md       & プロジェクト固有の指示書（常に読み込まれる） \\
+      Memory          & セッション間で記憶を永続化（4タイプ） \\
+      Plan Mode       & Shift+Tab で読み取り専用の設計モード \\
+      Subagent        & 並列タスク・重い処理を子プロセスに委任 \\
+      Hooks           & ツール実行前後にシェルコマンドを自動実行 \\
+      Custom Skills   & \api{/commit} 等のカスタムワークフロー \\
+      MCP Server      & 外部サービス連携（DB、draw.io 等） \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  {\footnotesize 公式: \url{https://docs.anthropic.com/en/docs/claude-code}}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{CLAUDE.md — プロジェクトの指示書}
+  \begin{block}{階層構造（すべて同時に読み込まれる）}
+    {\small
+    \begin{tabular}{lp{60mm}}
+      \api{\textasciitilde/.claude/CLAUDE.md} & グローバル設定（全プロジェクト共通）\\
+      \api{<repo>/CLAUDE.md}      & プロジェクト設定（Git 管理） \\
+      \api{<subdir>/CLAUDE.md}    & ディレクトリ固有の設定 \\
+      \api{.claude/rules/*.md}    & パス限定ルール（paths フロントマター）\\
+    \end{tabular}
+    }
+  \end{block}
+
+  \vspace{0.2em}
+
+  \begin{alertblock}{書くべき内容}
+    \begin{itemize}\footnotesize
+      \item ビルド・テストコマンド / コーディング規約 / コミット形式
+      \item \warn{やってはいけないこと}（アンチパターン）← 最重要
+      \item プロジェクト構造の概要
+    \end{itemize}
+  \end{alertblock}
+
+  {\footnotesize \textbf{Tips:} 「ガードレール」型（禁止事項の明示）は指示型より効果的。200行以内を目標に}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{CLAUDE.md の実例 / Real Example}
+  \begin{lstlisting}[language={}, numbers=none]
+## Build Environment
+sf build vehicle     # ビルド
+sf flash vehicle -m  # 書き込み+モニタ
+
+## Slide Rules
+**CRITICAL: .tex 変更後は必ず PDF リビルド+レビュー**
+
+## Slide Review Checklist
+| ID | チェック内容                    |
+|----|--------------------------------|
+| L1 | フッターにはみ出していないか   |
+| T4 | 矢印は水平・垂直のみ          |
+| T8 | resizebox{w}{h} 両方指定は禁止 |
+  \end{lstlisting}
+
+  {\footnotesize チェックリストは実際の失敗事例から段階的に構築された（後述）}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Memory — セッション間の記憶}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{4つのメモリタイプ}
+        {\small
+        \begin{tabular}{lp{28mm}}
+          \hline
+          \textbf{Type} & \textbf{用途} \\
+          \hline
+          user     & ユーザーの専門性・好み \\
+          feedback & 修正指示・NG パターン \\
+          project  & 進行中の作業・期限 \\
+          reference & 外部リソースへのリンク \\
+          \hline
+        \end{tabular}
+        }
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{feedback メモリの実例}
+        {\scriptsize
+        \texttt{速度優先は手戻りを招き工数増大。}\\
+        \texttt{チェックリストは1回もスキップしない。}\\
+        \texttt{サブエージェントの判定を鵜呑みにしない。}
+        }
+      \end{exampleblock}
+      \vspace{0.3em}
+      {\footnotesize 一度保存すれば、\textbf{全ての将来のセッション}で Claude がこのルールに従う}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.5em}
+
+  {\footnotesize \textbf{Tips:} コードや Git 履歴から分かる情報は保存しない（二重管理の回避）}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Plan Mode — 実装前に設計する}
+  \begin{block}{Plan Mode とは}
+    Shift+Tab でトグル。コード編集を\textbf{できない}モード。\\
+    調査・設計に集中させ、方針が固まってから実装に移る
+  \end{block}
+
+  \vspace{0.2em}
+
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      \begin{alertblock}{有効な場面}
+        \begin{itemize}\small
+          \item 複数ファイルにまたがる変更
+          \item アーキテクチャの判断が必要
+          \item 失敗コストが高い作業
+        \end{itemize}
+      \end{alertblock}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{exampleblock}{典型的なフロー}
+        {\small
+        \textbf{1.} Plan Mode で調査・設計 \\
+        \textbf{2.} ユーザーが計画を承認 \\
+        \textbf{3.} 実装 → テスト → コミット \\
+        \textbf{4.} 問題発見 → 計画を更新
+        }
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+
+  {\footnotesize \textbf{Tips:} 「思考」と「実行」を分離することで手戻りを大幅に削減できる}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Subagent — 並列処理とコンテキスト保護}
+  \begin{table}
+    \centering\footnotesize
+    \begin{tabular}{llp{48mm}}
+      \hline
+      \textbf{タイプ} & \textbf{用途} & \textbf{説明} \\
+      \hline
+      general-purpose & 汎用タスク     & 全ツール利用可。複雑な作業を委任 \\
+      Explore         & コード検索     & 読み取り専用。高速なコードベース探索 \\
+      Plan            & 設計           & 読み取り専用。アーキテクチャ設計 \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \begin{exampleblock}{このプロジェクトでの活用例}
+    \begin{itemize}\footnotesize
+      \item \textbf{画像レビュー} — PDF を画像化して目視確認。メインに画像を持ち込まない
+      \item \textbf{並列リサーチ} — 複数サブエージェントを同時起動して情報収集
+      \item \textbf{バックグラウンド実行} — ビルドを裏で実行し完了通知を受け取る
+    \end{itemize}
+  \end{exampleblock}
+
+  \begin{alertblock}{}
+    {\footnotesize サブエージェントの「問題なし」を鵜呑みにしない — メイン側で検証すること}
+  \end{alertblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Hooks \& Skills — 自動化の仕組み}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Hooks（自動実行）}
+        {\small
+        \begin{tabular}{lp{26mm}}
+          \hline
+          \textbf{Event} & \textbf{用途} \\
+          \hline
+          PreToolUse  & 危険操作のブロック \\
+          PostToolUse & 自動 lint / format \\
+          Notification & Slack 通知転送 \\
+          Stop        & 応答完了後の自動テスト \\
+          \hline
+        \end{tabular}
+        }
+
+        \vspace{0.3em}
+
+        {\scriptsize \api{settings.json} で設定。\\
+        prompt-based / agent-based も可能}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Custom Skills}
+        {\small
+        \api{/commit} — ガイドライン準拠の\\
+        \hspace{2em}Git コミットを自動作成 \\[4pt]
+        \api{/simplify} — コード品質チェック \\[4pt]
+        \api{/batch} — 並列ワークツリーで\\
+        \hspace{2em}大規模変更を一括処理
+        }
+
+        \vspace{0.3em}
+
+        {\scriptsize \api{.claude/skills/} に SKILL.md で定義。\\
+        \texttt{\$ARGUMENTS} で引数を受け取れる}
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+
+  {\footnotesize \textbf{Tips:} 繰り返す作業は Skill に、条件付き自動化は Hook にまとめる}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{コンテキスト管理 / Context Management}
+  \begin{alertblock}{コンテキストウィンドウは最重要リソース}
+    Claude が一度に扱える情報量には上限。無駄に消費すると性能劣化し指示を忘れる
+  \end{alertblock}
+
+  \vspace{0.2em}
+
+  \begin{table}
+    \centering\small
+    \begin{tabular}{ll}
+      \hline
+      \textbf{手法} & \textbf{説明} \\
+      \hline
+      \api{/compact}       & 会話履歴を要約して圧縮（\textasciitilde95\% で自動発動）\\
+      Subagent 委任         & 大量の検索結果をメインに持ち込まない \\
+      Memory 永続化         & 繰り返し伝える情報はメモリに保存 \\
+      CLAUDE.md 簡潔化      & 毎回読み込まれるので 200 行以内に \\
+      画像はサブエージェント & PDF/画像の Read はコンテキスト消費大 \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  {\footnotesize \textbf{教訓:} PDF 全ページ確認をメインで行い rate limit 抵触 → サブエージェント限定ルールを制定}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{実践ワークフロー / Workflow in Practice}
+  \begin{center}
+    \begin{tikzpicture}[
+      node distance=6mm and 10mm,
+      box/.style={rectangle, rounded corners=3pt, draw=sfblue,
+                  fill=sflight, minimum height=8mm, minimum width=28mm,
+                  font=\small, align=center},
+      arr/.style={-{Stealth[length=2.5mm]}, sfblue, thick},
+    ]
+      \node[box] (start)   {前回の Next steps\\を確認};
+      \node[box, right=of start] (plan) {Plan Mode\\で設計};
+      \node[box, right=of plan]  (impl) {実装\\（小さな単位）};
+      \node[box, below=of impl]  (test) {ビルド/テスト\\で検証};
+      \node[box, below=of plan]  (commit) {\texttt{/commit}\\で記録};
+      \node[box, below=of start] (review) {レビュー\\（チェックリスト）};
+
+      \draw[arr] (start)  -- (plan);
+      \draw[arr] (plan)   -- (impl);
+      \draw[arr] (impl)   -- (test);
+      \draw[arr] (test)   -- (commit);
+      \draw[arr] (commit) -- (review);
+
+      % Fix loop
+      \draw[arr, sfred] (review.west) -- ++(-6mm,0)
+        node[above, font=\scriptsize, sfred, pos=0.4] {問題あり}
+        |- (impl.west);
+
+      % Done
+      \draw[arr, sfgreen] (review.south) -- ++(0,-6mm)
+        node[right, font=\scriptsize, sfgreen] {完了 → 次のタスクへ};
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Git コミット戦略 / Commit Strategy}
+  \begin{block}{Conventional Commits + Next steps}
+    \begin{lstlisting}[language={}, numbers=none]
+fix(slides): fix P33 arrow-node penetration
+
+Changes:
+- TikZ座標を調整しノード貫通を解消
+- adjustbox で均等スケーリングに変更
+
+Next steps:
+- sf build vehicle でビルド確認
+- P34-P40 の同様の問題を確認
+    \end{lstlisting}
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      {\small \textbf{自動コミットのトリガー:}}
+      \begin{itemize}\small
+        \item ファイル変更後
+        \item テスト/ビルド成功後
+        \item 「ここまで」「休憩」等の発言
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      {\small \textbf{Next steps の効果:}}
+      \begin{itemize}\small
+        \item セッション再開時の起点になる
+        \item 817 コミット中 318 件に記載
+        \item 具体的なコマンド・検証項目を含む
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{失敗から学ぶ / Lessons from Failures}
+  \begin{alertblock}{事例: P33 espnow\_dataflow — 7回の fix コミット}
+    1枚のスライドの TikZ 図修正にリビルドサイクルが12回以上発生
+  \end{alertblock}
+
+  \vspace{0.3em}
+
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      {\small \textbf{何が起きたか:}}
+      \begin{enumerate}\scriptsize
+        \item \texttt{resizebox\{w\}\{h\}} でフォント縦伸び
+        \item 矢印方向が上段/下段で不統一
+        \item 場当たり的に Beamer 側で対処
+        \item チェックリスト未適用で見落とし
+      \end{enumerate}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      {\small \textbf{得られた教訓:}}
+      \begin{enumerate}\scriptsize
+        \item 根本原因を最初に特定する
+        \item チェックリストは1回も省略しない
+        \item サブエージェントの判定を鵜呑みにしない
+        \item CLAUDE.md に失敗事例を記録 → 再発防止
+      \end{enumerate}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.5em}
+
+  \begin{exampleblock}{対策}
+    {\small feedback メモリに保存 → 全セッションで Claude がこのルールに従うようになった}
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{反復改善のパターン / Iteration Patterns}
+  \begin{table}
+    \centering\small
+    \begin{tabular}{lcp{48mm}}
+      \hline
+      \textbf{領域} & \textbf{Fix} & \textbf{内容} \\
+      \hline
+      installer          & 18 & WSL2、Windows パス、Python 検出 \\
+      シミュレータカメラ   & 13 & VPython カメラ追従（revert 2回含む） \\
+      P33 TikZ 図        &  7 & ルーティング、アスペクト比、ノード貫通 \\
+      L10/L11 ヘッダー   &  5 & framesubtitle 削除後のレイアウト崩れ \\
+      エコシステム図      &  5 & 矢印ラベル重なり → 直角ルーティング \\
+      コントローラメニュー &  4 & フリッカー、残像、スクロール \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{0.5em}
+
+  \begin{block}{パターンの分析}
+    \begin{itemize}
+      \item \textbf{視覚的な問題}は反復回数が多い（テキストレビューだけでは不十分）
+      \item \textbf{チェックリスト導入後}は反復回数が減少
+      \item revert は 817 コミット中わずか 10 件（1.2\%）→ 方向転換は稀
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{CLAUDE.md の進化 / Evolution of CLAUDE.md}
+  \begin{center}
+    \begin{tikzpicture}[
+      node distance=3.5mm,
+      evt/.style={rectangle, rounded corners=2pt, draw=sfblue,
+                  fill=sflight, minimum width=80mm, minimum height=5.5mm,
+                  font=\scriptsize, align=left},
+      arr/.style={-{Stealth[length=2mm]}, sfgray},
+    ]
+      \node[evt] (e1) {Jan: ビルドコマンド、コーディング規約、sf CLI 使用方針};
+      \node[evt, below=of e1] (e2) {Jan: コミットガイドライン + Next steps ルール追加};
+      \node[evt, below=of e2] (e3) {Feb: スライドレビューチェックリスト導入（L1--L6, T1--T9）};
+      \node[evt, below=of e3] (e4) {Feb: サブエージェントによる画像レビュー方式に切替};
+      \node[evt, below=of e4] (e5) {Mar: サブエージェント限定ルール強制化（rate limit 対策）};
+      \node[evt, below=of e5] (e6) {Mar: TikZ チェックリスト大幅拡充（T4 直角ルーティング等）};
+      \node[evt, below=of e6] (e7) {Mar: feedback メモリで品質優先の原則を永続化};
+
+      \draw[arr] (e1) -- (e2);
+      \draw[arr] (e2) -- (e3);
+      \draw[arr] (e3) -- (e4);
+      \draw[arr] (e4) -- (e5);
+      \draw[arr] (e5) -- (e6);
+      \draw[arr] (e6) -- (e7);
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{統計で見るプロジェクト / Project by Numbers}
+  \begin{table}
+    \centering
+    \begin{tabular}{lr}
+      \hline
+      \textbf{指標} & \textbf{値} \\
+      \hline
+      総コミット数              & 817 \\
+      開発期間                  & 70 日間（2026/1/5 -- 3/15）\\
+      アクティブ日の平均         & 20.4 コミット/日 \\
+      最多の日                  & 63 コミット（1/12）\\
+      fix 比率                  & 40.3\%（329/817）\\
+      feat 比率                 & 27.5\%（225/817）\\
+      最長 fix チェイン          & 18 回（installer）\\
+      revert 回数               & 10 回（1.2\%）\\
+      Next steps 記載率         & 38.9\%（318/817）\\
+      CLAUDE.md 改訂回数        & 17 回 \\
+      \hline
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Top 10 Tips}
+  \begin{enumerate}\small
+    \item \textbf{CLAUDE.md は基盤} — ビルドコマンド、規約、禁止事項を書く
+    \item \textbf{ガードレール $>$ 指示} — 「やるな」の方が「やれ」より効果的
+    \item \textbf{Plan → Implement → Test} — 考えてから書く
+    \item \textbf{小さくコミット} — 1機能 = 1コミット、Next steps を含める
+    \item \textbf{チェックリストは省略しない} — 速度優先は手戻りで工数増大
+    \item \textbf{feedback メモリで学習} — 同じミスを二度と繰り返さない
+    \item \textbf{サブエージェントで並列化} — コンテキストを守りつつ効率化
+    \item \textbf{画像レビューはサブエージェントに} — rate limit 対策
+    \item \textbf{CLAUDE.md を育てる} — 失敗するたびにルールを追加
+    \item \textbf{コンテキストは最重要リソース} — \api{/compact} と Memory を活用
+  \end{enumerate}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{参考資料 / References}
+  \begin{table}
+    \centering\small
+    \begin{tabular}{lp{55mm}}
+      \hline
+      \textbf{リソース} & \textbf{URL} \\
+      \hline
+      公式ドキュメント &
+        \url{https://docs.anthropic.com/en/docs/claude-code} \\
+      ベストプラクティス &
+        \url{https://docs.anthropic.com/en/docs/claude-code/best-practices} \\
+      Claude Code GitHub &
+        \url{https://github.com/anthropics/claude-code} \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{0.5em}
+
+  \begin{exampleblock}{Claude Code を始めるには}
+    {\small
+    \texttt{npm install -g @anthropic-ai/claude-code} \\
+    \texttt{cd your-project \&\& claude}
+    }
+  \end{exampleblock}
+
+  \vspace{0.3em}
+
+  \begin{block}{インストール後の最初の一歩}
+    {\small
+    \texttt{claude /init} — CLAUDE.md を自動生成してからカスタマイズ
+    }
+  \end{block}
+\end{frame}
+
+\end{document}
