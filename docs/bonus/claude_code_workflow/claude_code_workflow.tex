@@ -976,46 +976,44 @@ allowed-tools: [Bash, Read]
 % === 付録: Claude Code と Codex CLI の違い ===
 \begin{frame}{付録: Claude Code と Codex CLI（OpenAI）の違い}
   \begin{block}{どちらもローカルで動く CLI コーディングエージェント}
-    {\small Codex CLI を使っている人向けに、主な違いを整理する}
+    {\small Codex CLI を使っている人向けに、主な違いを整理する。
+    指示書ファイルの仕組みは共通点が多い}
   \end{block}
-
-  \vspace{0.2em}
 
   \begin{table}
     \centering\tiny
-    \begin{tabular}{lp{38mm}p{38mm}}
+    \begin{tabular}{lp{37mm}p{37mm}}
       \hline
       & \textbf{Claude Code} & \textbf{Codex CLI} \\
       \hline
-      提供元 &
-        Anthropic（Claude） &
-        OpenAI（GPT-4o 等） \\
-      インストール &
-        \texttt{npm install -g @anthropic-ai/claude-code} &
-        \texttt{npm install -g @openai/codex} \\
-      知識の蓄積 &
-        CLAUDE.md + MEMORY.md で\\使うほど成長する &
-        対応する仕組みなし\\（毎回まっさらから開始） \\
+      指示書ファイル &
+        \textbf{CLAUDE.md} &
+        \textbf{AGENTS.md}（同じ役割） \\
+      階層構造 &
+        グローバル → プロジェクト → サブディレクトリ &
+        同様の階層構造あり\\（AGENTS.override.md で上書きも可） \\
+      パス固有ルール &
+        \texttt{.claude/rules/*.md} で\\パスごとにルールを分けられる &
+        なし（単一ファイル） \\
+      自動記憶 &
+        \textbf{MEMORY.md}（AI が自動で\\学習を記録。ローカル専用） &
+        \textbf{なし}（AGENTS.md を\\手動で編集する必要がある） \\
       計画モード &
         Plan Mode で設計→承認→実装 &
         なし \\
       自動化・拡張 &
-        Hooks / Skills / MCP で\\自由にカスタマイズ可能 &
+        Hooks / Skills / MCP &
         限定的 \\
       権限管理 &
-        suggest / auto-edit / full-auto\\の3段階 &
-        suggest / auto-edit / full-auto\\の3段階（同様） \\
-      料金 &
-        Anthropic API 従量課金\\（またはサブスク） &
-        OpenAI API 従量課金\\（またはサブスク） \\
+        suggest / auto-edit / full-auto &
+        suggest / auto-edit / full-auto \\
       \hline
     \end{tabular}
   \end{table}
 
-  \vspace{0.1em}
-
   {\scriptsize \textbf{最大の違い:}
-    Claude Code は CLAUDE.md + MEMORY.md で「育つ」。Codex CLI にはこの仕組みがない}
+    Claude Code は MEMORY.md で AI が自動的に学習を蓄積する。
+    Codex CLI は AGENTS.md を人間が手動で育てる必要がある}
 \end{frame}
 
 \end{document}
