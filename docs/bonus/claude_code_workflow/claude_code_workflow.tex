@@ -182,7 +182,37 @@
 % =====================================================================
 
 % ------------------------------------------------------------------
-% === P4: なぜ「計画」が必要か ===
+% === P4: まず「何を作るか」を決める ===
+\begin{frame}{まず「何を作るか」を決める — 要件定義}
+  \begin{alertblock}{AI に「いい感じに作って」は通じない}
+    {\small
+    曖昧な指示 → AI が勝手に解釈 → 意図と違うものができる。\\
+    \warn{最初に「何を作るか」を具体的に言葉にする}ことが最も重要}
+  \end{alertblock}
+
+  \vspace{0.2em}
+
+  \begin{exampleblock}{要件を具体化する3ステップ}
+    {\small
+    \textbf{1. 目的:} このプログラムは何のためにあるか？（1文で）\\
+    \textbf{2. 機能:} 具体的に何ができればいいか？（箇条書き）\\
+    \textbf{3. 制約:} 使う言語・ライブラリ・動作環境は？}
+  \end{exampleblock}
+
+  \vspace{0.2em}
+
+  \begin{block}{例: TODO アプリ}
+    {\footnotesize
+    \textbf{目的:} コマンドラインでタスクを管理する \\
+    \textbf{機能:} タスクの追加・一覧表示・完了・削除 \\
+    \textbf{制約:} Python、外部ライブラリなし、JSON ファイルで保存}
+  \end{block}
+
+  {\scriptsize \textbf{Tips:} 要件が具体的なほど AI の出力品質が上がる。チュートリアルで実践します}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P5: なぜ「計画」が必要か ===
 \begin{frame}{なぜ「計画」が必要か}
   \begin{alertblock}{AI に自由にコードを書かせると何が起きるか}
     \begin{itemize}\small
@@ -966,6 +996,203 @@ allowed-tools: [Bash, Read]
     \texttt{claude /init} — CLAUDE.md を自動生成 → カスタマイズして「育てる」を始めよう
     }
   \end{block}
+\end{frame}
+
+% =====================================================================
+% Part 7: チュートリアル — TODO アプリを作ろう（7枚）
+% =====================================================================
+
+% ------------------------------------------------------------------
+\begin{frame}{チュートリアル: TODO アプリを作ろう}
+  \begin{block}{概要}
+    {\small Claude Code のワークフローを体験する実践演習。\\
+    コマンドライン TODO アプリ（Python）を\textbf{ゼロから完成}させる}
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{table}
+    \centering\footnotesize
+    \begin{tabular}{rlp{60mm}}
+      \hline
+      \textbf{Step} & \textbf{内容} & \textbf{学ぶこと} \\
+      \hline
+      1 & インストールと初期設定 & 環境構築、CLAUDE.md 作成 \\
+      2 & 要件を定義する & 目的・機能・制約の言語化 \\
+      3 & 計画を立てる & Plan Mode の使い方 \\
+      4 & 実装する & 計画に基づく段階的な実装 \\
+      5 & バグを見つけて直す & テスト、デバッグ、コミット \\
+      6 & 振り返り & CLAUDE.md の改善サイクル \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  {\scriptsize \textbf{前提:} Python 3 と Node.js がインストール済みであること}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Step 1: インストールと初期設定}
+  \begin{block}{Claude Code をインストールして、プロジェクトを準備する}
+    \begin{lstlisting}[language={}, numbers=none]
+# 1. Claude Code をインストール
+npm install -g @anthropic-ai/claude-code
+# 2. プロジェクトフォルダを作成
+mkdir todo-app && cd todo-app
+# 3. Git リポジトリを初期化
+git init
+# 4. Claude Code を起動して CLAUDE.md を生成
+claude /init
+    \end{lstlisting}
+  \end{block}
+
+  \begin{exampleblock}{CLAUDE.md を編集して最初のルールを書く}
+    \begin{lstlisting}[language={}, numbers=none]
+## Build
+python todo.py
+## Rules
+- Python 3、外部ライブラリなし
+- データは todo.json に保存
+    \end{lstlisting}
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Step 2: 要件を Claude Code に伝える}
+  \begin{block}{目的・機能・制約を具体的に伝える}
+    {\small Claude Code に以下のように入力する:}
+  \end{block}
+
+  \begin{lstlisting}[language={}, numbers=none]
+コマンドライン TODO アプリを作りたい。
+
+目的: ターミナルでタスクを管理する
+機能:
+- タスクの追加 (add "タスク名")
+- 一覧表示 (list) - 未完了/完了を区別
+- 完了にする (done 番号)
+- 削除 (delete 番号)
+制約:
+- Python 3、外部ライブラリなし
+- データは todo.json に保存
+- 日本語対応
+
+まず Plan Mode で設計してください。
+  \end{lstlisting}
+
+  {\scriptsize \textbf{ポイント:} 「まず Plan Mode で」と指示することで、いきなりコードを書かせない}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Step 3: 計画を確認して承認する}
+  \begin{block}{Claude Code が計画を出す → 人間が確認}
+    {\small 計画モードで以下のような出力が返ってくる:}
+  \end{block}
+
+  \begin{lstlisting}[language={}, numbers=none]
+## Plan: コマンドライン TODO アプリ
+
+### ファイル構成
+1. todo.py     - メイン処理(引数解析、CRUD操作)
+2. todo.json   - データ保存(自動生成)
+
+### 設計
+- argparse で add/list/done/delete を処理
+- JSON ファイルでデータ永続化
+- 各タスクは {id, text, done} の辞書
+  \end{lstlisting}
+
+  \vspace{0.2em}
+
+  {\small
+  \textbf{確認ポイント:} ファイル構成は妥当か？ 設計は要件を満たすか？ \\
+  問題なければ「OK、実装して」と承認。修正したければ「ファイルは1つにして」等}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Step 4: 実装してテストする}
+  \begin{block}{承認後、Claude Code が実装を開始する}
+    {\small 実装が完了したら、自分で動かして確認:}
+  \end{block}
+
+  \begin{lstlisting}[language={}, numbers=none]
+# タスクを追加
+python todo.py add "牛乳を買う"
+python todo.py add "レポートを書く"
+
+# 一覧表示
+python todo.py list
+  [ ] 1: 牛乳を買う
+  [ ] 2: レポートを書く
+
+# 完了にする
+python todo.py done 1
+
+# 再度一覧 → 完了マークがつく
+python todo.py list
+  [x] 1: 牛乳を買う
+  [ ] 2: レポートを書く
+  \end{lstlisting}
+
+  {\scriptsize \textbf{動いたらコミット:} 「ここまでコミットして」→ Claude Code が自動で記録}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Step 5: バグを見つけて修正する}
+  \begin{alertblock}{意図的にバグを探してみる}
+    {\small 以下を試して、おかしな動作がないか確認:}
+  \end{alertblock}
+
+  \begin{lstlisting}[language={}, numbers=none]
+# 存在しない番号を完了にしたら？
+python todo.py done 999
+
+# 引数なしで実行したら？
+python todo.py
+
+# 空文字のタスクを追加したら？
+python todo.py add ""
+  \end{lstlisting}
+
+  \begin{exampleblock}{バグを Claude Code に修正させる}
+    {\small Claude Code に伝える:}
+
+    \begin{lstlisting}[language={}, numbers=none]
+done 999 でエラーになる。存在しない番号には
+エラーメッセージを表示してください。
+引数なしの場合はヘルプを表示してください。
+    \end{lstlisting}
+  \end{exampleblock}
+
+  {\scriptsize \textbf{修正後:} テストして OK なら「コミットして」}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Step 6: 振り返り — CLAUDE.md を育てる}
+  \begin{block}{チュートリアルで体験したワークフロー}
+    {\footnotesize
+    \begin{tabular}{rll}
+      \hline
+      \textbf{Step} & \textbf{やったこと} & \textbf{対応する機能} \\
+      \hline
+      1 & 環境構築 & \texttt{claude /init} で CLAUDE.md 作成 \\
+      2 & 要件定義 & 目的・機能・制約を言語化 \\
+      3 & 計画 & Plan Mode で設計→承認 \\
+      4 & 実装 & 承認後にコード生成→テスト \\
+      5 & バグ修正 & エラー報告→修正→コミット \\
+      6 & 振り返り & CLAUDE.md にルールを追加 \\
+      \hline
+    \end{tabular}
+    }
+  \end{block}
+
+  \vspace{0.2em}
+
+  \begin{exampleblock}{次にやること: CLAUDE.md を改善する}
+    {\footnotesize
+    チュートリアルで気づいたことを CLAUDE.md に追記しよう: \\
+    例: 「エラー処理は必ず入れること」「引数なしの場合はヘルプを表示」\\
+    → 次回から Claude Code が自動的にこのルールに従う = \textbf{育てる}}
+  \end{exampleblock}
 \end{frame}
 
 % =====================================================================
