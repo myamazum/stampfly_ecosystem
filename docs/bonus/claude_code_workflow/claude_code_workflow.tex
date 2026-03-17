@@ -567,79 +567,133 @@ Next steps:
 \end{frame}
 
 % ------------------------------------------------------------------
-% === P14: 知識はどこに蓄積されるか ===
-\begin{frame}{知識はどこに蓄積されるか}
-  \begin{center}
-    \begin{tikzpicture}[
-      node distance=4mm,
-      layer/.style={rectangle, rounded corners=3pt, draw=#1,
-                    minimum width=105mm, minimum height=9mm,
-                    font=\small, align=center, fill=#1!8},
-      item/.style={font=\scriptsize},
-    ]
-      % Layer 1: Git-managed (portable)
-      \node[layer=sfgreen] (git) {%
-        \textcolor{sfgreen}{\textbf{Git 管理（ポータブル）}}
-        — \texttt{git clone} で復元される};
-      \node[item, below=1mm of git] (git-items) {%
-        \texttt{CLAUDE.md} \quad
-        \texttt{.claude/settings.json} \quad
-        \texttt{.claude/skills/} \quad
-        \texttt{.claude/rules/}};
-
-      % Layer 2: Local only
-      \node[layer=sforange, below=6mm of git-items] (local) {%
-        \textcolor{sforange}{\textbf{ローカル専用}}
-        — この PC にだけ存在する};
-      \node[item, below=1mm of local] (local-items) {%
-        \texttt{Memory} \quad
-        \texttt{settings.local.json} \quad
-        \texttt{\textasciitilde/.claude/CLAUDE.md}};
-
-      % Layer 3: GitHub (team shared)
-      \node[layer=sfblue, below=6mm of local-items] (github) {%
-        \textcolor{sfblue}{\textbf{GitHub（チーム共有）}}
-        — リモートリポジトリに保存};
-      \node[item, below=1mm of github] (gh-items) {%
-        PR 履歴 \quad Issue \quad コミットログ \quad
-        CLAUDE.md（= チームの AI ルール）};
-    \end{tikzpicture}
-  \end{center}
-
-  \vspace{0.3em}
-
-  {\footnotesize \textbf{ポイント:}
-    \textcolor{sfgreen}{緑}の層は Git で管理 → 別 PC でも復元可能。
-    \textcolor{sforange}{橙}の層はローカル → 重要な feedback は CLAUDE.md にも書くべき}
-\end{frame}
-
-% ------------------------------------------------------------------
-% === P15: 別の PC で再現するには ===
-\begin{frame}{別の PC で再現するには}
-  \begin{block}{知識の復元手順}
+% === P14: Claude Code にとっての「知識」とは ===
+\begin{frame}{Claude Code にとっての「知識」とは}
+  \begin{block}{Claude Code は毎回まっさらな状態で起動する}
     {\small
-    \begin{tabular}{rp{90mm}}
-      \textbf{Step 1} & \texttt{git clone <repo>} — CLAUDE.md, Skills, Settings が復元される \\
-      \textbf{Step 2} & \texttt{claude} を起動 — CLAUDE.md が自動で読み込まれる \\
-      \textbf{Step 3} & Memory は新規だが、CLAUDE.md にルールがあれば即座に従う \\
-    \end{tabular}
-    }
+    前回の会話は覚えていない。ではどうやって「このプロジェクトのルール」を知るのか？\\
+    → \textbf{ファイルに書かれた情報を毎回読み込む}ことで知識を得る}
   \end{block}
 
   \vspace{0.3em}
 
+  \begin{table}
+    \centering\small
+    \begin{tabular}{lp{75mm}}
+      \hline
+      \textbf{知識の種類} & \textbf{具体例} \\
+      \hline
+      プロジェクトのルール &
+        「テストは pytest で実行」「コミットは英語で書く」 \\
+      過去の失敗から学んだこと &
+        「この関数は変更禁止」「SQL は直接書かない」 \\
+      ユーザーの好み &
+        「説明は日本語で」「コメントは簡潔に」 \\
+      カスタムコマンド &
+        \texttt{/commit} で自動コミット等 \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{0.3em}
+
+  {\footnotesize
+    これらの知識は\textbf{すべてファイルとして保存}されている。\\
+    ファイルの置き場所によって「持ち運べるか」「この PC だけか」が変わる → 次のページ}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P15: 持ち運べる知識 vs この PC だけの知識 ===
+\begin{frame}{持ち運べる知識 vs この PC だけの知識}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{持ち運べる知識（Git 管理）}
+        {\small プロジェクトのフォルダ内に保存。\\
+        \texttt{git clone} すれば別 PC でも復元}
+
+        \vspace{0.3em}
+
+        {\footnotesize
+        \begin{tabular}{lp{24mm}}
+          \hline
+          \textbf{ファイル} & \textbf{役割} \\
+          \hline
+          \texttt{CLAUDE.md}  & プロジェクトの\\ルールブック \\
+          \texttt{.claude/skills/} & カスタム\\コマンド \\
+          \texttt{.claude/settings.json} & 権限・Hook\\の設定 \\
+          \hline
+        \end{tabular}
+        }
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{この PC だけの知識（ローカル）}
+        {\small あなたの PC の中だけに保存。\\
+        別の PC には\warn{引き継がれない}}
+
+        \vspace{0.3em}
+
+        {\footnotesize
+        \begin{tabular}{lp{24mm}}
+          \hline
+          \textbf{ファイル} & \textbf{役割} \\
+          \hline
+          \texttt{Memory}  & 過去の会話で\\学んだこと \\
+          グローバル\\CLAUDE.md & 全プロジェクト\\共通の個人設定 \\
+          \hline
+        \end{tabular}
+        }
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.5em}
+
+  {\footnotesize \textbf{重要:}
+    Memory に保存した大事なルールは、\texttt{CLAUDE.md} にも書いておく。\\
+    そうすれば「持ち運べる知識」になり、別 PC・別メンバーにも引き継がれる}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P16: git clone すれば AI の知識も一緒に来る ===
+\begin{frame}{git clone すれば AI の知識も一緒に来る}
+  \begin{block}{別の PC やチームメンバーへの共有}
+    {\small CLAUDE.md や Skills は Git 管理。クローンすれば\textbf{AI の知識も自動的に手に入る}}
+  \end{block}
+
+  \vspace{0.2em}
+
+  \begin{center}
+    \begin{tikzpicture}[
+      node distance=5mm and 14mm,
+      box/.style={rectangle, rounded corners=3pt, draw=sfblue,
+                  fill=sflight, minimum height=8mm, minimum width=30mm,
+                  font=\small, align=center},
+      arr/.style={-{Stealth[length=2.5mm]}, sfblue, thick},
+    ]
+      \node[box] (clone) {\texttt{git clone}\\リポジトリを取得};
+      \node[box, right=of clone] (start) {\texttt{claude}\\を起動};
+      \node[box, right=of start] (ready) {CLAUDE.md を\\自動で読み込み};
+
+      \draw[arr] (clone) -- (start);
+      \draw[arr] (start) -- (ready);
+
+      \node[below=4mm of ready, font=\small, sfgreen] (result)
+        {→ 初日から AI がルールを理解};
+    \end{tikzpicture}
+  \end{center}
+
+  \vspace{0.2em}
+
   \begin{exampleblock}{GitHub = AI の知識のハブ}
-    {\footnotesize
+    {\scriptsize
     \begin{itemize}
-      \item チームメンバーが \texttt{git clone} → 同じ CLAUDE.md を共有
-      \item 新メンバーの AI も初日からプロジェクトのルールを理解
-      \item CLAUDE.md の改善も PR でレビュー可能
+      \item 新メンバーが \texttt{git clone} → 同じルールを共有、教育コスト削減
+      \item CLAUDE.md の改善を PR で提案 → チームで AI ルールをレビュー
+      \item コミットの Next steps → 別の人が作業を引き継ぎやすい
     \end{itemize}
     }
   \end{exampleblock}
-
-  {\scriptsize \textbf{Tips:}
-    Memory の重要な feedback は CLAUDE.md にも転記 → 別 PC・別メンバーにも引き継がれる}
 \end{frame}
 
 % ------------------------------------------------------------------
