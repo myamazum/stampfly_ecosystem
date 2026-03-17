@@ -151,11 +151,9 @@
 % === P3: Claude Code とは ===
 \begin{frame}{Claude Code とは}
   \begin{block}{概要}
-    Anthropic 社が提供するコーディングエージェント。\\
-    ターミナルから Claude を呼び出し、コードの読み書きからテスト・変更記録まで自律的に実行する
+    {\small Anthropic 社が提供するコーディングエージェント。
+    ターミナルから Claude を呼び出し、コードの読み書きからテスト・変更記録まで自律的に実行する}
   \end{block}
-
-  \vspace{0.3em}
 
   \begin{table}
     \centering\small
@@ -220,7 +218,7 @@
   \begin{columns}[T]
     \begin{column}{0.45\textwidth}
       \begin{alertblock}{有効な場面}
-        \begin{itemize}\small
+        \begin{itemize}\footnotesize
           \item 複数ファイルにまたがる変更
           \item 設計の判断が必要なとき
           \item 失敗コストが高い作業
@@ -230,11 +228,10 @@
     \end{column}
     \begin{column}{0.5\textwidth}
       \begin{exampleblock}{Plan Mode でできること}
-        {\small
+        {\footnotesize
         ファイルを読んで調査する \\
         プロジェクトの構造を分析する \\
-        変更計画を作って提案する \\
-        影響範囲を調べる \\[4pt]
+        変更計画を作って提案する \\[3pt]
         \warn{$\times$} ファイルの編集・作成 \\
         \warn{$\times$} コマンドの実行
         }
@@ -242,7 +239,7 @@
     \end{column}
   \end{columns}
 
-  {\footnotesize \textbf{Tips:} 大きな変更ほど計画モードが効く。5分の計画で1時間の手戻りを防げる}
+  {\scriptsize \textbf{Tips:} 大きな変更ほど計画モードが効く。5分の計画で1時間の手戻りを防げる}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -330,12 +327,10 @@
     }
   \end{alertblock}
 
-  \vspace{0.3em}
-
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \begin{block}{Git が提供する安全網}
-        {\footnotesize Git = ファイルの変更履歴を記録・管理するツール}
+        {\footnotesize Git = 変更履歴を記録・管理するツール}
         \begin{itemize}\footnotesize
           \item 変更の差分を確認できる
           \item いつでも前の状態に戻せる
@@ -501,11 +496,8 @@ Next steps:                  ← 次にやるべきこと
     \end{itemize}
   \end{alertblock}
 
-  \vspace{0.2em}
-
-  {\footnotesize \textbf{重要:} CLAUDE.md を書く = \textbf{AI に知識を教える}。
-    ドキュメント化の手間が「AI の教育投資」として返ってくる。\\
-    複数の場所に置ける: プロジェクト全体用、フォルダ別、個人用（すべて同時に読み込まれる）}
+  {\scriptsize \textbf{重要:} CLAUDE.md を書く = \textbf{AI に知識を教える}。
+    ドキュメント化の手間が「AI の教育投資」として返ってくる}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -630,11 +622,10 @@ Next steps:                  ← 次にやるべきこと
     \end{column}
   \end{columns}
 
-  \vspace{0.3em}
+  \vspace{0.2em}
 
   {\scriptsize \textbf{重要:}
-    記憶機能に保存した大事なルールは、指示書（CLAUDE.md）にも書いておく
-    → 「持ち運べる知識」になり別 PC・別メンバーにも引き継がれる}
+    Memory の大事なルールは CLAUDE.md にも書く → 持ち運べる知識になる}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -820,27 +811,21 @@ Next steps:                  ← 次にやるべきこと
 name: commit
 description: ルールに従って
   変更を記録する
-allowed-tools:
-  - Bash
-  - Read
+allowed-tools: [Bash, Read]
 ---
 1. 変更内容を確認
-2. ルールに従い記録メッセージ作成
+2. 記録メッセージ作成
 3. 変更を記録
-引数: $ARGUMENTS
         \end{lstlisting}
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
       \begin{exampleblock}{最初から使えるスキル}
-        {\footnotesize
-        \api{/commit} — ルールに従って\\
-        \hspace{2em}変更を自動で記録 \\[3pt]
-        \api{/simplify} — コードの品質を\\
-        \hspace{2em}チェックして改善 \\[3pt]
-        \api{/batch} — 大量の変更を\\
-        \hspace{2em}一括処理 \\[3pt]
-        {\scriptsize \textbf{Tips:} 繰り返す作業はスキルに}
+        {\scriptsize
+        \api{/commit} — 変更を自動で記録 \\[2pt]
+        \api{/simplify} — コード品質チェック \\[2pt]
+        \api{/batch} — 大量の変更を一括処理 \\[4pt]
+        \textbf{Tips:} 繰り返す作業はスキルに
         }
       \end{exampleblock}
     \end{column}
@@ -856,7 +841,7 @@ allowed-tools:
   \end{block}
 
   \begin{table}
-    \centering\footnotesize
+    \centering\scriptsize
     \begin{tabular}{lp{60mm}}
       \hline
       \textbf{種類} & \textbf{何をさせるか} \\
@@ -869,7 +854,7 @@ allowed-tools:
   \end{table}
 
   \begin{exampleblock}{活用例}
-    \begin{itemize}\footnotesize
+    \begin{itemize}\scriptsize
       \item \textbf{複数のテストを同時実行} — 待ち時間を短縮
       \item \textbf{大きなプロジェクトの調査} — 結果だけを受け取る
       \item \textbf{裏でビルド} — 完了したら通知が届く
@@ -885,10 +870,8 @@ allowed-tools:
     コンテキストを上手に管理することが大事}
   \end{alertblock}
 
-  \vspace{0.2em}
-
   \begin{table}
-    \centering\small
+    \centering\footnotesize
     \begin{tabular}{lp{70mm}}
       \hline
       \textbf{対策} & \textbf{説明} \\
@@ -901,9 +884,8 @@ allowed-tools:
     \end{tabular}
   \end{table}
 
-  {\footnotesize \textbf{Tips:}
-    会話が長くなったら \api{/compact} で圧縮。
-    大事な情報は記憶機能に保存しておけば、圧縮しても失われない}
+  {\scriptsize \textbf{Tips:}
+    \api{/compact} で圧縮。大事な情報は Memory に保存しておけば圧縮後も残る}
 \end{frame}
 
 % =====================================================================
