@@ -296,30 +296,30 @@
 % ------------------------------------------------------------------
 % === P7: Plan Mode の実践例 ===
 \begin{frame}[fragile]{Plan Mode の実践例}
-  \begin{block}{例: 「ユーザー認証の API エンドポイントを追加して」}
+  \begin{block}{例: 「CSV ファイルを読み込んでグラフを表示する機能を追加して」}
     {\footnotesize Plan Mode で Claude が出す計画の例:}
   \end{block}
 
   \begin{lstlisting}[language={}, numbers=none]
-## Plan: ユーザー認証 API の追加
+## Plan: CSV 読み込み + グラフ表示機能
 
 ### 変更対象ファイル
-1. src/routes/auth.ts    (新規) - ログイン/登録エンドポイント
-2. src/middleware/auth.ts (新規) - JWT 検証ミドルウェア
-3. src/models/user.ts    (既存) - パスワードハッシュ追加
-4. tests/auth.test.ts    (新規) - 認証フローのテスト
+1. src/csv_reader.py   (新規) - CSV 読み込み処理
+2. src/plot.py         (新規) - グラフ描画処理
+3. src/main.py         (既存) - メニューに項目追加
+4. tests/test_csv.py   (新規) - 読み込みのテスト
 
 ### 設計判断
-- セッション管理: JWT (既存の jsonwebtoken に統一)
-- パスワード: bcrypt でハッシュ化
-- バリデーション: 既存の zod スキーマに統合
+- CSV ライブラリ: 標準の csv モジュールを使用
+- グラフ描画: matplotlib を使用
+- ファイル選択: コマンドライン引数で指定
 
 ### 影響範囲
-- 既存の /api/users には影響なし
-- package.json に bcrypt を追加
+- 既存の機能には影響なし
+- requirements.txt に matplotlib を追加
   \end{lstlisting}
 
-  {\footnotesize ユーザーが「JWT ではなくセッション Cookie にして」→ 計画を修正 → 承認 → 実装開始}
+  {\footnotesize ユーザーが「3ファイルに分けず1ファイルにまとめて」→ 計画を修正 → 承認 → 実装開始}
 \end{frame}
 
 % =====================================================================
@@ -371,16 +371,16 @@
 \begin{frame}[fragile]{コミット戦略}
   \begin{block}{Conventional Commits + Next steps}
     \begin{lstlisting}[language={}, numbers=none]
-feat(auth): add JWT-based login endpoint
+feat(csv): add CSV import and graph display
 
 Changes:
-- POST /api/auth/login を実装
-- bcrypt でパスワード検証
-- JWT トークン発行(有効期限 24h)
+- CSV 読み込み処理を実装
+- matplotlib でグラフ描画機能を追加
+- メインメニューに項目を追加
 
 Next steps:
-- tests/auth.test.ts でログインフローをテスト
-- リフレッシュトークンの実装を検討
+- tests/test_csv.py でテストを実行
+- 大きな CSV ファイルでの動作確認
     \end{lstlisting}
   \end{block}
 
