@@ -497,20 +497,29 @@ Next steps:                  ← 次にやるべきこと
   \end{alertblock}
 
   {\scriptsize \textbf{重要:} CLAUDE.md を書く = \textbf{AI に知識を教える}。
-    ドキュメント化の手間が「AI の教育投資」として返ってくる}
+    ドキュメント化の手間が「AI の教育投資」として返ってくる。\\
+    ※ CLAUDE.md は\textbf{人間が書く}指示書。AI が自動で書き込むことはない}
 \end{frame}
 
 % ------------------------------------------------------------------
 % === P13: Memory — AI が学習する仕組み ===
-\begin{frame}{Memory（メモリ機能）— 会話を超えて覚えている仕組み}
-  \begin{block}{Memory とは}
-    {\small Claude Code が会話の中で学んだことを\textbf{ファイルに保存}し、
-    次回以降も自動的に読み込む仕組み。PC のメモリ（RAM）ではなく、独自の「記憶ファイル」}
+\begin{frame}{Memory（メモリ機能）— AI が自分で書く記憶ノート}
+  \begin{block}{Memory とは — CLAUDE.md との違い}
+    {\footnotesize
+    \begin{tabular}{lll}
+      & \textbf{CLAUDE.md} & \textbf{Memory} \\
+      \hline
+      誰が書くか & \textbf{人間}が書く & \textbf{AI が自動で}書く \\
+      何を書くか & プロジェクトのルール & 会話で学んだこと \\
+      保存場所   & プロジェクト内（Git 管理） & PC のローカル \\
+      共有       & チームで共有できる & この PC だけ \\
+    \end{tabular}
+    }
   \end{block}
-
+  \vspace{-4pt}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      {\footnotesize \textbf{4つの種類:}}
+      {\scriptsize \textbf{4つの種類:}}
       {\scriptsize
       \begin{tabular}{lp{26mm}}
         \hline
@@ -529,16 +538,18 @@ Next steps:                  ← 次にやるべきこと
         {\scriptsize
         \texttt{テストは必ず実行してから}\\
         \texttt{変更を記録すること。}\\
-        \texttt{→ 以降ずっとこのルールに従う}\\[6pt]
+        \texttt{→ 以降ずっとこのルールに従う}\\[2pt]
         \texttt{ファイル名は日本語禁止。}\\
         \texttt{→ 次回から自動的に従う}
         }
       \end{exampleblock}
+      \vspace{-6pt}
     \end{column}
   \end{columns}
 
-  {\footnotesize \textbf{最も強力なのは feedback。}
-    一度「こうしないで」と伝えれば、\textbf{次回以降すべての会話}で Claude が従う}
+  \vspace{-2pt}
+  {\scriptsize \textbf{最も強力なのは feedback} — 一度伝えれば次回以降すべての会話で従う}
+  \vspace{6pt}
 \end{frame}
 
 % ------------------------------------------------------------------
