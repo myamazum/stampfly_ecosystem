@@ -121,8 +121,8 @@
 % === P2: コーディングエージェントとは ===
 \begin{frame}{コーディングエージェントとは}
   \begin{block}{定義}
-    AI がターミナル上でコードを読み書きし、ビルド・テスト・Git 操作まで
-    \textbf{自律的に実行}するツール
+    AI がターミナル（黒い画面のコマンド入力画面）上でコードを読み書きし、
+    ビルド・テスト・変更履歴の記録まで\textbf{自律的に実行}するツール
   \end{block}
 
   \vspace{0.3em}
@@ -136,23 +136,23 @@
       動作     & 対話（コピペが必要）  & ファイルを直接編集 \\
       範囲     & 1ファイルの断片      & プロジェクト全体 \\
       実行     & ユーザーが手動実行    & ビルド・テストも自律実行 \\
-      Git      & 関与しない           & コミット・PR 作成まで \\
+      履歴管理 & 関与しない           & 変更の記録・共有まで \\
       \hline
     \end{tabular}
   \end{table}
 
   \vspace{0.3em}
 
-  {\footnotesize \textbf{なぜ CLI なのか:}
-    IDE プラグインと違い、SSH 先・Docker 内・CI 上など\textbf{どこでも動く}}
+  {\footnotesize \textbf{なぜターミナルで動くのか:}
+    エディタに依存しないので、\textbf{どんな開発環境でも同じように使える}}
 \end{frame}
 
 % ------------------------------------------------------------------
 % === P3: Claude Code とは ===
 \begin{frame}{Claude Code とは}
   \begin{block}{概要}
-    Anthropic 公式の CLI エージェント。ターミナルから Claude を呼び出し、
-    コード読み書き・ビルド・テスト・Git 操作を自律的に実行する
+    Anthropic 社が提供するコーディングエージェント。\\
+    ターミナルから Claude を呼び出し、コードの読み書きからテスト・変更記録まで自律的に実行する
   \end{block}
 
   \vspace{0.3em}
@@ -163,17 +163,17 @@
       \hline
       \textbf{機能} & \textbf{説明} \\
       \hline
-      CLAUDE.md       & プロジェクト固有の指示書（常に読み込まれる） \\
-      Memory          & セッション間で記憶を永続化（4タイプ） \\
-      Plan Mode       & Shift+Tab で読み取り専用の設計モード \\
-      Subagent        & 並列タスク・重い処理を子プロセスに委任 \\
-      Hooks \& Skills & 自動化とカスタムワークフロー \\
-      Git 統合        & コミット・PR 作成・ブランチ操作 \\
+      指示書ファイル    & プロジェクトのルールを書いたファイルを毎回読む \\
+      記憶の永続化      & 会話で学んだことを次回以降も覚えている \\
+      計画モード        & コードを書かずに調査・設計だけさせるモード \\
+      Git 連携          & 変更の記録・共有を自動で行う \\
+      自動化の仕組み    & 繰り返す作業やチェックを自動実行 \\
       \hline
     \end{tabular}
   \end{table}
 
   {\scriptsize
+    ※ 各機能の詳細は後半で解説 \quad
     インストール: \texttt{npm install -g @anthropic-ai/claude-code} \quad
     起動: \texttt{cd your-project \&\& claude}
   }
@@ -212,41 +212,37 @@
 % ------------------------------------------------------------------
 % === P5: Plan Mode — 設計してから書く ===
 \begin{frame}{Plan Mode — 設計してから書く}
-  \begin{block}{Plan Mode とは}
-    \textbf{Shift+Tab} でトグル。コード編集を\textbf{できない}読み取り専用モード。\\
-    調査・設計に集中させ、方針が固まってから実装に移る
+  \begin{block}{Plan Mode（計画モード）とは}
+    {\small \textbf{Shift+Tab} キーで切り替え。コード編集を\textbf{できない}読み取り専用モード。
+    AI に調査・設計だけをさせ、方針が固まってから実装に移る}
   \end{block}
-
-  \vspace{0.2em}
 
   \begin{columns}[T]
     \begin{column}{0.45\textwidth}
       \begin{alertblock}{有効な場面}
         \begin{itemize}\small
           \item 複数ファイルにまたがる変更
-          \item アーキテクチャの判断が必要
+          \item 設計の判断が必要なとき
           \item 失敗コストが高い作業
-          \item 初めて触るコードベース
+          \item 初めて触るプロジェクト
         \end{itemize}
       \end{alertblock}
     \end{column}
     \begin{column}{0.5\textwidth}
       \begin{exampleblock}{Plan Mode でできること}
         {\small
-        ファイル読み取り・検索 \\
-        コードベースの構造分析 \\
-        変更計画の策定・提案 \\
-        影響範囲の調査 \\[4pt]
-        \warn{$\times$} ファイル編集・作成 \\
-        \warn{$\times$} コマンド実行
+        ファイルを読んで調査する \\
+        プロジェクトの構造を分析する \\
+        変更計画を作って提案する \\
+        影響範囲を調べる \\[4pt]
+        \warn{$\times$} ファイルの編集・作成 \\
+        \warn{$\times$} コマンドの実行
         }
       \end{exampleblock}
     \end{column}
   \end{columns}
 
-  \vspace{0.3em}
-
-  {\footnotesize \textbf{Tips:} 大きな変更ほど Plan Mode が効く。5分の計画で1時間の手戻りを防げる}
+  {\footnotesize \textbf{Tips:} 大きな変更ほど計画モードが効く。5分の計画で1時間の手戻りを防げる}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -266,7 +262,7 @@
       \node[approve, right=14mm of plan] (approve) {ユーザーが\\承認/修正};
       \node[box, right=14mm of approve] (impl)    {実装\\（小さな単位）};
       \node[box, below=of impl]  (test)    {ビルド/テスト\\で検証};
-      \node[box, below=of approve] (commit) {\texttt{/commit}\\で記録};
+      \node[box, below=of approve] (commit) {変更を\\記録};
       \node[box, below=of plan]   (next)   {次のタスク\\or 完了};
 
       \draw[arr] (plan)    -- (approve);
@@ -296,9 +292,7 @@
 % ------------------------------------------------------------------
 % === P7: Plan Mode の実践例 ===
 \begin{frame}[fragile]{Plan Mode の実践例}
-  \begin{block}{例: 「CSV ファイルを読み込んでグラフを表示する機能を追加して」}
-    {\footnotesize Plan Mode で Claude が出す計画の例:}
-  \end{block}
+  {\small \textbf{例:} 「CSV を読み込んでグラフ表示する機能を追加して」→ 計画モードで出る計画:}
 
   \begin{lstlisting}[language={}, numbers=none]
 ## Plan: CSV 読み込み + グラフ表示機能
@@ -328,7 +322,7 @@
 
 % ------------------------------------------------------------------
 % === P8: なぜ Git が重要か ===
-\begin{frame}{なぜ Git が重要か}
+\begin{frame}{なぜ Git（変更履歴の管理）が重要か}
   \begin{alertblock}{AI がファイルを自律的に変更する世界では}
     {\small
     変更履歴がなければ「何が変わったか」「なぜ変わったか」が追えない。\\
@@ -341,65 +335,60 @@
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \begin{block}{Git が提供する安全網}
-        \begin{itemize}\small
+        {\footnotesize Git = ファイルの変更履歴を記録・管理するツール}
+        \begin{itemize}\footnotesize
           \item 変更の差分を確認できる
           \item いつでも前の状態に戻せる
-          \item 誰が（AI/人間）何を変えたか記録
-          \item ブランチで安全に実験できる
+          \item 誰が何を変えたか記録される
         \end{itemize}
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \begin{exampleblock}{Claude Code の Git 統合}
-        \begin{itemize}\small
-          \item 変更後に自動コミット提案
-          \item Conventional Commits 準拠
-          \item PR 作成・差分要約
-          \item コミット履歴から文脈を読む
+      \begin{exampleblock}{Claude Code の Git 連携}
+        \begin{itemize}\footnotesize
+          \item 記録メッセージを自動作成
+          \item 統一された記録形式に準拠
+          \item 変更の要約を自動生成
         \end{itemize}
       \end{exampleblock}
     \end{column}
   \end{columns}
 
-  \vspace{0.3em}
-
-  {\footnotesize \textbf{原則:} AI と協働するなら Git は必須。「こまめにコミット」が最大の保険}
+  {\footnotesize \textbf{原則:} AI と協働するなら Git は必須。「こまめに記録」が最大の保険}
 \end{frame}
 
 % ------------------------------------------------------------------
 % === P9: コミット戦略 ===
 \begin{frame}[fragile]{コミット戦略}
-  \begin{block}{Conventional Commits + Next steps}
+  \begin{block}{コミット（変更の記録）のルールを決めておく}
+    {\scriptsize 「何をなぜ変えたか」が伝わる記録を残す。Claude Code が自動でこの形式に従う:}
     \begin{lstlisting}[language={}, numbers=none]
 feat(csv): add CSV import and graph display
-
+                     ← 種類(範囲): 変更の要約（1行）
 Changes:
-- CSV 読み込み処理を実装
+- CSV 読み込み処理を実装     ← 何を変えたか
 - matplotlib でグラフ描画機能を追加
-- メインメニューに項目を追加
 
-Next steps:
+Next steps:                  ← 次にやるべきこと
 - tests/test_csv.py でテストを実行
 - 大きな CSV ファイルでの動作確認
     \end{lstlisting}
   \end{block}
 
-  \vspace{0.2em}
-
   \begin{columns}[T]
     \begin{column}{0.45\textwidth}
-      {\small \textbf{コミットのタイミング:}}
+      {\small \textbf{記録するタイミング:}}
       \begin{itemize}\scriptsize
-        \item 1機能 = 1コミット（小さな単位）
-        \item テスト/ビルド成功後
+        \item 1機能 = 1記録（小さな単位で）
+        \item テスト成功後
         \item 作業の区切り・中断時
       \end{itemize}
     \end{column}
     \begin{column}{0.5\textwidth}
-      {\small \textbf{Next steps の効果:}}
+      {\small \textbf{Next steps（次の作業）の効果:}}
       \begin{itemize}\scriptsize
-        \item 次のセッション開始時の起点になる
-        \item 具体的なコマンド・検証項目を含む
+        \item 次回起動時の再開ポイントになる
+        \item 具体的な検証項目を含む
         \item AI が「前回の続き」を即座に把握
       \end{itemize}
     \end{column}
@@ -408,18 +397,18 @@ Next steps:
 
 % ------------------------------------------------------------------
 % === P10: GitHub 連携 — PR とレビュー ===
-\begin{frame}{GitHub 連携 — PR とレビュー}
-  \begin{block}{Claude Code で PR を作成する}
+\begin{frame}{GitHub 連携 — 変更をチームに共有する}
+  \begin{block}{Pull Request（PR）= 「この変更をレビューしてください」という依頼}
     {\small
-    \texttt{「この変更で PR を作成して」} と指示するだけで:}
+    \texttt{「この変更で PR を作成して」} と Claude Code に指示するだけで:}
     \begin{enumerate}\small
-      \item 変更差分を分析して PR タイトル・本文を自動生成
-      \item \texttt{gh pr create} で GitHub に PR を作成
-      \item レビューコメントへの対応も指示可能
+      \item 変更内容を分析して説明文を自動生成
+      \item GitHub 上に PR（変更のレビュー依頼）を作成
+      \item チームメンバーのレビューコメントへの対応も可能
     \end{enumerate}
   \end{block}
 
-  \vspace{0.3em}
+  \vspace{0.2em}
 
   \begin{center}
     \begin{tikzpicture}[
@@ -429,11 +418,11 @@ Next steps:
                   font=\scriptsize, align=center},
       arr/.style={-{Stealth[length=2mm]}, sfblue, thick},
     ]
-      \node[box] (branch) {feature branch\\を作成};
-      \node[box, right=of branch] (impl) {実装 +\\コミット};
-      \node[box, right=of impl] (pr) {PR 作成\\(gh pr create)};
-      \node[box, right=of pr] (review) {チームが\\レビュー};
-      \node[box, right=of review] (merge) {承認 →\\マージ};
+      \node[box] (branch) {作業用の枝を\\作成};
+      \node[box, right=of branch] (impl) {実装 +\\変更を記録};
+      \node[box, right=of impl] (pr) {PR を作成\\（レビュー依頼）};
+      \node[box, right=of pr] (review) {チームが\\確認};
+      \node[box, right=of review] (merge) {承認 →\\本流に統合};
 
       \draw[arr] (branch) -- (impl);
       \draw[arr] (impl) -- (pr);
@@ -444,49 +433,46 @@ Next steps:
 
   \vspace{0.2em}
 
-  {\footnotesize \textbf{Tips:} Claude Code は PR のレビューコメントを読んで修正コミットも作れる}
+  {\footnotesize \textbf{Tips:} Claude Code はレビューコメントを読んで修正も自動で作れる}
 \end{frame}
 
 % ------------------------------------------------------------------
 % === P11: ブランチ戦略と安全運用 ===
-\begin{frame}{ブランチ戦略と安全運用}
-  \begin{alertblock}{main ブランチを直接変更しない}
-    {\small AI が \texttt{git push origin main} を実行すると、レビューなしで本番に反映される。
-    必ず feature branch → PR → merge のフローを守る}
+\begin{frame}{安全な運用 — 本流を直接触らない}
+  \begin{alertblock}{本流（main）を直接変更しない}
+    {\small Git では「本流」と「作業用の枝」を分けられる。AI に本流を直接変更させると、
+    レビューなしで反映されてしまう。必ず作業枝 → レビュー → 統合の流れを守る}
   \end{alertblock}
 
-  \vspace{0.3em}
+  \vspace{0.2em}
 
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \begin{block}{推奨フロー}
         {\scriptsize
-        \textbf{1.} \texttt{git checkout -b feat/auth} \\
-        \textbf{2.} 実装・テスト・コミット \\
-        \textbf{3.} \texttt{gh pr create} で PR 作成 \\
-        \textbf{4.} レビュー・承認後にマージ \\
-        \textbf{5.} ブランチを削除
+        \textbf{1.} 作業用の枝を作成 \\
+        \textbf{2.} その枝で実装・テスト・記録 \\
+        \textbf{3.} レビュー依頼を作成 \\
+        \textbf{4.} 確認・承認後に本流へ統合 \\
+        \textbf{5.} 作業枝を削除
         }
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \begin{block}{権限制限で安全に}
+      \begin{block}{AI にやらせないことを決める}
         {\scriptsize
-        \texttt{settings.json} で制御:
+        設定ファイルで制御:
         \begin{itemize}
-          \item \texttt{permissions.deny} で\\
-                \texttt{git push origin main} をブロック
-          \item \texttt{--allowedTools} で\\
-                使えるツールを制限
-          \item GitHub の branch protection\\
-                ルールと組み合わせる
+          \item 本流への直接書き込みをブロック
+          \item 使えるコマンドを制限
+          \item GitHub 側でも本流を保護できる
         \end{itemize}
         }
       \end{block}
     \end{column}
   \end{columns}
 
-  \vspace{0.3em}
+  \vspace{0.2em}
 
   {\footnotesize \textbf{原則:} AI に「何をさせるか」だけでなく「何をさせないか」も設定する}
 \end{frame}
@@ -497,73 +483,70 @@ Next steps:
 
 % ------------------------------------------------------------------
 % === P12: CLAUDE.md — プロジェクトの知識を蓄積する ===
-\begin{frame}{CLAUDE.md — プロジェクトの知識を蓄積する}
-  \begin{block}{階層構造（すべて同時に読み込まれる）}
-    {\small
-    \begin{tabular}{lp{60mm}}
-      \api{\textasciitilde/.claude/CLAUDE.md} & グローバル設定（全プロジェクト共通）\\
-      \api{<repo>/CLAUDE.md}      & プロジェクト設定（Git 管理） \\
-      \api{<subdir>/CLAUDE.md}    & ディレクトリ固有の設定 \\
-      \api{.claude/rules/*.md}    & パス限定ルール（paths フロントマター）\\
-    \end{tabular}
-    }
+\begin{frame}{CLAUDE.md — AI への指示書ファイル}
+  \begin{block}{CLAUDE.md とは}
+    {\small プロジェクトのフォルダに置くテキストファイル（\texttt{CLAUDE.md}）。\\
+    Claude Code は起動するたびにこのファイルを\textbf{最初に読む}。\\
+    ここに書いたルールに AI が従うようになる}
   \end{block}
 
   \vspace{0.2em}
 
   \begin{alertblock}{書くべき内容}
     \begin{itemize}\footnotesize
-      \item ビルド・テストコマンド / コーディング規約 / コミット形式
-      \item \warn{やってはいけないこと}（アンチパターン）← 最も効果が高い
-      \item プロジェクト構造の概要
+      \item ビルド・テストの実行コマンド
+      \item コードの書き方のルール・変更記録の形式
+      \item \warn{やってはいけないこと}（例:「このファイルは変更禁止」）← 最も効果が高い
+      \item プロジェクトの構造の説明
     \end{itemize}
   \end{alertblock}
 
   \vspace{0.2em}
 
   {\footnotesize \textbf{重要:} CLAUDE.md を書く = \textbf{AI に知識を教える}。
-    ドキュメント化のコストが「AI の教育投資」として返ってくる}
+    ドキュメント化の手間が「AI の教育投資」として返ってくる。\\
+    複数の場所に置ける: プロジェクト全体用、フォルダ別、個人用（すべて同時に読み込まれる）}
 \end{frame}
 
 % ------------------------------------------------------------------
 % === P13: Memory — AI が学習する仕組み ===
-\begin{frame}{Memory — AI が学習する仕組み}
+\begin{frame}{Memory（メモリ機能）— 会話を超えて覚えている仕組み}
+  \begin{block}{Memory とは}
+    {\small Claude Code が会話の中で学んだことを\textbf{ファイルに保存}し、
+    次回以降も自動的に読み込む仕組み。PC のメモリ（RAM）ではなく、独自の「記憶ファイル」}
+  \end{block}
+
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \begin{block}{4つのメモリタイプ}
-        {\small
-        \begin{tabular}{lp{28mm}}
-          \hline
-          \textbf{Type} & \textbf{用途} \\
-          \hline
-          user     & ユーザーの専門性・好み \\
-          feedback & 修正指示・NG パターン \\
-          project  & 進行中の作業・期限 \\
-          reference & 外部リソースへのリンク \\
-          \hline
-        \end{tabular}
-        }
-      \end{block}
+      {\footnotesize \textbf{4つの種類:}}
+      {\scriptsize
+      \begin{tabular}{lp{26mm}}
+        \hline
+        \textbf{種類} & \textbf{何を覚えるか} \\
+        \hline
+        user     & あなたの専門性・好み \\
+        feedback & 「こうしないで」\\という修正指示 \\
+        project  & 進行中の作業・期限 \\
+        reference & 参考URLやツール名 \\
+        \hline
+      \end{tabular}
+      }
     \end{column}
     \begin{column}{0.48\textwidth}
-      \begin{exampleblock}{feedback メモリの例}
+      \begin{exampleblock}{feedback の例}
         {\scriptsize
         \texttt{テストは必ず実行してから}\\
-        \texttt{コミットすること。}\\
-        \texttt{→ 全セッションで自動遵守}\\[6pt]
-        \texttt{SQL は ORM 経由で書くこと。}\\
-        \texttt{生 SQL は禁止。}\\
+        \texttt{変更を記録すること。}\\
+        \texttt{→ 以降ずっとこのルールに従う}\\[6pt]
+        \texttt{ファイル名は日本語禁止。}\\
         \texttt{→ 次回から自動的に従う}
         }
       \end{exampleblock}
     \end{column}
   \end{columns}
 
-  \vspace{0.5em}
-
-  {\footnotesize \textbf{最も強力なのは feedback メモリ。}
-    一度「こうしないで」と伝えれば、\textbf{全ての将来のセッション}で Claude が従う。\\
-    コードや Git 履歴から分かる情報は保存しない（二重管理の回避）}
+  {\footnotesize \textbf{最も強力なのは feedback。}
+    一度「こうしないで」と伝えれば、\textbf{次回以降すべての会話}で Claude が従う}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -571,35 +554,35 @@ Next steps:
 \begin{frame}{Claude Code にとっての「知識」とは}
   \begin{block}{Claude Code は毎回まっさらな状態で起動する}
     {\small
-    前回の会話は覚えていない。ではどうやって「このプロジェクトのルール」を知るのか？\\
+    前回の会話は覚えていない。ではどうやってルールを知るのか？
     → \textbf{ファイルに書かれた情報を毎回読み込む}ことで知識を得る}
   \end{block}
 
-  \vspace{0.3em}
+  \vspace{0.2em}
 
   \begin{table}
-    \centering\small
+    \centering\footnotesize
     \begin{tabular}{lp{75mm}}
       \hline
       \textbf{知識の種類} & \textbf{具体例} \\
       \hline
       プロジェクトのルール &
-        「テストは pytest で実行」「コミットは英語で書く」 \\
+        「テストは pytest で実行」「変更記録は英語で書く」 \\
       過去の失敗から学んだこと &
-        「この関数は変更禁止」「SQL は直接書かない」 \\
+        「この関数は変更禁止」 \\
       ユーザーの好み &
         「説明は日本語で」「コメントは簡潔に」 \\
       カスタムコマンド &
-        \texttt{/commit} で自動コミット等 \\
+        \texttt{/commit} で自動記録 等 \\
       \hline
     \end{tabular}
   \end{table}
 
-  \vspace{0.3em}
+  \vspace{0.2em}
 
   {\footnotesize
-    これらの知識は\textbf{すべてファイルとして保存}されている。\\
-    ファイルの置き場所によって「持ち運べるか」「この PC だけか」が変わる → 次のページ}
+    これらは\textbf{すべてファイルとして保存}されている。
+    置き場所で「持ち運べるか」「この PC だけか」が変わる → 次ページ}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -620,7 +603,7 @@ Next steps:
           \hline
           \texttt{CLAUDE.md}  & プロジェクトの\\ルールブック \\
           \texttt{.claude/skills/} & カスタム\\コマンド \\
-          \texttt{.claude/settings.json} & 権限・Hook\\の設定 \\
+          \texttt{.claude/settings.json} & 権限・自動化\\の設定 \\
           \hline
         \end{tabular}
         }
@@ -647,18 +630,18 @@ Next steps:
     \end{column}
   \end{columns}
 
-  \vspace{0.5em}
+  \vspace{0.3em}
 
-  {\footnotesize \textbf{重要:}
-    Memory に保存した大事なルールは、\texttt{CLAUDE.md} にも書いておく。\\
-    そうすれば「持ち運べる知識」になり、別 PC・別メンバーにも引き継がれる}
+  {\scriptsize \textbf{重要:}
+    記憶機能に保存した大事なルールは、指示書（CLAUDE.md）にも書いておく
+    → 「持ち運べる知識」になり別 PC・別メンバーにも引き継がれる}
 \end{frame}
 
 % ------------------------------------------------------------------
 % === P16: git clone すれば AI の知識も一緒に来る ===
 \begin{frame}{git clone すれば AI の知識も一緒に来る}
   \begin{block}{別の PC やチームメンバーへの共有}
-    {\small CLAUDE.md や Skills は Git 管理。クローンすれば\textbf{AI の知識も自動的に手に入る}}
+    {\small CLAUDE.md やカスタムコマンドは Git 管理。クローンすれば\textbf{AI の知識も自動的に手に入る}}
   \end{block}
 
   \vspace{0.2em}
@@ -685,12 +668,11 @@ Next steps:
 
   \vspace{0.2em}
 
-  \begin{exampleblock}{GitHub = AI の知識のハブ}
+  \begin{exampleblock}{GitHub = AI の知識の共有拠点}
     {\scriptsize
     \begin{itemize}
-      \item 新メンバーが \texttt{git clone} → 同じルールを共有、教育コスト削減
-      \item CLAUDE.md の改善を PR で提案 → チームで AI ルールをレビュー
-      \item コミットの Next steps → 別の人が作業を引き継ぎやすい
+      \item 新メンバーがクローン → 同じルールを即座に共有
+      \item 指示書の改善をレビュー依頼で提案 → チームで AI ルールを議論
     \end{itemize}
     }
   \end{exampleblock}
@@ -709,8 +691,8 @@ Next steps:
     ]
       \node[box] (use)    {Claude Code を\\使って開発};
       \node[box, right=of use] (fail)   {期待と違う\\結果が出る};
-      \node[box, right=of fail] (rule)  {CLAUDE.md に\\ルールを追加};
-      \node[box, below=of rule] (mem)   {Memory に\\feedback 保存};
+      \node[box, right=of fail] (rule)  {指示書に\\ルールを追加};
+      \node[box, below=of rule] (mem)   {記憶機能で\\学んだことを保存};
       \node[box, below=of fail] (improve) {次回から\\自動的に改善};
       \node[box, below=of use] (grow)   {さらに高度な\\タスクを任せる};
 
@@ -747,10 +729,11 @@ Next steps:
 
 % ------------------------------------------------------------------
 % === P17: Hooks とは — イベント駆動の自動化 ===
-\begin{frame}{Hooks とは — イベント駆動の自動化}
-  \begin{block}{概念}
-    {\small Claude がツールを使う前後に、シェルコマンドを\textbf{自動実行}する仕組み。\\
-    「ファイルを保存したら自動で lint を走らせる」のようなことができる}
+\begin{frame}{Hooks（フック）とは — 「○○したら自動で△△する」}
+  \begin{block}{Hooks とは}
+    {\small Claude Code が何か操作をする\textbf{前後に、決めておいた処理を自動実行}する仕組み。\\
+    例: 「ファイルを書き換えたら自動でコード整形を走らせる」\\
+    例: 「危険なコマンドを実行しようとしたらブロックする」}
   \end{block}
 
   \vspace{0.2em}
@@ -759,22 +742,19 @@ Next steps:
     \centering\small
     \begin{tabular}{lp{65mm}}
       \hline
-      \textbf{イベント} & \textbf{用途} \\
+      \textbf{タイミング} & \textbf{何ができるか} \\
       \hline
-      PreToolUse  & ツール実行前。危険な操作をブロック \\
-      PostToolUse & ツール実行後。自動 lint / format \\
-      Notification & 通知発生時。Slack / メール転送 \\
-      Stop        & 応答完了後。自動テスト実行 \\
+      操作の前  & 危険な操作を事前にブロック \\
+      操作の後  & コード整形・書式チェックを自動実行 \\
+      通知時    & 長い処理の完了をデスクトップに通知 \\
+      応答完了後 & 自動でテストを実行 \\
       \hline
     \end{tabular}
   \end{table}
 
-  \vspace{0.2em}
-
-  {\footnotesize
-    設定場所: \api{.claude/settings.json}（Git管理）
-    または \api{settings.local.json}（ローカル専用）\\
-    prompt-based（テキスト判定）/ agent-based（AI判定）も選択可能}
+  {\scriptsize
+    設定場所: プロジェクトの設定ファイル（\texttt{.claude/settings.json}）。
+    一度設定すれば毎回自動で動く}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -815,54 +795,52 @@ Next steps:
     \end{column}
   \end{columns}
 
-  \vspace{0.3em}
+  \vspace{0.2em}
 
-  \begin{exampleblock}{その他の活用例}
-    {\scriptsize
-    \textbf{Notification Hook:} 長時間タスク完了時にデスクトップ通知を送る \\
-    \textbf{Stop Hook:} Claude の応答完了後に自動でテストスイートを実行
-    }
-  \end{exampleblock}
+  {\scriptsize \textbf{他の例:}
+    完了通知（長い処理が終わったらデスクトップ通知）/
+    自動テスト（作業完了後にテスト実行）}
 \end{frame}
 
 % ------------------------------------------------------------------
 % === P19: Skills とは — カスタムコマンド ===
-\begin{frame}[fragile]{Skills とは — カスタムコマンド}
-  \begin{block}{概念}
-    {\small 複雑なワークフローを \api{/commit} のような1コマンドで実行する仕組み。\\
-    \texttt{.claude/skills/} に \texttt{SKILL.md} で定義する}
+\begin{frame}[fragile]{Skills（スキル）とは — 自分だけのコマンドを作る}
+  \begin{block}{Skills とは}
+    {\small 「変更を記録して」のような複雑な手順を、\api{/commit} と打つだけで実行できる仕組み。\\
+    手順書ファイル（\texttt{SKILL.md}）をプロジェクト内に置いて定義する}
   \end{block}
 
   \vspace{0.2em}
 
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \begin{block}{SKILL.md の構造}
+      \begin{block}{手順書ファイルの中身}
         \begin{lstlisting}[language={}, numbers=none]
 ---
 name: commit
-description: ガイドライン準拠
-  のGitコミットを作成
+description: ルールに従って
+  変更を記録する
 allowed-tools:
   - Bash
   - Read
 ---
-1. git diff で変更を確認
-2. 規約に従いメッセージ作成
-3. git commit を実行
+1. 変更内容を確認
+2. ルールに従い記録メッセージ作成
+3. 変更を記録
 引数: $ARGUMENTS
         \end{lstlisting}
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \begin{exampleblock}{組み込み Skills}
+      \begin{exampleblock}{最初から使えるスキル}
         {\footnotesize
-        \api{/commit} — ガイドライン準拠の\\
-        \hspace{2em}Git コミットを自動作成 \\[3pt]
-        \api{/simplify} — コード品質チェック \\[3pt]
-        \api{/batch} — 並列ワークツリーで\\
-        \hspace{2em}大規模変更を一括処理 \\[3pt]
-        {\scriptsize \textbf{Tips:} 繰り返す作業を Skill に}
+        \api{/commit} — ルールに従って\\
+        \hspace{2em}変更を自動で記録 \\[3pt]
+        \api{/simplify} — コードの品質を\\
+        \hspace{2em}チェックして改善 \\[3pt]
+        \api{/batch} — 大量の変更を\\
+        \hspace{2em}一括処理 \\[3pt]
+        {\scriptsize \textbf{Tips:} 繰り返す作業はスキルに}
         }
       \end{exampleblock}
     \end{column}
@@ -871,66 +849,61 @@ allowed-tools:
 
 % ------------------------------------------------------------------
 % === P20: Subagent — 並列処理とコンテキスト保護 ===
-\begin{frame}{Subagent — 並列処理とコンテキスト保護}
+\begin{frame}{Subagent（サブエージェント）— AI の分身を使う}
+  \begin{block}{Subagent とは}
+    {\small Claude Code が\textbf{別の AI を一時的に起動して作業を任せる}仕組み。
+    人間でいう「部下に調査を頼む」ようなもの。本体は別の作業を続けられる}
+  \end{block}
+
   \begin{table}
     \centering\footnotesize
-    \begin{tabular}{llp{50mm}}
+    \begin{tabular}{lp{60mm}}
       \hline
-      \textbf{タイプ} & \textbf{用途} & \textbf{説明} \\
+      \textbf{種類} & \textbf{何をさせるか} \\
       \hline
-      general-purpose & 汎用タスク     & 全ツール利用可。複雑な作業を委任 \\
-      Explore         & コード検索     & 読み取り専用。高速なコードベース探索 \\
-      Plan            & 設計           & 読み取り専用。アーキテクチャ設計 \\
+      汎用タイプ    & 複雑な作業を丸ごと委任 \\
+      調査タイプ    & コードを読んで構造を調べる（編集はしない） \\
+      設計タイプ    & 変更計画を考える（編集はしない） \\
       \hline
     \end{tabular}
   \end{table}
 
-  \vspace{0.2em}
-
   \begin{exampleblock}{活用例}
     \begin{itemize}\footnotesize
-      \item \textbf{テスト並列実行} — 複数のテストスイートを同時に走らせる
-      \item \textbf{コードベース調査} — 大規模リポジトリの構造を探索させる
-      \item \textbf{バックグラウンドビルド} — ビルドを裏で実行し完了通知を受け取る
+      \item \textbf{複数のテストを同時実行} — 待ち時間を短縮
+      \item \textbf{大きなプロジェクトの調査} — 結果だけを受け取る
+      \item \textbf{裏でビルド} — 完了したら通知が届く
     \end{itemize}
   \end{exampleblock}
-
-  \vspace{0.2em}
-
-  \begin{alertblock}{}
-    {\footnotesize \textbf{コンテキスト保護:}
-      大量の検索結果やログをメインに持ち込まず、サブエージェントに要約させる}
-  \end{alertblock}
 \end{frame}
 
 % ------------------------------------------------------------------
-% === P21: コンテキスト管理 ===
-\begin{frame}{コンテキスト管理}
-  \begin{alertblock}{コンテキストウィンドウは最重要リソース}
-    {\small Claude が一度に扱える情報量には上限。無駄に消費すると性能が劣化し指示を忘れる}
+% === P22: コンテキスト管理 ===
+\begin{frame}{会話の長さを管理する}
+  \begin{alertblock}{AI が一度に覚えていられる量には上限がある}
+    {\small 会話が長くなると、AI は古い指示を忘れたり、精度が落ちたりする。\\
+    これを「コンテキスト（文脈）の限界」と呼ぶ。上手に管理することが大事}
   \end{alertblock}
 
   \vspace{0.2em}
 
   \begin{table}
     \centering\small
-    \begin{tabular}{ll}
+    \begin{tabular}{lp{70mm}}
       \hline
-      \textbf{手法} & \textbf{説明} \\
+      \textbf{対策} & \textbf{説明} \\
       \hline
-      \api{/compact}       & 会話履歴を要約して圧縮（\textasciitilde95\% で自動発動）\\
-      Subagent 委任         & 大量の検索結果をメインに持ち込まない \\
-      Memory 永続化         & 繰り返し伝える情報はメモリに保存 \\
-      CLAUDE.md 簡潔化      & 毎回読み込まれるので 200 行以内に \\
+      \api{/compact}（圧縮）    & 会話履歴を AI に要約させて短くする \\
+      サブエージェントに委任     & 大量の調査結果を本体に持ち込まない \\
+      Memory に保存              & 毎回伝え直す情報は記憶ファイルに保存 \\
+      CLAUDE.md を簡潔に         & 毎回読むファイルなので短く保つ \\
       \hline
     \end{tabular}
   \end{table}
 
-  \vspace{0.3em}
-
   {\footnotesize \textbf{Tips:}
-    セッションが長くなったら \api{/compact} で圧縮。
-    重要な情報は Memory に保存しておけば圧縮後も失われない}
+    会話が長くなったら \api{/compact} で圧縮。
+    大事な情報は記憶機能に保存しておけば、圧縮しても失われない}
 \end{frame}
 
 % =====================================================================
@@ -946,17 +919,17 @@ allowed-tools:
       \hline
       \textbf{失敗パターン} & \textbf{何が起きるか} \\
       \hline
-      Plan なしでいきなり実装させる &
+      計画なしでいきなり実装させる &
         意図と違う設計で大量変更 → やり直し \\
-      Git を使わない &
+      変更履歴を管理しない &
         AI の変更を追えない → 戻せない \\
-      CLAUDE.md を書かない &
+      指示書ファイルを書かない &
         毎回同じ指示を繰り返す → 非効率 \\
-      main に直接 push &
+      本流に直接変更を送る &
         レビューなしで本番反映 → 障害リスク \\
-      Hooks を使わず手作業を繰り返す &
-        lint 忘れ・フォーマット崩れが頻発 \\
-      Memory を活用しない &
+      自動化を使わず手作業を繰り返す &
+        書式チェック忘れ・整形崩れが頻発 \\
+      記憶機能を活用しない &
         同じミスを何度も指摘する必要がある \\
       \hline
     \end{tabular}
@@ -964,23 +937,23 @@ allowed-tools:
 
   {\scriptsize \textbf{共通の原因:}
     AI を「魔法の箱」として扱ってしまう →
-    \textbf{対策:} ガードレール（Plan, Git, CLAUDE.md）を先に整える}
+    \textbf{対策:} 安全装置（計画・変更管理・指示書）を先に整える}
 \end{frame}
 
 % ------------------------------------------------------------------
 % === P23: Top 10 Tips ===
 \begin{frame}{Top 10 Tips}
   \begin{enumerate}\small
-    \item \textbf{Plan Mode で考えてから書く} — 5分の計画で1時間の手戻りを防ぐ
-    \item \textbf{Git は必須} — こまめにコミット、Next steps を含める
-    \item \textbf{feature branch → PR → merge} — main を直接触らない
-    \item \textbf{CLAUDE.md は AI への教育投資} — 書くほど賢くなる
-    \item \textbf{ガードレール $>$ 指示} — 「やるな」の方が「やれ」より効果的
-    \item \textbf{feedback メモリで学習} — 同じミスを二度と繰り返さない
+    \item \textbf{計画してから書かせる} — 5分の計画で1時間の手戻りを防ぐ
+    \item \textbf{変更は必ず Git で記録} — こまめに記録、Next steps を含める
+    \item \textbf{作業枝 → レビュー → 本流} — 本流を直接触らない
+    \item \textbf{指示書（CLAUDE.md）は AI への教育投資} — 書くほど賢くなる
+    \item \textbf{「やるな」は「やれ」より効果的} — 禁止事項を明記する
+    \item \textbf{記憶機能で同じミスを防ぐ} — 一度伝えれば以降ずっと従う
     \item \textbf{Claude Code を育てる} — 失敗するたびにルールを追加
-    \item \textbf{Hooks で自動化} — 手作業の繰り返しを排除
-    \item \textbf{Skills でワークフロー化} — 複雑な手順を1コマンドに
-    \item \textbf{GitHub = AI の知識のハブ} — clone すれば知識も一緒に来る
+    \item \textbf{フック（Hooks）で自動化} — 手作業の繰り返しを排除
+    \item \textbf{スキル（Skills）で1コマンドに} — 複雑な手順をまとめる
+    \item \textbf{GitHub = AI の知識の共有拠点} — クローンすれば知識も一緒に来る
   \end{enumerate}
 \end{frame}
 
