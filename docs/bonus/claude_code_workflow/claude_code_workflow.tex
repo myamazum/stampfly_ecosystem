@@ -1,6 +1,6 @@
 % ==================================================================
-% Claude Code Workflow — AI-Driven Development in Practice
-% Claude Code ワークフロー — AI駆動開発の実践
+% Claude Code ワークフロー — コーディングエージェント入門
+% Claude Code Workflow — Introduction to Coding Agents
 %
 % This is a standalone slide deck, independent of the workshop slides.
 % Delete this entire directory (docs/bonus/) to remove it.
@@ -18,6 +18,7 @@
 \definecolor{sfgray}{RGB}{80, 80, 80}
 \definecolor{sfred}{RGB}{220, 50, 30}
 \definecolor{sfgreen}{RGB}{40, 160, 40}
+\definecolor{sforange}{RGB}{230, 140, 20}
 
 \setbeamercolor{palette primary}{bg=sfblue, fg=white}
 \setbeamercolor{palette secondary}{bg=sfdark, fg=white}
@@ -77,7 +78,7 @@
 \usepackage{url}
 \usepackage{amsmath}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc, fit}
 
 % --- Code listing style ---
 \lstdefinestyle{cccode}{
@@ -101,41 +102,54 @@
 
 % === Document ===
 \title{Claude Code ワークフロー}
-\subtitle{AI駆動開発の実践}
+\subtitle{コーディングエージェント入門}
 \author{伊藤 恒平}
 \date{2026}
 
 \begin{document}
 
-% === Title ===
+% =====================================================================
+% Part 1: 導入（3枚）
+% =====================================================================
+
+% === P1: タイトル ===
 \begin{frame}
   \titlepage
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{このスライドについて / Purpose}
-  \begin{block}{概要}
-    StampFly Ecosystem のスライド・ファームウェア・ツールは
-    すべて \textbf{Claude Code}（Anthropic の CLI エージェント）と人間の協働で開発された
+% === P2: コーディングエージェントとは ===
+\begin{frame}{コーディングエージェントとは}
+  \begin{block}{定義}
+    AI がターミナル上でコードを読み書きし、ビルド・テスト・Git 操作まで
+    \textbf{自律的に実行}するツール
   \end{block}
 
   \vspace{0.3em}
 
-  \begin{itemize}
-    \item 817 コミット / 70 日間 — アクティブ日平均 20 コミット
-    \item fix 329 件、feat 225 件、docs 140 件
-    \item CLAUDE.md の継続的改善で品質を担保
-  \end{itemize}
+  \begin{table}
+    \centering\small
+    \begin{tabular}{lll}
+      \hline
+      & \textbf{チャット AI} & \textbf{コーディングエージェント} \\
+      \hline
+      動作     & 対話（コピペが必要）  & ファイルを直接編集 \\
+      範囲     & 1ファイルの断片      & プロジェクト全体 \\
+      実行     & ユーザーが手動実行    & ビルド・テストも自律実行 \\
+      Git      & 関与しない           & コミット・PR 作成まで \\
+      \hline
+    \end{tabular}
+  \end{table}
 
   \vspace{0.3em}
 
-  \begin{exampleblock}{ゴール}
-    {\small 実プロジェクトで得た Claude Code のワークフローと Tips を共有する}
-  \end{exampleblock}
+  {\footnotesize \textbf{なぜ CLI なのか:}
+    IDE プラグインと違い、SSH 先・Docker 内・CI 上など\textbf{どこでも動く}}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{Claude Code とは / What is Claude Code?}
+% === P3: Claude Code とは ===
+\begin{frame}{Claude Code とは}
   \begin{block}{概要}
     Anthropic 公式の CLI エージェント。ターミナルから Claude を呼び出し、
     コード読み書き・ビルド・テスト・Git 操作を自律的に実行する
@@ -153,18 +167,337 @@
       Memory          & セッション間で記憶を永続化（4タイプ） \\
       Plan Mode       & Shift+Tab で読み取り専用の設計モード \\
       Subagent        & 並列タスク・重い処理を子プロセスに委任 \\
-      Hooks           & ツール実行前後にシェルコマンドを自動実行 \\
-      Custom Skills   & \api{/commit} 等のカスタムワークフロー \\
-      MCP Server      & 外部サービス連携（DB、draw.io 等） \\
+      Hooks \& Skills & 自動化とカスタムワークフロー \\
+      Git 統合        & コミット・PR 作成・ブランチ操作 \\
       \hline
     \end{tabular}
   \end{table}
 
-  {\footnotesize 公式: \url{https://docs.anthropic.com/en/docs/claude-code}}
+  {\scriptsize
+    インストール: \texttt{npm install -g @anthropic-ai/claude-code} \quad
+    起動: \texttt{cd your-project \&\& claude}
+  }
+\end{frame}
+
+% =====================================================================
+% Part 2: 核心ワークフロー — Plan → Approve → Implement（4枚）
+% =====================================================================
+
+% ------------------------------------------------------------------
+% === P4: なぜ「計画」が必要か ===
+\begin{frame}{なぜ「計画」が必要か}
+  \begin{alertblock}{AI に自由にコードを書かせると何が起きるか}
+    \begin{itemize}\small
+      \item 意図と違う設計で大量のファイルを変更 → \warn{手戻りコスト大}
+      \item テストなしで実装を進める → バグの発見が遅れる
+      \item 既存コードの意図を誤解 → 動いていた機能が壊れる
+    \end{itemize}
+  \end{alertblock}
+
+  \vspace{0.5em}
+
+  \begin{exampleblock}{解決策: 「承認」ステップを挟む}
+    {\small
+    \textbf{1.} AI に計画を出させる（コードは書かせない）\\
+    \textbf{2.} 人間が計画をレビューして承認/修正 \\
+    \textbf{3.} 承認後に初めて実装を開始
+    }
+  \end{exampleblock}
+
+  \vspace{0.3em}
+
+  {\footnotesize \textbf{原則:} 「考える」と「書く」を分離する。これが手戻りを防ぐ最大のコツ}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{CLAUDE.md — プロジェクトの指示書}
+% === P5: Plan Mode — 設計してから書く ===
+\begin{frame}{Plan Mode — 設計してから書く}
+  \begin{block}{Plan Mode とは}
+    \textbf{Shift+Tab} でトグル。コード編集を\textbf{できない}読み取り専用モード。\\
+    調査・設計に集中させ、方針が固まってから実装に移る
+  \end{block}
+
+  \vspace{0.2em}
+
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      \begin{alertblock}{有効な場面}
+        \begin{itemize}\small
+          \item 複数ファイルにまたがる変更
+          \item アーキテクチャの判断が必要
+          \item 失敗コストが高い作業
+          \item 初めて触るコードベース
+        \end{itemize}
+      \end{alertblock}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{exampleblock}{Plan Mode でできること}
+        {\small
+        ファイル読み取り・検索 \\
+        コードベースの構造分析 \\
+        変更計画の策定・提案 \\
+        影響範囲の調査 \\[4pt]
+        \warn{$\times$} ファイル編集・作成 \\
+        \warn{$\times$} コマンド実行
+        }
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+
+  {\footnotesize \textbf{Tips:} 大きな変更ほど Plan Mode が効く。5分の計画で1時間の手戻りを防げる}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P6: Plan → Approve → Implement サイクル ===
+\begin{frame}{Plan → Approve → Implement サイクル}
+  \begin{center}
+    \begin{tikzpicture}[
+      node distance=6mm and 12mm,
+      box/.style={rectangle, rounded corners=3pt, draw=sfblue,
+                  fill=sflight, minimum height=8mm, minimum width=26mm,
+                  font=\small, align=center},
+      approve/.style={box, draw=sfred, fill=sfred!10,
+                  line width=1.2pt},
+      arr/.style={-{Stealth[length=2.5mm]}, sfblue, thick},
+    ]
+      \node[box] (plan)     {Plan Mode\\で設計};
+      \node[approve, right=14mm of plan] (approve) {ユーザーが\\承認/修正};
+      \node[box, right=14mm of approve] (impl)    {実装\\（小さな単位）};
+      \node[box, below=of impl]  (test)    {ビルド/テスト\\で検証};
+      \node[box, below=of approve] (commit) {\texttt{/commit}\\で記録};
+      \node[box, below=of plan]   (next)   {次のタスク\\or 完了};
+
+      \draw[arr] (plan)    -- (approve);
+      \draw[arr] (approve) -- (impl);
+      \draw[arr] (impl)    -- (test);
+      \draw[arr] (test)    -- (commit);
+      \draw[arr] (commit)  -- (next);
+
+      % Reject loop
+      \draw[arr, sfred] (approve.north) -- ++(0,6mm)
+        -| (plan.north)
+        node[above, font=\scriptsize, sfred, pos=0.3] {修正依頼};
+
+      % Fix loop
+      \draw[arr, sforange] (test.east) -- ++(8mm,0) |- (impl.east)
+        node[right, font=\scriptsize, sforange, pos=0.25] {失敗};
+    \end{tikzpicture}
+  \end{center}
+
+  \vspace{0.2em}
+
+  {\footnotesize
+    \textcolor{sfred}{\textbf{赤枠}} = 人間の承認ポイント。
+    ここで方向修正できるから安全に AI を使える}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P7: Plan Mode の実践例 ===
+\begin{frame}[fragile]{Plan Mode の実践例}
+  \begin{block}{例: 「ユーザー認証の API エンドポイントを追加して」}
+    {\footnotesize Plan Mode で Claude が出す計画の例:}
+  \end{block}
+
+  \begin{lstlisting}[language={}, numbers=none]
+## Plan: ユーザー認証 API の追加
+
+### 変更対象ファイル
+1. src/routes/auth.ts    (新規) - ログイン/登録エンドポイント
+2. src/middleware/auth.ts (新規) - JWT 検証ミドルウェア
+3. src/models/user.ts    (既存) - パスワードハッシュ追加
+4. tests/auth.test.ts    (新規) - 認証フローのテスト
+
+### 設計判断
+- セッション管理: JWT (既存の jsonwebtoken に統一)
+- パスワード: bcrypt でハッシュ化
+- バリデーション: 既存の zod スキーマに統合
+
+### 影響範囲
+- 既存の /api/users には影響なし
+- package.json に bcrypt を追加
+  \end{lstlisting}
+
+  {\footnotesize ユーザーが「JWT ではなくセッション Cookie にして」→ 計画を修正 → 承認 → 実装開始}
+\end{frame}
+
+% =====================================================================
+% Part 3: Git/GitHub 連携（4枚）
+% =====================================================================
+
+% ------------------------------------------------------------------
+% === P8: なぜ Git が重要か ===
+\begin{frame}{なぜ Git が重要か}
+  \begin{alertblock}{AI がファイルを自律的に変更する世界では}
+    {\small
+    変更履歴がなければ「何が変わったか」「なぜ変わったか」が追えない。\\
+    \warn{Git なしで AI にコードを書かせるのは、セーブなしでゲームをするようなもの}
+    }
+  \end{alertblock}
+
+  \vspace{0.3em}
+
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Git が提供する安全網}
+        \begin{itemize}\small
+          \item 変更の差分を確認できる
+          \item いつでも前の状態に戻せる
+          \item 誰が（AI/人間）何を変えたか記録
+          \item ブランチで安全に実験できる
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{Claude Code の Git 統合}
+        \begin{itemize}\small
+          \item 変更後に自動コミット提案
+          \item Conventional Commits 準拠
+          \item PR 作成・差分要約
+          \item コミット履歴から文脈を読む
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+
+  {\footnotesize \textbf{原則:} AI と協働するなら Git は必須。「こまめにコミット」が最大の保険}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P9: コミット戦略 ===
+\begin{frame}[fragile]{コミット戦略}
+  \begin{block}{Conventional Commits + Next steps}
+    \begin{lstlisting}[language={}, numbers=none]
+feat(auth): add JWT-based login endpoint
+
+Changes:
+- POST /api/auth/login を実装
+- bcrypt でパスワード検証
+- JWT トークン発行(有効期限 24h)
+
+Next steps:
+- tests/auth.test.ts でログインフローをテスト
+- リフレッシュトークンの実装を検討
+    \end{lstlisting}
+  \end{block}
+
+  \vspace{0.2em}
+
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      {\small \textbf{コミットのタイミング:}}
+      \begin{itemize}\scriptsize
+        \item 1機能 = 1コミット（小さな単位）
+        \item テスト/ビルド成功後
+        \item 作業の区切り・中断時
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      {\small \textbf{Next steps の効果:}}
+      \begin{itemize}\scriptsize
+        \item 次のセッション開始時の起点になる
+        \item 具体的なコマンド・検証項目を含む
+        \item AI が「前回の続き」を即座に把握
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P10: GitHub 連携 — PR とレビュー ===
+\begin{frame}{GitHub 連携 — PR とレビュー}
+  \begin{block}{Claude Code で PR を作成する}
+    {\small
+    \texttt{「この変更で PR を作成して」} と指示するだけで:}
+    \begin{enumerate}\small
+      \item 変更差分を分析して PR タイトル・本文を自動生成
+      \item \texttt{gh pr create} で GitHub に PR を作成
+      \item レビューコメントへの対応も指示可能
+    \end{enumerate}
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{center}
+    \begin{tikzpicture}[
+      node distance=5mm and 10mm,
+      box/.style={rectangle, rounded corners=3pt, draw=sfblue,
+                  fill=sflight, minimum height=7mm, minimum width=22mm,
+                  font=\scriptsize, align=center},
+      arr/.style={-{Stealth[length=2mm]}, sfblue, thick},
+    ]
+      \node[box] (branch) {feature branch\\を作成};
+      \node[box, right=of branch] (impl) {実装 +\\コミット};
+      \node[box, right=of impl] (pr) {PR 作成\\(gh pr create)};
+      \node[box, right=of pr] (review) {チームが\\レビュー};
+      \node[box, right=of review] (merge) {承認 →\\マージ};
+
+      \draw[arr] (branch) -- (impl);
+      \draw[arr] (impl) -- (pr);
+      \draw[arr] (pr) -- (review);
+      \draw[arr] (review) -- (merge);
+    \end{tikzpicture}
+  \end{center}
+
+  \vspace{0.2em}
+
+  {\footnotesize \textbf{Tips:} Claude Code は PR のレビューコメントを読んで修正コミットも作れる}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P11: ブランチ戦略と安全運用 ===
+\begin{frame}{ブランチ戦略と安全運用}
+  \begin{alertblock}{main ブランチを直接変更しない}
+    {\small AI が \texttt{git push origin main} を実行すると、レビューなしで本番に反映される。
+    必ず feature branch → PR → merge のフローを守る}
+  \end{alertblock}
+
+  \vspace{0.3em}
+
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{推奨フロー}
+        {\scriptsize
+        \textbf{1.} \texttt{git checkout -b feat/auth} \\
+        \textbf{2.} 実装・テスト・コミット \\
+        \textbf{3.} \texttt{gh pr create} で PR 作成 \\
+        \textbf{4.} レビュー・承認後にマージ \\
+        \textbf{5.} ブランチを削除
+        }
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{権限制限で安全に}
+        {\scriptsize
+        \texttt{settings.json} で制御:
+        \begin{itemize}
+          \item \texttt{permissions.deny} で\\
+                \texttt{git push origin main} をブロック
+          \item \texttt{--allowedTools} で\\
+                使えるツールを制限
+          \item GitHub の branch protection\\
+                ルールと組み合わせる
+        \end{itemize}
+        }
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+
+  {\footnotesize \textbf{原則:} AI に「何をさせるか」だけでなく「何をさせないか」も設定する}
+\end{frame}
+
+% =====================================================================
+% Part 4: 知識の資産化 — Claude Code を育てる（5枚）
+% =====================================================================
+
+% ------------------------------------------------------------------
+% === P12: CLAUDE.md — プロジェクトの知識を蓄積する ===
+\begin{frame}{CLAUDE.md — プロジェクトの知識を蓄積する}
   \begin{block}{階層構造（すべて同時に読み込まれる）}
     {\small
     \begin{tabular}{lp{60mm}}
@@ -181,37 +514,20 @@
   \begin{alertblock}{書くべき内容}
     \begin{itemize}\footnotesize
       \item ビルド・テストコマンド / コーディング規約 / コミット形式
-      \item \warn{やってはいけないこと}（アンチパターン）← 最重要
+      \item \warn{やってはいけないこと}（アンチパターン）← 最も効果が高い
       \item プロジェクト構造の概要
     \end{itemize}
   \end{alertblock}
 
-  {\footnotesize \textbf{Tips:} 「ガードレール」型（禁止事項の明示）は指示型より効果的。200行以内を目標に}
+  \vspace{0.2em}
+
+  {\footnotesize \textbf{重要:} CLAUDE.md を書く = \textbf{AI に知識を教える}。
+    ドキュメント化のコストが「AI の教育投資」として返ってくる}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{CLAUDE.md の実例 / Real Example}
-  \begin{lstlisting}[language={}, numbers=none]
-## Build Environment
-sf build vehicle     # ビルド
-sf flash vehicle -m  # 書き込み+モニタ
-
-## Slide Rules
-**CRITICAL: .tex 変更後は必ず PDF リビルド+レビュー**
-
-## Slide Review Checklist
-| ID | チェック内容                    |
-|----|--------------------------------|
-| L1 | フッターにはみ出していないか   |
-| T4 | 矢印は水平・垂直のみ          |
-| T8 | resizebox{w}{h} 両方指定は禁止 |
-  \end{lstlisting}
-
-  {\footnotesize チェックリストは実際の失敗事例から段階的に構築された（後述）}
-\end{frame}
-
-% ------------------------------------------------------------------
-\begin{frame}{Memory — セッション間の記憶}
+% === P13: Memory — AI が学習する仕組み ===
+\begin{frame}{Memory — AI が学習する仕組み}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \begin{block}{4つのメモリタイプ}
@@ -230,64 +546,281 @@ sf flash vehicle -m  # 書き込み+モニタ
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \begin{exampleblock}{feedback メモリの実例}
+      \begin{exampleblock}{feedback メモリの例}
         {\scriptsize
-        \texttt{速度優先は手戻りを招き工数増大。}\\
-        \texttt{チェックリストは1回もスキップしない。}\\
-        \texttt{サブエージェントの判定を鵜呑みにしない。}
+        \texttt{テストは必ず実行してから}\\
+        \texttt{コミットすること。}\\
+        \texttt{→ 全セッションで自動遵守}\\[6pt]
+        \texttt{SQL は ORM 経由で書くこと。}\\
+        \texttt{生 SQL は禁止。}\\
+        \texttt{→ 次回から自動的に従う}
         }
       \end{exampleblock}
-      \vspace{0.3em}
-      {\footnotesize 一度保存すれば、\textbf{全ての将来のセッション}で Claude がこのルールに従う}
     \end{column}
   \end{columns}
 
   \vspace{0.5em}
 
-  {\footnotesize \textbf{Tips:} コードや Git 履歴から分かる情報は保存しない（二重管理の回避）}
+  {\footnotesize \textbf{最も強力なのは feedback メモリ。}
+    一度「こうしないで」と伝えれば、\textbf{全ての将来のセッション}で Claude が従う。\\
+    コードや Git 履歴から分かる情報は保存しない（二重管理の回避）}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{Plan Mode — 実装前に設計する}
-  \begin{block}{Plan Mode とは}
-    Shift+Tab でトグル。コード編集を\textbf{できない}モード。\\
-    調査・設計に集中させ、方針が固まってから実装に移る
+% === P14: 知識はどこに蓄積されるか ===
+\begin{frame}{知識はどこに蓄積されるか}
+  \begin{center}
+    \begin{tikzpicture}[
+      node distance=4mm,
+      layer/.style={rectangle, rounded corners=3pt, draw=#1,
+                    minimum width=105mm, minimum height=9mm,
+                    font=\small, align=center, fill=#1!8},
+      item/.style={font=\scriptsize},
+    ]
+      % Layer 1: Git-managed (portable)
+      \node[layer=sfgreen] (git) {%
+        \textcolor{sfgreen}{\textbf{Git 管理（ポータブル）}}
+        — \texttt{git clone} で復元される};
+      \node[item, below=1mm of git] (git-items) {%
+        \texttt{CLAUDE.md} \quad
+        \texttt{.claude/settings.json} \quad
+        \texttt{.claude/skills/} \quad
+        \texttt{.claude/rules/}};
+
+      % Layer 2: Local only
+      \node[layer=sforange, below=6mm of git-items] (local) {%
+        \textcolor{sforange}{\textbf{ローカル専用}}
+        — この PC にだけ存在する};
+      \node[item, below=1mm of local] (local-items) {%
+        \texttt{Memory} \quad
+        \texttt{settings.local.json} \quad
+        \texttt{\textasciitilde/.claude/CLAUDE.md}};
+
+      % Layer 3: GitHub (team shared)
+      \node[layer=sfblue, below=6mm of local-items] (github) {%
+        \textcolor{sfblue}{\textbf{GitHub（チーム共有）}}
+        — リモートリポジトリに保存};
+      \node[item, below=1mm of github] (gh-items) {%
+        PR 履歴 \quad Issue \quad コミットログ \quad
+        CLAUDE.md（= チームの AI ルール）};
+    \end{tikzpicture}
+  \end{center}
+
+  \vspace{0.3em}
+
+  {\footnotesize \textbf{ポイント:}
+    \textcolor{sfgreen}{緑}の層は Git で管理 → 別 PC でも復元可能。
+    \textcolor{sforange}{橙}の層はローカル → 重要な feedback は CLAUDE.md にも書くべき}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P15: 別の PC で再現するには ===
+\begin{frame}{別の PC で再現するには}
+  \begin{block}{知識の復元手順}
+    {\small
+    \begin{tabular}{rp{90mm}}
+      \textbf{Step 1} & \texttt{git clone <repo>} — CLAUDE.md, Skills, Settings が復元される \\
+      \textbf{Step 2} & \texttt{claude} を起動 — CLAUDE.md が自動で読み込まれる \\
+      \textbf{Step 3} & Memory は新規だが、CLAUDE.md にルールがあれば即座に従う \\
+    \end{tabular}
+    }
   \end{block}
 
-  \vspace{0.2em}
+  \vspace{0.3em}
+
+  \begin{exampleblock}{GitHub = AI の知識のハブ}
+    {\footnotesize
+    \begin{itemize}
+      \item チームメンバーが \texttt{git clone} → 同じ CLAUDE.md を共有
+      \item 新メンバーの AI も初日からプロジェクトのルールを理解
+      \item CLAUDE.md の改善も PR でレビュー可能
+    \end{itemize}
+    }
+  \end{exampleblock}
+
+  {\scriptsize \textbf{Tips:}
+    Memory の重要な feedback は CLAUDE.md にも転記 → 別 PC・別メンバーにも引き継がれる}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P16: Claude Code を育てる ===
+\begin{frame}{Claude Code を育てる}
+  \begin{center}
+    \begin{tikzpicture}[
+      node distance=7mm,
+      box/.style={rectangle, rounded corners=3pt, draw=sfblue,
+                  fill=sflight, minimum height=8mm, minimum width=30mm,
+                  font=\small, align=center},
+      arr/.style={-{Stealth[length=2.5mm]}, sfblue, thick},
+    ]
+      \node[box] (use)    {Claude Code を\\使って開発};
+      \node[box, right=of use] (fail)   {期待と違う\\結果が出る};
+      \node[box, right=of fail] (rule)  {CLAUDE.md に\\ルールを追加};
+      \node[box, below=of rule] (mem)   {Memory に\\feedback 保存};
+      \node[box, below=of fail] (improve) {次回から\\自動的に改善};
+      \node[box, below=of use] (grow)   {さらに高度な\\タスクを任せる};
+
+      \draw[arr] (use)     -- (fail);
+      \draw[arr] (fail)    -- (rule);
+      \draw[arr] (rule)    -- (mem);
+      \draw[arr] (mem)     -- (improve);
+      \draw[arr] (improve) -- (grow);
+      \draw[arr, sfgreen] (grow.west) -- ++(-8mm,0) |- (use.west)
+        node[left, font=\scriptsize, sfgreen, pos=0.25] {成長サイクル};
+    \end{tikzpicture}
+  \end{center}
+
+  \vspace{0.3em}
 
   \begin{columns}[T]
-    \begin{column}{0.45\textwidth}
-      \begin{alertblock}{有効な場面}
-        \begin{itemize}\small
-          \item 複数ファイルにまたがる変更
-          \item アーキテクチャの判断が必要
-          \item 失敗コストが高い作業
-        \end{itemize}
-      \end{alertblock}
+    \begin{column}{0.48\textwidth}
+      {\footnotesize \textbf{1ヶ月目:} ビルドコマンドと\\基本規約だけの CLAUDE.md}
     \end{column}
-    \begin{column}{0.5\textwidth}
-      \begin{exampleblock}{典型的なフロー}
-        {\small
-        \textbf{1.} Plan Mode で調査・設計 \\
-        \textbf{2.} ユーザーが計画を承認 \\
-        \textbf{3.} 実装 → テスト → コミット \\
-        \textbf{4.} 問題発見 → 計画を更新
-        }
-      \end{exampleblock}
+    \begin{column}{0.48\textwidth}
+      {\footnotesize \textbf{3ヶ月目:} 失敗事例から構築された\\チェックリスト・禁止事項の集大成}
     \end{column}
   \end{columns}
 
   \vspace{0.3em}
 
-  {\footnotesize \textbf{Tips:} 「思考」と「実行」を分離することで手戻りを大幅に削減できる}
+  {\footnotesize \textbf{投資対効果:}
+    ドキュメント化の時間は「AI への教育投資」。使い込むほど Claude は賢くなる}
+\end{frame}
+
+% =====================================================================
+% Part 5: 拡張機能 — 自分だけの Claude を作る（5枚）
+% =====================================================================
+
+% ------------------------------------------------------------------
+% === P17: Hooks とは — イベント駆動の自動化 ===
+\begin{frame}{Hooks とは — イベント駆動の自動化}
+  \begin{block}{概念}
+    {\small Claude がツールを使う前後に、シェルコマンドを\textbf{自動実行}する仕組み。\\
+    「ファイルを保存したら自動で lint を走らせる」のようなことができる}
+  \end{block}
+
+  \vspace{0.2em}
+
+  \begin{table}
+    \centering\small
+    \begin{tabular}{lp{65mm}}
+      \hline
+      \textbf{イベント} & \textbf{用途} \\
+      \hline
+      PreToolUse  & ツール実行前。危険な操作をブロック \\
+      PostToolUse & ツール実行後。自動 lint / format \\
+      Notification & 通知発生時。Slack / メール転送 \\
+      Stop        & 応答完了後。自動テスト実行 \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  \vspace{0.2em}
+
+  {\footnotesize
+    設定場所: \api{.claude/settings.json}（Git管理）
+    または \api{settings.local.json}（ローカル専用）\\
+    prompt-based（テキスト判定）/ agent-based（AI判定）も選択可能}
 \end{frame}
 
 % ------------------------------------------------------------------
+% === P18: Hooks の作り方と活用例 ===
+\begin{frame}[fragile]{Hooks の作り方と活用例}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{例1: 自動フォーマット}
+        \begin{lstlisting}[language={}, numbers=none]
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Write|Edit",
+      "command": "npx prettier
+        --write $TOOL_INPUT_PATH"
+    }]
+  }
+}
+        \end{lstlisting}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{例2: 危険コマンドブロック}
+        \begin{lstlisting}[language={}, numbers=none]
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "command": "if echo
+        $TOOL_INPUT | grep -q
+        'rm -rf'; then
+        exit 2; fi"
+    }]
+  }
+}
+        \end{lstlisting}
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+
+  \begin{exampleblock}{その他の活用例}
+    {\scriptsize
+    \textbf{Notification Hook:} 長時間タスク完了時にデスクトップ通知を送る \\
+    \textbf{Stop Hook:} Claude の応答完了後に自動でテストスイートを実行
+    }
+  \end{exampleblock}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P19: Skills とは — カスタムコマンド ===
+\begin{frame}[fragile]{Skills とは — カスタムコマンド}
+  \begin{block}{概念}
+    {\small 複雑なワークフローを \api{/commit} のような1コマンドで実行する仕組み。\\
+    \texttt{.claude/skills/} に \texttt{SKILL.md} で定義する}
+  \end{block}
+
+  \vspace{0.2em}
+
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{SKILL.md の構造}
+        \begin{lstlisting}[language={}, numbers=none]
+---
+name: commit
+description: ガイドライン準拠
+  のGitコミットを作成
+allowed-tools:
+  - Bash
+  - Read
+---
+1. git diff で変更を確認
+2. 規約に従いメッセージ作成
+3. git commit を実行
+引数: $ARGUMENTS
+        \end{lstlisting}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{組み込み Skills}
+        {\footnotesize
+        \api{/commit} — ガイドライン準拠の\\
+        \hspace{2em}Git コミットを自動作成 \\[3pt]
+        \api{/simplify} — コード品質チェック \\[3pt]
+        \api{/batch} — 並列ワークツリーで\\
+        \hspace{2em}大規模変更を一括処理 \\[3pt]
+        {\scriptsize \textbf{Tips:} 繰り返す作業を Skill に}
+        }
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P20: Subagent — 並列処理とコンテキスト保護 ===
 \begin{frame}{Subagent — 並列処理とコンテキスト保護}
   \begin{table}
     \centering\footnotesize
-    \begin{tabular}{llp{48mm}}
+    \begin{tabular}{llp{50mm}}
       \hline
       \textbf{タイプ} & \textbf{用途} & \textbf{説明} \\
       \hline
@@ -298,70 +831,29 @@ sf flash vehicle -m  # 書き込み+モニタ
     \end{tabular}
   \end{table}
 
-  \begin{exampleblock}{このプロジェクトでの活用例}
+  \vspace{0.2em}
+
+  \begin{exampleblock}{活用例}
     \begin{itemize}\footnotesize
-      \item \textbf{画像レビュー} — PDF を画像化して目視確認。メインに画像を持ち込まない
-      \item \textbf{並列リサーチ} — 複数サブエージェントを同時起動して情報収集
-      \item \textbf{バックグラウンド実行} — ビルドを裏で実行し完了通知を受け取る
+      \item \textbf{テスト並列実行} — 複数のテストスイートを同時に走らせる
+      \item \textbf{コードベース調査} — 大規模リポジトリの構造を探索させる
+      \item \textbf{バックグラウンドビルド} — ビルドを裏で実行し完了通知を受け取る
     \end{itemize}
   \end{exampleblock}
 
+  \vspace{0.2em}
+
   \begin{alertblock}{}
-    {\footnotesize サブエージェントの「問題なし」を鵜呑みにしない — メイン側で検証すること}
+    {\footnotesize \textbf{コンテキスト保護:}
+      大量の検索結果やログをメインに持ち込まず、サブエージェントに要約させる}
   \end{alertblock}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{Hooks \& Skills — 自動化の仕組み}
-  \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \begin{block}{Hooks（自動実行）}
-        {\small
-        \begin{tabular}{lp{26mm}}
-          \hline
-          \textbf{Event} & \textbf{用途} \\
-          \hline
-          PreToolUse  & 危険操作のブロック \\
-          PostToolUse & 自動 lint / format \\
-          Notification & Slack 通知転送 \\
-          Stop        & 応答完了後の自動テスト \\
-          \hline
-        \end{tabular}
-        }
-
-        \vspace{0.3em}
-
-        {\scriptsize \api{settings.json} で設定。\\
-        prompt-based / agent-based も可能}
-      \end{block}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \begin{block}{Custom Skills}
-        {\small
-        \api{/commit} — ガイドライン準拠の\\
-        \hspace{2em}Git コミットを自動作成 \\[4pt]
-        \api{/simplify} — コード品質チェック \\[4pt]
-        \api{/batch} — 並列ワークツリーで\\
-        \hspace{2em}大規模変更を一括処理
-        }
-
-        \vspace{0.3em}
-
-        {\scriptsize \api{.claude/skills/} に SKILL.md で定義。\\
-        \texttt{\$ARGUMENTS} で引数を受け取れる}
-      \end{block}
-    \end{column}
-  \end{columns}
-
-  \vspace{0.3em}
-
-  {\footnotesize \textbf{Tips:} 繰り返す作業は Skill に、条件付き自動化は Hook にまとめる}
-\end{frame}
-
-% ------------------------------------------------------------------
-\begin{frame}{コンテキスト管理 / Context Management}
+% === P21: コンテキスト管理 ===
+\begin{frame}{コンテキスト管理}
   \begin{alertblock}{コンテキストウィンドウは最重要リソース}
-    Claude が一度に扱える情報量には上限。無駄に消費すると性能劣化し指示を忘れる
+    {\small Claude が一度に扱える情報量には上限。無駄に消費すると性能が劣化し指示を忘れる}
   \end{alertblock}
 
   \vspace{0.2em}
@@ -376,221 +868,71 @@ sf flash vehicle -m  # 書き込み+モニタ
       Subagent 委任         & 大量の検索結果をメインに持ち込まない \\
       Memory 永続化         & 繰り返し伝える情報はメモリに保存 \\
       CLAUDE.md 簡潔化      & 毎回読み込まれるので 200 行以内に \\
-      画像はサブエージェント & PDF/画像の Read はコンテキスト消費大 \\
       \hline
     \end{tabular}
   \end{table}
-
-  {\footnotesize \textbf{教訓:} PDF 全ページ確認をメインで行い rate limit 抵触 → サブエージェント限定ルールを制定}
-\end{frame}
-
-% ------------------------------------------------------------------
-\begin{frame}{実践ワークフロー / Workflow in Practice}
-  \begin{center}
-    \begin{tikzpicture}[
-      node distance=6mm and 10mm,
-      box/.style={rectangle, rounded corners=3pt, draw=sfblue,
-                  fill=sflight, minimum height=8mm, minimum width=28mm,
-                  font=\small, align=center},
-      arr/.style={-{Stealth[length=2.5mm]}, sfblue, thick},
-    ]
-      \node[box] (start)   {前回の Next steps\\を確認};
-      \node[box, right=of start] (plan) {Plan Mode\\で設計};
-      \node[box, right=of plan]  (impl) {実装\\（小さな単位）};
-      \node[box, below=of impl]  (test) {ビルド/テスト\\で検証};
-      \node[box, below=of plan]  (commit) {\texttt{/commit}\\で記録};
-      \node[box, below=of start] (review) {レビュー\\（チェックリスト）};
-
-      \draw[arr] (start)  -- (plan);
-      \draw[arr] (plan)   -- (impl);
-      \draw[arr] (impl)   -- (test);
-      \draw[arr] (test)   -- (commit);
-      \draw[arr] (commit) -- (review);
-
-      % Fix loop
-      \draw[arr, sfred] (review.west) -- ++(-6mm,0)
-        node[above, font=\scriptsize, sfred, pos=0.4] {問題あり}
-        |- (impl.west);
-
-      % Done
-      \draw[arr, sfgreen] (review.south) -- ++(0,-6mm)
-        node[right, font=\scriptsize, sfgreen] {完了 → 次のタスクへ};
-    \end{tikzpicture}
-  \end{center}
-\end{frame}
-
-% ------------------------------------------------------------------
-\begin{frame}{Git コミット戦略 / Commit Strategy}
-  \begin{block}{Conventional Commits + Next steps}
-    \begin{lstlisting}[language={}, numbers=none]
-fix(slides): fix P33 arrow-node penetration
-
-Changes:
-- TikZ座標を調整しノード貫通を解消
-- adjustbox で均等スケーリングに変更
-
-Next steps:
-- sf build vehicle でビルド確認
-- P34-P40 の同様の問題を確認
-    \end{lstlisting}
-  \end{block}
 
   \vspace{0.3em}
 
-  \begin{columns}[T]
-    \begin{column}{0.45\textwidth}
-      {\small \textbf{自動コミットのトリガー:}}
-      \begin{itemize}\small
-        \item ファイル変更後
-        \item テスト/ビルド成功後
-        \item 「ここまで」「休憩」等の発言
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.5\textwidth}
-      {\small \textbf{Next steps の効果:}}
-      \begin{itemize}\small
-        \item セッション再開時の起点になる
-        \item 817 コミット中 318 件に記載
-        \item 具体的なコマンド・検証項目を含む
-      \end{itemize}
-    \end{column}
-  \end{columns}
+  {\footnotesize \textbf{Tips:}
+    セッションが長くなったら \api{/compact} で圧縮。
+    重要な情報は Memory に保存しておけば圧縮後も失われない}
 \end{frame}
 
-% ------------------------------------------------------------------
-\begin{frame}{失敗から学ぶ / Lessons from Failures}
-  \begin{alertblock}{事例: P33 espnow\_dataflow — 7回の fix コミット}
-    1枚のスライドの TikZ 図修正にリビルドサイクルが12回以上発生
-  \end{alertblock}
-
-  \vspace{0.3em}
-
-  \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      {\small \textbf{何が起きたか:}}
-      \begin{enumerate}\scriptsize
-        \item \texttt{resizebox\{w\}\{h\}} でフォント縦伸び
-        \item 矢印方向が上段/下段で不統一
-        \item 場当たり的に Beamer 側で対処
-        \item チェックリスト未適用で見落とし
-      \end{enumerate}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      {\small \textbf{得られた教訓:}}
-      \begin{enumerate}\scriptsize
-        \item 根本原因を最初に特定する
-        \item チェックリストは1回も省略しない
-        \item サブエージェントの判定を鵜呑みにしない
-        \item CLAUDE.md に失敗事例を記録 → 再発防止
-      \end{enumerate}
-    \end{column}
-  \end{columns}
-
-  \vspace{0.5em}
-
-  \begin{exampleblock}{対策}
-    {\small feedback メモリに保存 → 全セッションで Claude がこのルールに従うようになった}
-  \end{exampleblock}
-\end{frame}
+% =====================================================================
+% Part 6: まとめ（3枚）
+% =====================================================================
 
 % ------------------------------------------------------------------
-\begin{frame}{反復改善のパターン / Iteration Patterns}
+% === P22: 初心者がやりがちな失敗 ===
+\begin{frame}{初心者がやりがちな失敗}
   \begin{table}
-    \centering\small
-    \begin{tabular}{lcp{48mm}}
+    \centering\footnotesize
+    \begin{tabular}{p{40mm}p{55mm}}
       \hline
-      \textbf{領域} & \textbf{Fix} & \textbf{内容} \\
+      \textbf{失敗パターン} & \textbf{何が起きるか} \\
       \hline
-      installer          & 18 & WSL2、Windows パス、Python 検出 \\
-      シミュレータカメラ   & 13 & VPython カメラ追従（revert 2回含む） \\
-      P33 TikZ 図        &  7 & ルーティング、アスペクト比、ノード貫通 \\
-      L10/L11 ヘッダー   &  5 & framesubtitle 削除後のレイアウト崩れ \\
-      エコシステム図      &  5 & 矢印ラベル重なり → 直角ルーティング \\
-      コントローラメニュー &  4 & フリッカー、残像、スクロール \\
+      Plan なしでいきなり実装させる &
+        意図と違う設計で大量変更 → やり直し \\
+      Git を使わない &
+        AI の変更を追えない → 戻せない \\
+      CLAUDE.md を書かない &
+        毎回同じ指示を繰り返す → 非効率 \\
+      main に直接 push &
+        レビューなしで本番反映 → 障害リスク \\
+      Hooks を使わず手作業を繰り返す &
+        lint 忘れ・フォーマット崩れが頻発 \\
+      Memory を活用しない &
+        同じミスを何度も指摘する必要がある \\
       \hline
     \end{tabular}
   \end{table}
 
-  \vspace{0.5em}
-
-  \begin{block}{パターンの分析}
-    \begin{itemize}
-      \item \textbf{視覚的な問題}は反復回数が多い（テキストレビューだけでは不十分）
-      \item \textbf{チェックリスト導入後}は反復回数が減少
-      \item revert は 817 コミット中わずか 10 件（1.2\%）→ 方向転換は稀
-    \end{itemize}
-  \end{block}
+  {\scriptsize \textbf{共通の原因:}
+    AI を「魔法の箱」として扱ってしまう →
+    \textbf{対策:} ガードレール（Plan, Git, CLAUDE.md）を先に整える}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{CLAUDE.md の進化 / Evolution of CLAUDE.md}
-  \begin{center}
-    \begin{tikzpicture}[
-      node distance=3.5mm,
-      evt/.style={rectangle, rounded corners=2pt, draw=sfblue,
-                  fill=sflight, minimum width=80mm, minimum height=5.5mm,
-                  font=\scriptsize, align=left},
-      arr/.style={-{Stealth[length=2mm]}, sfgray},
-    ]
-      \node[evt] (e1) {Jan: ビルドコマンド、コーディング規約、sf CLI 使用方針};
-      \node[evt, below=of e1] (e2) {Jan: コミットガイドライン + Next steps ルール追加};
-      \node[evt, below=of e2] (e3) {Feb: スライドレビューチェックリスト導入（L1--L6, T1--T9）};
-      \node[evt, below=of e3] (e4) {Feb: サブエージェントによる画像レビュー方式に切替};
-      \node[evt, below=of e4] (e5) {Mar: サブエージェント限定ルール強制化（rate limit 対策）};
-      \node[evt, below=of e5] (e6) {Mar: TikZ チェックリスト大幅拡充（T4 直角ルーティング等）};
-      \node[evt, below=of e6] (e7) {Mar: feedback メモリで品質優先の原則を永続化};
-
-      \draw[arr] (e1) -- (e2);
-      \draw[arr] (e2) -- (e3);
-      \draw[arr] (e3) -- (e4);
-      \draw[arr] (e4) -- (e5);
-      \draw[arr] (e5) -- (e6);
-      \draw[arr] (e6) -- (e7);
-    \end{tikzpicture}
-  \end{center}
-\end{frame}
-
-% ------------------------------------------------------------------
-\begin{frame}{統計で見るプロジェクト / Project by Numbers}
-  \begin{table}
-    \centering
-    \begin{tabular}{lr}
-      \hline
-      \textbf{指標} & \textbf{値} \\
-      \hline
-      総コミット数              & 817 \\
-      開発期間                  & 70 日間（2026/1/5 -- 3/15）\\
-      アクティブ日の平均         & 20.4 コミット/日 \\
-      最多の日                  & 63 コミット（1/12）\\
-      fix 比率                  & 40.3\%（329/817）\\
-      feat 比率                 & 27.5\%（225/817）\\
-      最長 fix チェイン          & 18 回（installer）\\
-      revert 回数               & 10 回（1.2\%）\\
-      Next steps 記載率         & 38.9\%（318/817）\\
-      CLAUDE.md 改訂回数        & 17 回 \\
-      \hline
-    \end{tabular}
-  \end{table}
-\end{frame}
-
-% ------------------------------------------------------------------
+% === P23: Top 10 Tips ===
 \begin{frame}{Top 10 Tips}
   \begin{enumerate}\small
-    \item \textbf{CLAUDE.md は基盤} — ビルドコマンド、規約、禁止事項を書く
+    \item \textbf{Plan Mode で考えてから書く} — 5分の計画で1時間の手戻りを防ぐ
+    \item \textbf{Git は必須} — こまめにコミット、Next steps を含める
+    \item \textbf{feature branch → PR → merge} — main を直接触らない
+    \item \textbf{CLAUDE.md は AI への教育投資} — 書くほど賢くなる
     \item \textbf{ガードレール $>$ 指示} — 「やるな」の方が「やれ」より効果的
-    \item \textbf{Plan → Implement → Test} — 考えてから書く
-    \item \textbf{小さくコミット} — 1機能 = 1コミット、Next steps を含める
-    \item \textbf{チェックリストは省略しない} — 速度優先は手戻りで工数増大
     \item \textbf{feedback メモリで学習} — 同じミスを二度と繰り返さない
-    \item \textbf{サブエージェントで並列化} — コンテキストを守りつつ効率化
-    \item \textbf{画像レビューはサブエージェントに} — rate limit 対策
-    \item \textbf{CLAUDE.md を育てる} — 失敗するたびにルールを追加
-    \item \textbf{コンテキストは最重要リソース} — \api{/compact} と Memory を活用
+    \item \textbf{Claude Code を育てる} — 失敗するたびにルールを追加
+    \item \textbf{Hooks で自動化} — 手作業の繰り返しを排除
+    \item \textbf{Skills でワークフロー化} — 複雑な手順を1コマンドに
+    \item \textbf{GitHub = AI の知識のハブ} — clone すれば知識も一緒に来る
   \end{enumerate}
 \end{frame}
 
 % ------------------------------------------------------------------
-\begin{frame}{参考資料 / References}
+% === P24: 参考資料 / はじめよう ===
+\begin{frame}{参考資料 / はじめよう}
   \begin{table}
     \centering\small
     \begin{tabular}{lp{55mm}}
@@ -618,9 +960,9 @@ Next steps:
 
   \vspace{0.3em}
 
-  \begin{block}{インストール後の最初の一歩}
+  \begin{block}{最初の一歩}
     {\small
-    \texttt{claude /init} — CLAUDE.md を自動生成してからカスタマイズ
+    \texttt{claude /init} — CLAUDE.md を自動生成 → カスタマイズして「育てる」を始めよう
     }
   \end{block}
 \end{frame}
