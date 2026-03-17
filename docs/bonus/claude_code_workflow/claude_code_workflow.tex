@@ -185,27 +185,23 @@
 % === P4: まず「何を作るか」を決める ===
 \begin{frame}{まず「何を作るか」を決める — 要件定義}
   \begin{alertblock}{AI に「いい感じに作って」は通じない}
-    {\small
+    {\footnotesize
     曖昧な指示 → AI が勝手に解釈 → 意図と違うものができる。\\
     \warn{最初に「何を作るか」を具体的に言葉にする}ことが最も重要}
   \end{alertblock}
 
-  \vspace{0.2em}
-
   \begin{exampleblock}{要件を具体化する3ステップ}
-    {\small
+    {\footnotesize
     \textbf{1. 目的:} このプログラムは何のためにあるか？（1文で）\\
     \textbf{2. 機能:} 具体的に何ができればいいか？（箇条書き）\\
     \textbf{3. 制約:} 使う言語・ライブラリ・動作環境は？}
   \end{exampleblock}
 
-  \vspace{0.2em}
-
   \begin{block}{例: TODO アプリ}
-    {\footnotesize
-    \textbf{目的:} コマンドラインでタスクを管理する \\
-    \textbf{機能:} タスクの追加・一覧表示・完了・削除 \\
-    \textbf{制約:} Python、外部ライブラリなし、JSON ファイルで保存}
+    {\scriptsize
+    \textbf{目的:} コマンドラインでタスクを管理する \quad
+    \textbf{機能:} 追加・一覧・完了・削除 \quad
+    \textbf{制約:} Python、外部ライブラリなし}
   \end{block}
 
   {\scriptsize \textbf{Tips:} 要件が具体的なほど AI の出力品質が上がる。チュートリアルで実践します}
