@@ -502,12 +502,12 @@ Next steps:                  ← 次にやるべきこと
 \end{frame}
 
 % ------------------------------------------------------------------
-% === P13: Memory — AI が学習する仕組み ===
-\begin{frame}{Memory（メモリ機能）— AI が自分で書く記憶ノート}
-  \begin{block}{Memory とは — CLAUDE.md との違い}
+% === P13: Memory（MEMORY.md）— AI が自分で書く記憶ノート ===
+\begin{frame}{Memory（MEMORY.md）— AI が自分で書く記憶ノート}
+  \begin{block}{CLAUDE.md との違い}
     {\footnotesize
     \begin{tabular}{lll}
-      & \textbf{CLAUDE.md} & \textbf{Memory} \\
+      & \textbf{CLAUDE.md} & \textbf{MEMORY.md} \\
       \hline
       誰が書くか & \textbf{人間}が書く & \textbf{AI が自動で}書く \\
       何を書くか & プロジェクトのルール & 会話で学んだこと \\
@@ -516,40 +516,21 @@ Next steps:                  ← 次にやるべきこと
     \end{tabular}
     }
   \end{block}
-  \vspace{-4pt}
-  \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      {\scriptsize \textbf{4つの種類:}}
-      {\scriptsize
-      \begin{tabular}{lp{26mm}}
-        \hline
-        \textbf{種類} & \textbf{何を覚えるか} \\
-        \hline
-        user     & あなたの専門性・好み \\
-        feedback & 「こうしないで」\\という修正指示 \\
-        project  & 進行中の作業・期限 \\
-        reference & 参考URLやツール名 \\
-        \hline
-      \end{tabular}
-      }
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \begin{exampleblock}{feedback の例}
-        {\scriptsize
-        \texttt{テストは必ず実行してから}\\
-        \texttt{変更を記録すること。}\\
-        \texttt{→ 以降ずっとこのルールに従う}\\[2pt]
-        \texttt{ファイル名は日本語禁止。}\\
-        \texttt{→ 次回から自動的に従う}
-        }
-      \end{exampleblock}
-      \vspace{-6pt}
-    \end{column}
-  \end{columns}
 
-  \vspace{-2pt}
-  {\scriptsize \textbf{最も強力なのは feedback} — 一度伝えれば次回以降すべての会話で従う}
-  \vspace{6pt}
+  \begin{alertblock}{MEMORY.md の仕組み}
+    \begin{itemize}\footnotesize
+      \item Claude Code が会話中に「覚えておくべきこと」を見つけると\textbf{自動で作成・更新}する
+      \item \texttt{MEMORY.md} はメモリファイルへの\textbf{索引}（200行制限あり）
+      \item 実際の記憶内容は個別のファイルに保存され、索引からリンクされる
+      \item 「これを覚えて」と明示的に指示することもできる
+    \end{itemize}
+  \end{alertblock}
+
+  \begin{exampleblock}{}
+    {\scriptsize
+    \textbf{注意:} Memory はローカル専用 → 別 PC やチームメンバーには引き継がれない。\\
+    大事なルールは CLAUDE.md にも書いておくと、Git 経由で共有・復元できる}
+  \end{exampleblock}
 \end{frame}
 
 % ------------------------------------------------------------------
