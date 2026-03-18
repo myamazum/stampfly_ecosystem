@@ -740,14 +740,13 @@ Next steps:                  ← 次にやるべきこと
 % === P17: Hooks とは — イベント駆動の自動化 ===
 \begin{frame}{Hooks（フック）とは — 「○○したら自動で△△する」}
   \begin{block}{Hooks とは}
-    {\footnotesize Claude Code が何か操作をする\textbf{前後に、決めておいた処理を自動実行}する仕組み。\\
-    例: 「ファイルを書き換えたら自動でコード整形を走らせる」\\
-    例: 「危険なコマンドを実行しようとしたらブロックする」}
+    {\scriptsize Claude Code が何か操作をする\textbf{前後に、決めておいた処理を自動実行}する仕組み。\\
+    例: 「ファイルを書き換えたら自動でコード整形」/「危険なコマンドをブロック」}
   \end{block}
 
-  \vspace{-0.3em}
+  \vspace{0.2em}
 
-  {\footnotesize
+  {\scriptsize
   \begin{tabular}{lp{60mm}}
     \hline
     \textbf{タイミング} & \textbf{何ができるか} \\
@@ -760,7 +759,7 @@ Next steps:                  ← 次にやるべきこと
   \end{tabular}
   }
 
-  \vspace{-0.2em}
+  \vspace{0.2em}
 
   \begin{alertblock}{Hooks はどこに設定するか}
     {\scriptsize
