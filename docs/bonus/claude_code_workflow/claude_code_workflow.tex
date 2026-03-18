@@ -307,9 +307,10 @@
 
   \vspace{0.2em}
 
-  {\footnotesize
+  {\scriptsize
     \textcolor{sfred}{\textbf{赤枠}} = 人間の承認ポイント。
-    ここで方向修正できるから安全に AI を使える}
+    ここで方向修正できるから安全に AI を使える。\\
+    \textbf{Tips:} 大きな変更はフェーズに分割して計画 → 各フェーズを独立してコミット・検証}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -336,7 +337,9 @@
 - requirements.txt に matplotlib を追加
   \end{lstlisting}
 
-  {\footnotesize ユーザーが「3ファイルに分けず1ファイルにまとめて」→ 計画を修正 → 承認 → 実装開始}
+  {\scriptsize
+    ユーザーが「3ファイルに分けず1ファイルにまとめて」→ 計画を修正 → 承認 → 実装開始 \\
+    \textbf{Tips:} 「バグを直して」より「バグが起きない設計にして」と計画させる方が効果的}
 \end{frame}
 
 % =====================================================================
@@ -409,7 +412,7 @@ Next steps:                  ← 次にやるべきこと
       {\small \textbf{Next steps（次の作業）の効果:}}
       \begin{itemize}\scriptsize
         \item 次回起動時の再開ポイントになる
-        \item 具体的な検証項目を含む
+        \item \textbf{コマンドレベル}で具体的に書く
         \item AI が「前回の続き」を即座に把握
       \end{itemize}
     \end{column}
@@ -726,10 +729,9 @@ Next steps:                  ← 次にやるべきこと
     \end{column}
   \end{columns}
 
-  \vspace{0.3em}
-
-  {\footnotesize \textbf{投資対効果:}
-    ドキュメント化の時間は「AI への教育投資」。使い込むほど Claude は賢くなる}
+  {\scriptsize \textbf{実例:}
+    あるプロジェクトでは CLAUDE.md が20回以上更新され、チェック項目は0個→30個以上に成長。\\
+    \textbf{投資対効果:} ドキュメント化の時間は「AI への教育投資」。使い込むほど賢くなる}
 \end{frame}
 
 % =====================================================================
@@ -900,13 +902,26 @@ allowed-tools: [Bash, Read]
     \end{tabular}
   \end{table}
 
-  \begin{exampleblock}{活用例}
-    \begin{itemize}\scriptsize
-      \item \textbf{複数のテストを同時実行} — 待ち時間を短縮
-      \item \textbf{大きなプロジェクトの調査} — 結果だけを受け取る
-      \item \textbf{裏でビルド} — 完了したら通知が届く
-    \end{itemize}
-  \end{exampleblock}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{任せてよいこと}
+        {\scriptsize
+        大量ファイルの検索・調査 \\
+        テストの並列実行 \\
+        ビルドのバックグラウンド実行
+        }
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{メインで確認すべきこと}
+        {\scriptsize
+        設計判断・方針の決定 \\
+        サブエージェントの「問題なし」\\を鵜呑みにしない \\
+        最終的な品質の検証
+        }
+      \end{alertblock}
+    \end{column}
+  \end{columns}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -966,7 +981,8 @@ allowed-tools: [Bash, Read]
 
   {\scriptsize \textbf{共通の原因:}
     AI を「魔法の箱」として扱ってしまう →
-    \textbf{対策:} 安全装置（計画・変更管理・指示書）を先に整える}
+    \textbf{対策:} 安全装置（計画・変更管理・指示書）を先に整える \\
+    \textbf{目安:} fix が3回以上続いたら手を止めて Plan Mode に戻る（場当たり修正の連鎖を断つ）}
 \end{frame}
 
 % ------------------------------------------------------------------
