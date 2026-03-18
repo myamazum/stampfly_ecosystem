@@ -740,38 +740,56 @@ Next steps:                  ← 次にやるべきこと
 % === P17: Hooks とは — イベント駆動の自動化 ===
 \begin{frame}{Hooks（フック）とは — 「○○したら自動で△△する」}
   \begin{block}{Hooks とは}
-    {\small Claude Code が何か操作をする\textbf{前後に、決めておいた処理を自動実行}する仕組み。\\
+    {\footnotesize Claude Code が何か操作をする\textbf{前後に、決めておいた処理を自動実行}する仕組み。\\
     例: 「ファイルを書き換えたら自動でコード整形を走らせる」\\
     例: 「危険なコマンドを実行しようとしたらブロックする」}
   \end{block}
 
-  \vspace{0.2em}
+  \vspace{-0.3em}
 
-  \begin{table}
-    \centering\small
-    \begin{tabular}{lp{65mm}}
+  {\footnotesize
+  \begin{tabular}{lp{60mm}}
+    \hline
+    \textbf{タイミング} & \textbf{何ができるか} \\
+    \hline
+    操作の前  & 危険な操作を事前にブロック \\
+    操作の後  & コード整形・書式チェックを自動実行 \\
+    通知時    & 長い処理の完了をデスクトップに通知 \\
+    応答完了後 & 自動でテストを実行 \\
+    \hline
+  \end{tabular}
+  }
+
+  \vspace{-0.2em}
+
+  \begin{alertblock}{Hooks はどこに設定するか}
+    {\scriptsize
+    \begin{tabular}{lll}
       \hline
-      \textbf{タイミング} & \textbf{何ができるか} \\
+      \textbf{ファイル} & \textbf{範囲} & \textbf{共有} \\
       \hline
-      操作の前  & 危険な操作を事前にブロック \\
-      操作の後  & コード整形・書式チェックを自動実行 \\
-      通知時    & 長い処理の完了をデスクトップに通知 \\
-      応答完了後 & 自動でテストを実行 \\
+      \texttt{.claude/settings.json} &
+        プロジェクト限定 &
+        Git 管理 \\
+      \texttt{settings.local.json} &
+        プロジェクト + PC &
+        ローカル専用 \\
+      \texttt{\textasciitilde/.claude/settings.json} &
+        PC の全プロジェクト &
+        ローカル専用 \\
       \hline
     \end{tabular}
-  \end{table}
-
-  {\scriptsize
-    設定場所: プロジェクトの設定ファイル（\texttt{.claude/settings.json}）。
-    一度設定すれば毎回自動で動く}
+    }
+  \end{alertblock}
 \end{frame}
 
 % ------------------------------------------------------------------
-% === P18: Hooks の作り方と活用例 ===
-\begin{frame}[fragile]{Hooks の作り方と活用例}
+% === P19: Hooks の活用例 ===
+\begin{frame}[fragile]{Hooks の活用例}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \begin{block}{例1: 自動フォーマット}
+        {\scriptsize ファイル編集後に自動で整形}
         \begin{lstlisting}[language={}, numbers=none]
 {
   "hooks": {
@@ -787,6 +805,7 @@ Next steps:                  ← 次にやるべきこと
     \end{column}
     \begin{column}{0.48\textwidth}
       \begin{block}{例2: 危険コマンドブロック}
+        {\scriptsize 実行前に危険な操作を止める}
         \begin{lstlisting}[language={}, numbers=none]
 {
   "hooks": {
@@ -804,22 +823,19 @@ Next steps:                  ← 次にやるべきこと
     \end{column}
   \end{columns}
 
-  \vspace{0.2em}
-
   {\scriptsize \textbf{他の例:}
-    完了通知（長い処理が終わったらデスクトップ通知）/
-    自動テスト（作業完了後にテスト実行）}
+    完了通知（デスクトップ通知）/
+    自動テスト（作業完了後に実行）/
+    コミット前チェック}
 \end{frame}
 
 % ------------------------------------------------------------------
-% === P19: Skills とは — カスタムコマンド ===
+% === P20: Skills とは — カスタムコマンド ===
 \begin{frame}[fragile]{Skills（スキル）とは — 自分だけのコマンドを作る}
   \begin{block}{Skills とは}
-    {\small 「変更を記録して」のような複雑な手順を、\api{/commit} と打つだけで実行できる仕組み。\\
+    {\small 複雑な手順を \api{/commit} のような1コマンドで実行できる仕組み。\\
     手順書ファイル（\texttt{SKILL.md}）をプロジェクト内に置いて定義する}
   \end{block}
-
-  \vspace{0.2em}
 
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
@@ -838,14 +854,28 @@ allowed-tools: [Bash, Read]
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \begin{exampleblock}{最初から使えるスキル}
+      \begin{alertblock}{Skills はどこに置くか}
         {\scriptsize
-        \api{/commit} — 変更を自動で記録 \\[2pt]
-        \api{/simplify} — コード品質チェック \\[2pt]
-        \api{/batch} — 大量の変更を一括処理 \\[4pt]
-        \textbf{Tips:} 繰り返す作業はスキルに
+        \begin{tabular}{lp{22mm}}
+          \hline
+          \textbf{場所} & \textbf{範囲} \\
+          \hline
+          \texttt{.claude/skills/} &
+            プロジェクト固有\\（Git で共有） \\
+          \texttt{\textasciitilde/.claude/skills/} &
+            この PC の全\\プロジェクト共通 \\
+          \hline
+        \end{tabular}
         }
-      \end{exampleblock}
+
+        \vspace{0.3em}
+
+        {\scriptsize
+        \textbf{組み込み:} \\
+        \api{/commit} 変更を記録 \\
+        \api{/simplify} 品質チェック
+        }
+      \end{alertblock}
     \end{column}
   \end{columns}
 \end{frame}
