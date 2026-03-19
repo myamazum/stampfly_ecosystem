@@ -1,0 +1,269 @@
+site_name: StampFly Ecosystem
+site_description: Educational drone control engineering platform
+site_url: ""
+docs_dir: ..
+site_dir: /tmp/stampfly-docs-site
+
+# Watch only directories containing Markdown docs (not entire repo)
+# Markdown があるディレクトリのみ監視（全リポジトリは重すぎる）
+watch:
+  - ../docs
+  - ../firmware
+  - ../protocol
+  - ../control
+  - ../analysis
+  - ../tools
+  - ../simulator
+  - ../ros
+  - ../examples
+  - ../README.md
+  - ../PROJECT_PLAN.md
+
+theme:
+  name: material
+  language: ja
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: ダークモードに切替
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: ライトモードに切替
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search:
+      lang:
+        - ja
+        - en
+  - awesome-pages
+
+extra_css:
+  - docs/stylesheets/extra.css
+
+markdown_extensions:
+  - tables
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - toc:
+      permalink: true
+  - attr_list
+  - def_list
+
+# Exclude non-documentation directories from processing
+# ドキュメント対象外のディレクトリを除外
+exclude_docs: |
+  site/
+  .claude/
+  _wip/
+  knote/
+  **/build/
+  **/.cache/
+  **/managed_components/
+  **/node_modules/
+  **/venv/
+  **/__pycache__/
+  third_party/
+
+nav:
+  # ==================== Home ====================
+  - Home:
+    - README.md
+    - プロジェクト計画: PROJECT_PLAN.md
+
+  # ==================== docs/ ドキュメント ====================
+  - ドキュメント:
+    - 概要: docs/overview.md
+    - クイックスタート: docs/getting-started.md
+    - スライド資料: docs/slides.md
+    - ドキュメント目録: docs/DOCUMENT_INDEX.md
+    - セットアップ:
+      - 概要: docs/setup/README.md
+      - macOS: docs/setup/macos.md
+      - Linux: docs/setup/linux.md
+      - Windows (WSL2): docs/setup/windows.md
+      - 教育向け: docs/setup/education.md
+      - WiFi STA: docs/setup/wifi-sta.md
+    - アーキテクチャ:
+      - 制御系設計: docs/architecture/control-system.md
+      - 座標系: docs/architecture/coordinate-systems.md
+      - 物理パラメータ: docs/architecture/stampfly-parameters.md
+      - 制御配分: docs/architecture/control-allocation-migration.md
+      - Genesis 統合: docs/architecture/genesis-integration.md
+      - TDMA 通信: docs/architecture/tdma-usage.md
+      - Tello API: docs/architecture/tello-api-reference.md
+      - ROS2 UDP: docs/architecture/ros2-udp-debug.md
+    - sf CLI:
+      - コマンド一覧: docs/commands/README.md
+      - sf version: docs/commands/sf-version.md
+      - sf doctor: docs/commands/sf-doctor.md
+      - sf setup: docs/commands/sf-setup.md
+      - sf build: docs/commands/sf-build.md
+      - sf flash: docs/commands/sf-flash.md
+      - sf monitor: docs/commands/sf-monitor.md
+      - sf log: docs/commands/sf-log.md
+      - sf sim: docs/commands/sf-sim.md
+      - sf cal: docs/commands/sf-cal.md
+    - ガイド:
+      - 安全ガイド: docs/guides/safety.md
+      - トラブルシューティング: docs/guides/troubleshooting.md
+      - 用語集: docs/guides/glossary.md
+      - 開発ツール: docs/guides/tools.md
+      - フライトログ可視化: docs/guides/flight-log-viz.md
+    - 教育:
+      - ワークショップガイド: docs/workshop/workshop_guide.md
+      - スケジュール: docs/workshop/workshop_schedule.md
+      - 競技ルール: docs/workshop/competition_rules.md
+      - スライド資料ガイド: docs/workshop/slides/README.md
+      - ワークショップアンケート: docs/workshop/survey/workshop_survey.md
+      - シラバス: docs/university/syllabus.md
+      - 評価ルーブリック: docs/university/assessment_rubric.md
+    - 開発ガイドライン:
+      - スタイルガイド: docs/contributing/style-guide.md
+      - コミット規約: docs/contributing/commit-guidelines.md
+      - コマンド追加: docs/contributing/adding-sf-commands.md
+      - FW コマンド追加: docs/contributing/adding-firmware-commands.md
+      - スキャフォールディング: docs/contributing/scaffolding-tool.md
+
+  # ==================== ファームウェア ====================
+  - ファームウェア:
+    - Vehicle:
+      - 概要: firmware/vehicle/README.md
+      - コンポーネント:
+        - センサーフュージョン: firmware/vehicle/components/sf_algo_fusion/README.md
+        - BMI270 IMU:
+          - 概要: firmware/vehicle/components/sf_hal_bmi270/README.md
+          - API: firmware/vehicle/components/sf_hal_bmi270/docs/API.md
+          - BMI270 ドキュメント: firmware/vehicle/components/sf_hal_bmi270/docs/bmi270_doc_ja.md
+          - ESP-IDF SPI ガイド: firmware/vehicle/components/sf_hal_bmi270/docs/esp_idf_bmi270_spi_guide.md
+          - M5StampFly 仕様: firmware/vehicle/components/sf_hal_bmi270/docs/M5StamFly_spec_ja.md
+          - サンプル:
+            - Polling: firmware/vehicle/components/sf_hal_bmi270/examples/basic_polling/README.md
+            - Interrupt: firmware/vehicle/components/sf_hal_bmi270/examples/basic_interrupt/README.md
+            - FIFO: firmware/vehicle/components/sf_hal_bmi270/examples/basic_fifo/README.md
+            - 開発ステージ:
+              - 概要: firmware/vehicle/components/sf_hal_bmi270/examples/development/README.md
+              - Stage 1 SPI: firmware/vehicle/components/sf_hal_bmi270/examples/development/stage1_spi_basic/README.md
+              - Stage 2 Init: firmware/vehicle/components/sf_hal_bmi270/examples/development/stage2_init/README.md
+              - Stage 3 Polling: firmware/vehicle/components/sf_hal_bmi270/examples/development/stage3_polling/README.md
+              - Stage 4 Interrupt: firmware/vehicle/components/sf_hal_bmi270/examples/development/stage4_interrupt/README.md
+              - Stage 5 FIFO:
+                - 概要: firmware/vehicle/components/sf_hal_bmi270/examples/development/stage5_fifo/README.md
+                - Step 1 Basic: firmware/vehicle/components/sf_hal_bmi270/examples/development/stage5_fifo/step1_basic_read/README.md
+                - Step 2 Multi: firmware/vehicle/components/sf_hal_bmi270/examples/development/stage5_fifo/step2_multi_frames/README.md
+                - Step 3 Flush: firmware/vehicle/components/sf_hal_bmi270/examples/development/stage5_fifo/step3_flush/README.md
+                - Step 4 Watermark: firmware/vehicle/components/sf_hal_bmi270/examples/development/stage5_fifo/step4_watermark_int/README.md
+        - PMW3901 オプティカルフロー:
+          - 概要: firmware/vehicle/components/sf_hal_pmw3901/README.md
+          - 使用方法: firmware/vehicle/components/sf_hal_pmw3901/docs/how_to_use_pwm3901.md
+          - 実装リファレンス: firmware/vehicle/components/sf_hal_pmw3901/docs/PMW3901_IMPLEMENTATION_REFERENCE.md
+          - HW 仕様: firmware/vehicle/components/sf_hal_pmw3901/docs/STAMPFLY_HARDWARE_SPEC.md
+        - VL53L3CX ToF:
+          - 概要: firmware/vehicle/components/sf_hal_vl53l3cx/README.md
+          - API: firmware/vehicle/components/sf_hal_vl53l3cx/docs/API.md
+          - ドライバドキュメント: firmware/vehicle/components/sf_hal_vl53l3cx/docs/VL53L3CX_driver_doc.md
+          - I2C API 分析: firmware/vehicle/components/sf_hal_vl53l3cx/docs/i2c_master_api_analysis.md
+          - M5StampFly 仕様: firmware/vehicle/components/sf_hal_vl53l3cx/docs/M5StamFly_spec_ja.md
+          - サンプル:
+            - 概要: firmware/vehicle/components/sf_hal_vl53l3cx/examples/README.md
+            - Polling: firmware/vehicle/components/sf_hal_vl53l3cx/examples/basic_polling/README.md
+            - Interrupt: firmware/vehicle/components/sf_hal_vl53l3cx/examples/basic_interrupt/README.md
+            - 開発ステージ:
+              - 概要: firmware/vehicle/components/sf_hal_vl53l3cx/examples/development/README.md
+              - Stage 1 I2C Scan: firmware/vehicle/components/sf_hal_vl53l3cx/examples/development/stage1_i2c_scan/README.md
+              - Stage 2 Register: firmware/vehicle/components/sf_hal_vl53l3cx/examples/development/stage2_register_test/README.md
+              - Stage 3 Init: firmware/vehicle/components/sf_hal_vl53l3cx/examples/development/stage3_device_init/README.md
+              - Stage 4 Polling: firmware/vehicle/components/sf_hal_vl53l3cx/examples/development/stage4_polling_measurement/README.md
+              - Stage 5 Interrupt: firmware/vehicle/components/sf_hal_vl53l3cx/examples/development/stage5_interrupt_measurement/README.md
+              - Stage 6 Dual: firmware/vehicle/components/sf_hal_vl53l3cx/examples/development/stage6_dual_sensor/README.md
+              - Stage 7 Teleplot: firmware/vehicle/components/sf_hal_vl53l3cx/examples/development/stage7_teleplot_streaming/README.md
+              - Stage 8 Filter: firmware/vehicle/components/sf_hal_vl53l3cx/examples/development/stage8_filtered_streaming/README.md
+      - テスト:
+        - フローキャリブレーション: firmware/vehicle/tests/eskf_debug/docs/flow_calibration_plan.md
+    - Controller:
+      - 概要: firmware/controller/README.md
+    - Common:
+      - 概要: firmware/common/README.md
+    - Workshop:
+      - 概要: firmware/workshop/README.md
+      - レッスン:
+        - L0 セットアップ: firmware/workshop/lessons/lesson_00_setup/README.md
+        - L1 モーター: firmware/workshop/lessons/lesson_01_motor/README.md
+        - L2 コントローラ: firmware/workshop/lessons/lesson_02_controller/README.md
+        - L3 LED: firmware/workshop/lessons/lesson_03_led/README.md
+        - L4 IMU: firmware/workshop/lessons/lesson_04_imu/README.md
+        - L5 P 制御: firmware/workshop/lessons/lesson_05_p_control/README.md
+        - L6 モデリング: firmware/workshop/lessons/lesson_06_modeling/README.md
+        - L7 システム同定: firmware/workshop/lessons/lesson_07_sysid/README.md
+        - L8 PID: firmware/workshop/lessons/lesson_08_pid/README.md
+        - L9 状態推定: firmware/workshop/lessons/lesson_09_estimation/README.md
+        - L10 API: firmware/workshop/lessons/lesson_10_api_overview/README.md
+        - L12 Python SDK: firmware/workshop/lessons/lesson_12_python_sdk/README.md
+        - L13 競技: firmware/workshop/lessons/lesson_13_competition/README.md
+
+  # ==================== その他 ====================
+  - ツール・解析:
+    - プロトコル: protocol/README.md
+    - 制御設計:
+      - 概要: control/README.md
+      # README.md conflicts with index.html in this dir; link removed
+      # - ループシェイピング: control/design/loop_shaping_tool/README.md
+    - 解析:
+      - 概要: analysis/README.md
+      - データセット: analysis/datasets/README.md
+      - ノートブック: analysis/notebooks/README.md
+      - スクリプト: analysis/scripts/README.md
+    - ツール:
+      - 概要: tools/README.md
+      - キャリブレーション: tools/calibration/README.md
+      - ログ解析: tools/log_analyzer/README.md
+      - ログキャプチャ: tools/log_capture/README.md
+    - シミュレータ:
+      - 概要: simulator/README.md
+      - Genesis: simulator/genesis/README.md
+      - URDF メッシュ法線: simulator/genesis/docs/urdf_mesh_normals.md
+      - サンドボックス: simulator/sandbox/README.md
+    - ROS: ros/README.md
+    - サンプル: examples/README.md
+
+  # ==================== 計画 ====================
+  - 計画:
+    - 現行:
+      - エコシステム移行: docs/plans/ecosystem-migration.md
+      - インストーラ: docs/plans/installer-architecture.md
+      - Vehicle FW: docs/plans/vehicle-firmware.md
+      - HW テスト: docs/plans/hardware-test.md
+      - ROS2 統合: docs/plans/ros2-integration.md
+      - シミュレータ移行: docs/plans/simulator-migration.md
+    - アーカイブ:
+      - Controller ESP-IDF 移行: docs/plans/archive/controller-espidf-migration.md
+      - Controller メニュー USB: docs/plans/archive/controller-menu-usb.md
+      - HIL FW: docs/plans/archive/hil-firmware.md
+      - Serial CLI: docs/plans/archive/serial-cli-rebuild.md
+      - Tello 互換: docs/plans/archive/tello-compat.md
+      - Vehicle Phase3 テスト: docs/plans/archive/vehicle-phase3-test.md
+      - Vehicle Phase3 ガイド: docs/plans/archive/vehicle-phase3-test-guide.md
+      - WiFi 通信: docs/plans/archive/wifi-comm.md
+      - WiFi コマンド: docs/plans/archive/wifi-command-implementation.md
+      - Workshop スライド再構成: docs/plans/archive/workshop-slides-restructure.md

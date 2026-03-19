@@ -72,7 +72,7 @@ def run(args: argparse.Namespace) -> int:
         console.print("  Install with: pip install -r requirements-docs.txt")
         return 1
 
-    mkdocs_yml = project_root / "mkdocs.yml"
+    mkdocs_yml = project_root / ".mkdocs" / "mkdocs.yml"
     if not mkdocs_yml.exists():
         console.error(f"mkdocs.yml not found: {mkdocs_yml}")
         return 1
