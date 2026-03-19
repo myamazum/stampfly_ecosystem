@@ -99,6 +99,9 @@ tools/log_analyzer/*.png
 *.vrb
 *.synctex.gz
 
+# MkDocs build output
+site/
+
 # Personal notes
 knote/
 

@@ -19,6 +19,7 @@ from . import query
 from . import rc
 from . import lesson
 from . import competition
+from . import docs
 
 __all__ = [
     "version",
@@ -36,4 +37,5 @@ __all__ = [
     "rc",
     "lesson",
     "competition",
+    "docs",
 ]
