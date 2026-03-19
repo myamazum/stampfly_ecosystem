@@ -5,8 +5,8 @@ MkDocs を使用してドキュメントサイトを提供・ビルドします�
 """
 
 import argparse
+import shutil
 import subprocess
-import sys
 import webbrowser
 from pathlib import Path
 from ..utils import console, paths
@@ -47,57 +47,30 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     parser.set_defaults(func=run)
 
 
-def _check_mkdocs() -> bool:
-    """Check if mkdocs is installed"""
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "mkdocs", "--version"],
-            capture_output=True,
-            check=True,
-        )
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
-
-
-def _install_deps(project_root: Path) -> int:
-    """Install documentation dependencies"""
-    req_file = project_root / "requirements-docs.txt"
-    if not req_file.exists():
-        console.error(f"Requirements file not found: {req_file}")
-        return 1
-
-    console.info("Installing documentation dependencies...")
-    result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-q", "-r", str(req_file)],
-    )
-    return result.returncode
+def _find_mkdocs() -> str | None:
+    """Find mkdocs executable in PATH"""
+    return shutil.which("mkdocs")
 
 
 def run(args: argparse.Namespace) -> int:
     """Execute docs command"""
-    project_root = paths.project_root()
+    project_root = paths.root()
     action = getattr(args, "action", None)
 
     # Default action: serve
+    # デフォルトは serve
     if action is None:
         action = "serve"
         args.lan = False
         args.port = 8000
 
-    # Check mkdocs availability
-    if not _check_mkdocs():
-        console.warning("MkDocs not found. Installing dependencies...")
-        ret = _install_deps(project_root)
-        if ret != 0:
-            console.error("Failed to install dependencies.")
-            console.print(f"  Try: pip install -r {project_root}/requirements-docs.txt")
-            return 1
-
-        # Verify installation
-        if not _check_mkdocs():
-            console.error("MkDocs installation failed.")
-            return 1
+    # Find mkdocs executable
+    # mkdocs 実行ファイルを検索
+    mkdocs_bin = _find_mkdocs()
+    if mkdocs_bin is None:
+        console.error("mkdocs not found.")
+        console.print("  Install with: pip install -r requirements-docs.txt")
+        return 1
 
     mkdocs_yml = project_root / "mkdocs.yml"
     if not mkdocs_yml.exists():
@@ -116,7 +89,7 @@ def run(args: argparse.Namespace) -> int:
         console.print()
 
         cmd = [
-            sys.executable, "-m", "mkdocs", "serve",
+            mkdocs_bin, "serve",
             "--dev-addr", f"{addr}:{port}",
             "-f", str(mkdocs_yml),
         ]
@@ -132,7 +105,7 @@ def run(args: argparse.Namespace) -> int:
     elif action == "build":
         console.info("Building documentation site...")
         cmd = [
-            sys.executable, "-m", "mkdocs", "build",
+            mkdocs_bin, "build",
             "-f", str(mkdocs_yml),
         ]
         result = subprocess.run(cmd, cwd=project_root)
@@ -146,7 +119,7 @@ def run(args: argparse.Namespace) -> int:
         return result.returncode
 
     elif action == "open":
-        url = f"http://127.0.0.1:8000"
+        url = "http://127.0.0.1:8000"
         console.info(f"Opening {url} in browser...")
         webbrowser.open(url)
         return 0
