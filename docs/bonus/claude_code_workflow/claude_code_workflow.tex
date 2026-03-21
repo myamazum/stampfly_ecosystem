@@ -343,23 +343,94 @@
 \end{frame}
 
 % =====================================================================
-% Part 3: Git/GitHub 連携（4枚）
+% Part 3: Git/GitHub 連携（6枚）
 % =====================================================================
 
 % ------------------------------------------------------------------
-% === P8: なぜ Git が重要か ===
-\begin{frame}{なぜ Git（変更履歴の管理）が重要か}
-  \begin{alertblock}{AI がファイルを自律的に変更する世界では}
+% === P8: Git とは — 歴史と価値 ===
+\begin{frame}{Git とは — 歴史と「なぜ世界標準になったか」}
+  \begin{block}{Git の誕生}
     {\small
-    変更履歴がなければ「何が変わったか」「なぜ変わったか」が追えない。\\
-    \warn{Git なしで AI にコードを書かせるのは、セーブなしでゲームをするようなもの}
-    }
-  \end{alertblock}
+    \textbf{2005年}、Linux の生みの親 Linus Torvalds が Linux カーネル開発のために作成。\\
+    数千人が同時に開発する巨大プロジェクトを管理するために生まれた}
+  \end{block}
+
+  \vspace{0.3em}
 
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{Git が解決した問題}
+        \begin{itemize}\footnotesize
+          \item 「誰が・いつ・何を・なぜ」変えたか完全に記録
+          \item いつでも過去の状態に戻せる
+          \item 複数人が同時に作業できる
+          \item 変更を安全に統合できる
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{しかし使い方が難しい}
+        \begin{itemize}\footnotesize
+          \item コマンドが多く覚えきれない
+          \item 操作を間違えると怖い
+          \item 初心者の最大の挫折ポイント
+        \end{itemize}
+        \vspace{0.3em}
+        {\footnotesize → \textbf{便利さは圧倒的だが\\ハードルが高い}}
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+
+  {\footnotesize 現在、GitHub 上のプロジェクト数は \textbf{3億以上}。Git はソフトウェア開発の事実上の標準}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P9: AI × Git — 難しさを AI に任せ、旨みだけを得る ===
+\begin{frame}{AI × Git — 難しさを AI に任せ、旨みだけを得る}
+  \begin{block}{AI コーディングエージェントが Git を操作する}
+    {\small
+    Git の複雑なコマンドは\textbf{全て AI が代行}。
+    あなたは「記録して」「戻して」と言うだけ}
+  \end{block}
+
+  \vspace{0.3em}
+
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{AI の弱点を Git が補う}
+        \begin{itemize}\footnotesize
+          \item AI は会話が長くなると\textbf{忘れる}
+          \item Git ログ = AI の\textbf{外部記憶装置}
+          \item 「前回何をしたか」を Git から復元
+          \item Next steps で再開ポイントを記録
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Git ログの副産物}
+        \begin{itemize}\footnotesize
+          \item \textbf{作業記録}が自動的に残る
+          \item \textbf{作業日報}を git log から生成可能
+          \item 「何時間で何をしたか」が一目瞭然
+          \item コードレビューの材料にもなる
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.3em}
+
+  {\footnotesize \warn{Git なしで AI にコードを書かせるのは、セーブなしでゲームをするようなもの}。使わない手はない}
+\end{frame}
+
+% ------------------------------------------------------------------
+% === P10: なぜ Git が重要か（まとめ） ===
+\begin{frame}{Git + AI エージェント = 最強の組み合わせ}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
       \begin{block}{Git が提供する安全網}
-        {\footnotesize Git = 変更履歴を記録・管理するツール}
         \begin{itemize}\footnotesize
           \item 変更の差分を確認できる
           \item いつでも前の状態に戻せる
@@ -378,11 +449,34 @@
     \end{column}
   \end{columns}
 
+  \vspace{0.5em}
+
+  \begin{center}
+    \begin{tikzpicture}[
+      node distance=3mm and 8mm,
+      box/.style={rectangle, rounded corners=3pt, draw=sfblue,
+                  fill=sflight, minimum height=8mm, minimum width=28mm,
+                  font=\scriptsize, align=center},
+      arr/.style={-{Stealth[length=2mm]}, sfblue, thick},
+      biarr/.style={{Stealth[length=2mm]}-{Stealth[length=2mm]}, sforange, thick},
+    ]
+      \node[box] (ai) {AI エージェント\\コードを書く};
+      \node[box, right=15mm of ai] (git) {Git\\変更を記録};
+      \node[box, right=15mm of git] (human) {あなた\\確認・判断};
+
+      \draw[arr] (ai) -- node[above, font=\tiny] {自動コミット} (git);
+      \draw[arr] (git) -- node[above, font=\tiny] {履歴・差分} (human);
+      \draw[biarr] ([yshift=-3mm]ai.east) -- node[below, font=\tiny] {ログから文脈を復元} ([yshift=-3mm]git.west);
+    \end{tikzpicture}
+  \end{center}
+
+  \vspace{0.3em}
+
   {\footnotesize \textbf{原則:} AI と協働するなら Git は必須。「こまめに記録」が最大の保険}
 \end{frame}
 
 % ------------------------------------------------------------------
-% === P9: コミット戦略 ===
+% === P11: コミット戦略 ===
 \begin{frame}[fragile]{コミット戦略}
   \begin{block}{コミット（変更の記録）のルールを決めておく}
     {\scriptsize 「何をなぜ変えたか」が伝わる記録を残す。Claude Code が自動でこの形式に従う:}
@@ -420,7 +514,7 @@ Next steps:                  ← 次にやるべきこと
 \end{frame}
 
 % ------------------------------------------------------------------
-% === P10: GitHub 連携 — PR とレビュー ===
+% === P12: GitHub 連携 — PR とレビュー ===
 \begin{frame}{GitHub 連携 — 変更をチームに共有する}
   \begin{block}{Pull Request（PR）= 「この変更をレビューしてください」という依頼}
     {\small
@@ -461,7 +555,7 @@ Next steps:                  ← 次にやるべきこと
 \end{frame}
 
 % ------------------------------------------------------------------
-% === P11: ブランチ戦略と安全運用 ===
+% === P13: ブランチ戦略と安全運用 ===
 \begin{frame}{安全な運用 — main ブランチを直接触らない}
   \begin{alertblock}{main（main）を直接変更しない}
     {\small Git では「main」と「ブランチ」を分けられる。AI にmainを直接変更させると、
