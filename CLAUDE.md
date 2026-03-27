@@ -414,6 +414,10 @@ When developing this codebase, follow this order:
 - **Analysis/Tools**: Python (Jupyter notebooks, scripts)
 - **Protocol Spec**: YAML or Protocol Buffers
 
+## SCI26 原稿
+
+`docs/sci26/` に SCI26 OS04 の学会原稿（LaTeX）がある。原稿の執筆・推敲を行う場合は、必ず `docs/sci26/WRITING_POLICY.md` を最初に読み、方針に従うこと。
+
 ## Reference
 
 All architectural decisions are documented in `PROJECT_PLAN.md`. Consult this document before making structural changes.
