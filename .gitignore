@@ -108,3 +108,7 @@ knote/
 # Work in progress (not ready for git)
 # 開発中（git管理対象外）
 _wip/
+
+# Private documents (conference papers, etc.)
+# 非公開ドキュメント（学会原稿等）
+docs/sci26/
