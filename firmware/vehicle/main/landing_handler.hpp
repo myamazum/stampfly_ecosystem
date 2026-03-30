@@ -49,10 +49,11 @@ public:
         stationary_detector_.init();
         level_calibrator_.reset();
         reset();
-        // Boot時は初期キャリブレーション済みで開始（main.cppのPhase 2-3が担当）
+        // Boot時は着陸・キャリブレーション済みで開始（main.cppのPhase 2-3が担当）
         // ARM時にreset()でNOT_STARTEDに戻り、着陸後に再キャリブレーションが動作する
-        // Start as COMPLETED after boot (main.cpp Phase 2-3 handles initial calibration)
+        // Start as landed + calibrated after boot (main.cpp Phase 2-3 handles initial cal)
         // reset() on ARM reverts to NOT_STARTED, enabling post-flight recalibration
+        is_landed_ = true;
         calibration_state_ = CalibrationState::COMPLETED;
         syncToSystemStateManager();
     }
