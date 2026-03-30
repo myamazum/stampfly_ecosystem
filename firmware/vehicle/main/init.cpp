@@ -423,11 +423,13 @@ esp_err_t estimators()
             state.setESKFInitialized(true);
             g_fusion_ptr = &g_fusion;  // Set pointer for CLI access
 
-            // ジャイロバイアスキャリブレーション（静止状態で実行）
+            // ジャイロ・加速度バイアスキャリブレーション（静止状態で実行）
+            // Gyro & accel bias calibration (run while stationary)
             if (g_imu.isInitialized()) {
-                ESP_LOGI(TAG, "Calibrating gyro bias (keep device still)...");
+                ESP_LOGI(TAG, "Calibrating gyro/accel bias (keep device still)...");
                 constexpr int CALIB_SAMPLES = 200;  // 200サンプル @ 400Hz = 0.5秒
                 float gyro_sum_x = 0, gyro_sum_y = 0, gyro_sum_z = 0;
+                float accel_sum_x = 0, accel_sum_y = 0, accel_sum_z = 0;
                 int valid_samples = 0;
 
                 for (int i = 0; i < CALIB_SAMPLES; i++) {
@@ -435,28 +437,53 @@ esp_err_t estimators()
                     stampfly::GyroData gyro;
                     if (g_imu.readSensorData(accel, gyro) == ESP_OK) {
                         // BMI270座標系 → 機体座標系(NED) 変換
+                        // BMI270 to body frame (NED) conversion
                         float gyro_body_x = gyro.y;     // Roll rate
                         float gyro_body_y = gyro.x;     // Pitch rate
                         float gyro_body_z = -gyro.z;    // Yaw rate
+                        float accel_body_x = accel.y;   // Forward
+                        float accel_body_y = accel.x;   // Right
+                        float accel_body_z = -accel.z;  // Down
 
                         gyro_sum_x += gyro_body_x;
                         gyro_sum_y += gyro_body_y;
                         gyro_sum_z += gyro_body_z;
+                        accel_sum_x += accel_body_x;
+                        accel_sum_y += accel_body_y;
+                        accel_sum_z += accel_body_z;
                         valid_samples++;
                     }
                     vTaskDelay(pdMS_TO_TICKS(2));  // ~500Hz
                 }
 
                 if (valid_samples > 0) {
+                    float n = static_cast<float>(valid_samples);
+
+                    // Gyro bias: average of stationary readings
+                    // ジャイロバイアス: 静止時の平均値
                     stampfly::math::Vector3 gyro_bias(
-                        gyro_sum_x / valid_samples,
-                        gyro_sum_y / valid_samples,
-                        gyro_sum_z / valid_samples
+                        gyro_sum_x / n,
+                        gyro_sum_y / n,
+                        gyro_sum_z / n
                     );
                     g_fusion.setGyroBias(gyro_bias);
                     g_initial_gyro_bias = gyro_bias;  // binlog reset後に復元するため保存
                     ESP_LOGI(TAG, "Gyro bias set: [%.5f, %.5f, %.5f] rad/s",
                              gyro_bias.x, gyro_bias.y, gyro_bias.z);
+
+                    // Accel bias: deviation from expected gravity vector [0, 0, -g]
+                    // 加速度バイアス: 期待される重力ベクトル [0, 0, -g] からの偏差
+                    // ba = accel_avg - [0, 0, -g]
+                    // This does NOT include gravity in the bias.
+                    // 重力はバイアスに含まない。
+                    stampfly::math::Vector3 accel_bias(
+                        accel_sum_x / n,                            // X: should be 0
+                        accel_sum_y / n,                            // Y: should be 0
+                        accel_sum_z / n - (-config::eskf::GRAVITY)  // Z: should be -g
+                    );
+                    g_fusion.setAccelBias(accel_bias);
+                    ESP_LOGI(TAG, "Accel bias set: [%.4f, %.4f, %.4f] m/s²",
+                             accel_bias.x, accel_bias.y, accel_bias.z);
                 }
             }
 

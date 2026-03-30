@@ -116,7 +116,7 @@ def plot_extended(data, output_file=None, time_range=None, show_eskf=True, show_
     # Determine layout - all full-width rows
     n_rows = 4  # Gyro, Accel, Gyro Corrected, Control
     if show_eskf:
-        n_rows += 4  # Euler, Position, Velocity, Biases
+        n_rows += 5  # Euler, Position, Velocity, Gyro Bias, Accel Bias
     if show_sensors:
         n_rows += 2  # Height, Flow
 
@@ -218,15 +218,24 @@ def plot_extended(data, output_file=None, time_range=None, show_eskf=True, show_
         ax.grid(True, alpha=0.3)
         ax_idx += 1
 
-        # Biases (combined gyro and accel)
+        # Gyro Bias
+        # ジャイロバイアス
         ax = axes[ax_idx]
-        ax.plot(t, np.rad2deg(data['gyro_bias_x']), 'r-', label='Gyro X', linewidth=0.8)
-        ax.plot(t, np.rad2deg(data['gyro_bias_y']), 'g-', label='Gyro Y', linewidth=0.8)
-        ax.plot(t, np.rad2deg(data['gyro_bias_z']), 'b-', label='Gyro Z', linewidth=0.8)
-        ax.plot(t, data['accel_bias_x'] * 10, 'r--', label='Acc X×10', linewidth=0.8, alpha=0.6)
-        ax.plot(t, data['accel_bias_y'] * 10, 'g--', label='Acc Y×10', linewidth=0.8, alpha=0.6)
-        ax.plot(t, data['accel_bias_z'] * 10, 'b--', label='Acc Z×10', linewidth=0.8, alpha=0.6)
-        ax.set_ylabel('Bias\n[deg/s]', fontsize=8)
+        ax.plot(t, np.rad2deg(data['gyro_bias_x']), 'r-', label='X', linewidth=0.8)
+        ax.plot(t, np.rad2deg(data['gyro_bias_y']), 'g-', label='Y', linewidth=0.8)
+        ax.plot(t, np.rad2deg(data['gyro_bias_z']), 'b-', label='Z', linewidth=0.8)
+        ax.set_ylabel('Gyro Bias\n[deg/s]', fontsize=8)
+        ax.legend(**legend_style)
+        ax.grid(True, alpha=0.3)
+        ax_idx += 1
+
+        # Accel Bias
+        # 加速度バイアス
+        ax = axes[ax_idx]
+        ax.plot(t, data['accel_bias_x'], 'r-', label='X', linewidth=0.8)
+        ax.plot(t, data['accel_bias_y'], 'g-', label='Y', linewidth=0.8)
+        ax.plot(t, data['accel_bias_z'], 'b-', label='Z', linewidth=0.8)
+        ax.set_ylabel('Accel Bias\n[m/s²]', fontsize=8)
         ax.legend(**legend_style)
         ax.grid(True, alpha=0.3)
         ax_idx += 1
