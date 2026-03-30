@@ -778,6 +778,8 @@ void ESKF::predict(const Vector3& accel, const Vector3& gyro, float dt, bool ski
 
     // 結果をP_にコピー
     P_ = temp1_;
+
+    enforceCovarianceSymmetry();
 }
 
 void ESKF::updateBaro(float altitude)
@@ -809,6 +811,23 @@ void ESKF::updateBaro(float altitude)
     float dx[15];
     for (int i = 0; i < 15; i++) {
         dx[i] = K[i] * y;
+    }
+
+    // ========================================================================
+    // Attitude protection: clamp attitude corrections to prevent jumps
+    // Baro observes only POS_Z; attitude corrections via cross-covariance
+    // should be small. Clamp to enforce ESKF small-angle assumption.
+    // 姿勢保護: クロス共分散経由の姿勢修正をクランプし姿勢ジャンプを防止
+    // ========================================================================
+    constexpr float ATT_CLAMP = 0.05f;  // ±0.05 rad (~2.9°)
+    dx[ATT_X] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_X]));
+    dx[ATT_Y] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_Y]));
+    dx[ATT_Z] = 0.0f;  // Yaw not observable from altitude
+    // ヨーは高度観測から不可観測 — ジャイロ積分と地磁気に委ねる
+
+    if (std::abs(dx[ATT_X]) > 0.01f || std::abs(dx[ATT_Y]) > 0.01f) {
+        ESP_LOGW(TAG, "Baro att correction clamped: dx_att=[%.4f, %.4f] P(att,posZ)=[%.2e, %.2e, %.2e]",
+                 dx[ATT_X], dx[ATT_Y], P_(6, 2), P_(7, 2), P_(8, 2));
     }
 
     // 状態注入
@@ -857,6 +876,8 @@ void ESKF::updateBaro(float altitude)
             P_(i, j) = val;
         }
     }
+
+    enforceCovarianceSymmetry();
 }
 
 void ESKF::updateToF(float distance)
@@ -911,6 +932,23 @@ void ESKF::updateToF(float distance)
         dx[i] = K[i] * y;
     }
 
+    // ========================================================================
+    // Attitude protection: clamp attitude corrections to prevent jumps
+    // ToF observes only POS_Z; attitude corrections via cross-covariance
+    // should be small. Clamp to enforce ESKF small-angle assumption.
+    // 姿勢保護: クロス共分散経由の姿勢修正をクランプし姿勢ジャンプを防止
+    // ========================================================================
+    constexpr float ATT_CLAMP = 0.05f;  // ±0.05 rad (~2.9°)
+    dx[ATT_X] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_X]));
+    dx[ATT_Y] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_Y]));
+    dx[ATT_Z] = 0.0f;  // Yaw not observable from altitude
+    // ヨーは高度観測から不可観測 — ジャイロ積分と地磁気に委ねる
+
+    if (std::abs(dx[ATT_X]) > 0.01f || std::abs(dx[ATT_Y]) > 0.01f) {
+        ESP_LOGW(TAG, "ToF att correction clamped: dx_att=[%.4f, %.4f] innov=%.4f P(att,posZ)=[%.2e, %.2e, %.2e]",
+                 dx[ATT_X], dx[ATT_Y], y, P_(6, 2), P_(7, 2), P_(8, 2));
+    }
+
     // 状態注入
     state_.position.x += dx[POS_X];
     state_.position.y += dx[POS_Y];
@@ -957,6 +995,8 @@ void ESKF::updateToF(float distance)
             P_(i, j) = val;
         }
     }
+
+    enforceCovarianceSymmetry();
 }
 
 void ESKF::updateMag(const Vector3& mag)
@@ -1141,6 +1181,8 @@ void ESKF::updateMag(const Vector3& mag)
             P_(i, j) = val;
         }
     }
+
+    enforceCovarianceSymmetry();
 }
 
 void ESKF::updateFlow(float flow_x, float flow_y, float height)
@@ -1259,6 +1301,23 @@ void ESKF::updateFlowWithGyro(float flow_x, float flow_y, float distance,
         dx[i] = K[i][0] * y0 + K[i][1] * y1;
     }
 
+    // ========================================================================
+    // Attitude protection: clamp attitude corrections to prevent jumps
+    // Flow observes velocity; attitude corrections via cross-covariance
+    // should be small. Clamp to enforce ESKF small-angle assumption.
+    // 姿勢保護: クロス共分散経由の姿勢修正をクランプし姿勢ジャンプを防止
+    // ========================================================================
+    constexpr float ATT_CLAMP = 0.05f;  // ±0.05 rad (~2.9°)
+    dx[ATT_X] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_X]));
+    dx[ATT_Y] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_Y]));
+    dx[ATT_Z] = 0.0f;  // Yaw not reliably observable from optical flow
+    // ヨーはフロー観測から信頼性なし — ジャイロ積分と地磁気に委ねる
+
+    if (std::abs(dx[ATT_X]) > 0.01f || std::abs(dx[ATT_Y]) > 0.01f) {
+        ESP_LOGW(TAG, "Flow att correction clamped: dx_att=[%.4f, %.4f]",
+                 dx[ATT_X], dx[ATT_Y]);
+    }
+
     // 状態注入
     state_.position.x += dx[POS_X];
     state_.position.y += dx[POS_Y];
@@ -1316,6 +1375,8 @@ void ESKF::updateFlowWithGyro(float flow_x, float flow_y, float distance,
             P_(i, j) = val;
         }
     }
+
+    enforceCovarianceSymmetry();
 }
 
 void ESKF::updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
@@ -1444,6 +1505,23 @@ void ESKF::updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
         dx[i] = K[i][0] * y0 + K[i][1] * y1;
     }
 
+    // ========================================================================
+    // Attitude protection: clamp attitude corrections to prevent jumps
+    // FlowRaw observes velocity; attitude corrections via cross-covariance
+    // should be small. Clamp to enforce ESKF small-angle assumption.
+    // 姿勢保護: クロス共分散経由の姿勢修正をクランプし姿勢ジャンプを防止
+    // ========================================================================
+    constexpr float ATT_CLAMP = 0.05f;  // ±0.05 rad (~2.9°)
+    dx[ATT_X] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_X]));
+    dx[ATT_Y] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_Y]));
+    dx[ATT_Z] = 0.0f;  // Yaw not reliably observable from optical flow
+    // ヨーはフロー観測から信頼性なし — ジャイロ積分と地磁気に委ねる
+
+    if (std::abs(dx[ATT_X]) > 0.01f || std::abs(dx[ATT_Y]) > 0.01f) {
+        ESP_LOGW(TAG, "FlowRaw att correction clamped: dx_att=[%.4f, %.4f]",
+                 dx[ATT_X], dx[ATT_Y]);
+    }
+
     // 状態注入
     state_.position.x += dx[POS_X];
     state_.position.y += dx[POS_Y];
@@ -1489,6 +1567,8 @@ void ESKF::updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
             P_(i, j) = val;
         }
     }
+
+    enforceCovarianceSymmetry();
 }
 
 void ESKF::updateAccelAttitude(const Vector3& accel)
@@ -1715,6 +1795,27 @@ void ESKF::updateAccelAttitude(const Vector3& accel)
             val += R_val * (Ki0*K[j][0] + Ki1*K[j][1] + Ki2*K[j][2]);
 
             P_(i, j) = val;
+        }
+    }
+
+    enforceCovarianceSymmetry();
+}
+
+void ESKF::enforceCovarianceSymmetry()
+{
+    // Enforce symmetry of P matrix by averaging P and P^T
+    // Also enforce minimum diagonal values to prevent numerical collapse
+    // 共分散行列の対称性を強制し、数値崩壊を防止
+    for (int i = 0; i < 15; i++) {
+        // Ensure positive diagonal
+        // 対角要素の下限を保証
+        if (P_(i, i) < 1e-12f) {
+            P_(i, i) = 1e-12f;
+        }
+        for (int j = i + 1; j < 15; j++) {
+            float avg = 0.5f * (P_(i, j) + P_(j, i));
+            P_(i, j) = avg;
+            P_(j, i) = avg;
         }
     }
 }
