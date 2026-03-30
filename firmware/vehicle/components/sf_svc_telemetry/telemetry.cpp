@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include <cstring>
+#include <unistd.h>  // for close()
 
 static const char* TAG = "Telemetry";
 
@@ -53,8 +54,11 @@ esp_err_t Telemetry::init(const Config& config)
     // Start HTTP server
     httpd_config_t httpd_config = HTTPD_DEFAULT_CONFIG();
     httpd_config.server_port = config_.port;
-    httpd_config.max_open_sockets = MAX_CLIENTS + 1;  // +1 for HTTP requests
+    httpd_config.max_open_sockets = MAX_CLIENTS + 2;  // +2 for HTTP requests headroom
     httpd_config.lru_purge_enable = true;
+    // Close callback to auto-cleanup disconnected WebSocket clients
+    // クローズコールバックで切断されたWebSocketクライアントを自動クリーンアップ
+    httpd_config.close_fn = close_handler;
 
     esp_err_t ret = httpd_start(&server_, &httpd_config);
     if (ret != ESP_OK) {
@@ -124,6 +128,17 @@ esp_err_t Telemetry::stop()
 
     ESP_LOGI(TAG, "Telemetry server stopped");
     return ESP_OK;
+}
+
+void Telemetry::close_handler(httpd_handle_t hd, int sockfd)
+{
+    // Called by httpd when any socket is closed (including LRU purge)
+    // httpd がソケットをクローズする時に呼ばれる（LRU purge 含む）
+    if (s_instance != nullptr) {
+        s_instance->removeClient(sockfd);
+    }
+    // Default close behavior
+    close(sockfd);
 }
 
 esp_err_t Telemetry::http_get_handler(httpd_req_t* req)
@@ -266,13 +281,14 @@ int Telemetry::broadcast(const void* data, size_t len)
         esp_err_t ret = httpd_ws_send_frame_async(server_, fd, &ws_pkt);
         if (ret == ESP_OK) {
             sent_count++;
-        } else if (ret == ESP_ERR_INVALID_ARG) {
-            // Client no longer valid - remove
-            ESP_LOGI(TAG, "Client fd=%d no longer valid, removing", fd);
+        } else {
+            // Any send failure removes the client to prevent socket leak
+            // 送信失敗時はソケットリークを防ぐためクライアントを即座に除去
+            ESP_LOGI(TAG, "Client fd=%d send failed (%s), removing",
+                     fd, esp_err_to_name(ret));
             client_fds_[i] = -1;
             client_count_--;
         }
-        // Other errors (e.g., EAGAIN) - keep client, retry next time
     }
 
     xSemaphoreGive(client_mutex_);

@@ -396,6 +396,7 @@ private:
     static esp_err_t ws_handler(httpd_req_t* req);
     static esp_err_t http_get_handler(httpd_req_t* req);
     static esp_err_t http_get_threejs_handler(httpd_req_t* req);
+    static void close_handler(httpd_handle_t hd, int sockfd);
 
     // Client management
     void addClient(int fd);
