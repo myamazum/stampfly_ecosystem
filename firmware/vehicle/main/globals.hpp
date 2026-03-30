@@ -148,6 +148,7 @@ extern int g_optflow_buffer_count;
 // =============================================================================
 
 extern stampfly::math::Vector3 g_initial_gyro_bias;
+extern stampfly::math::Vector3 g_initial_accel_bias;
 
 // =============================================================================
 // State Flags

@@ -482,6 +482,7 @@ esp_err_t estimators()
                         accel_sum_z / n - (-config::eskf::GRAVITY)  // Z: should be -g
                     );
                     g_fusion.setAccelBias(accel_bias);
+                    g_initial_accel_bias = accel_bias;  // reset後に復元するため保存
                     ESP_LOGI(TAG, "Accel bias set: [%.4f, %.4f, %.4f] m/s²",
                              accel_bias.x, accel_bias.y, accel_bias.z);
                 }

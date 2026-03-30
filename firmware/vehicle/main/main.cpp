@@ -155,9 +155,11 @@ void onBinlogStart()
     // センサーフュージョンをリセット（PC版と同じ初期状態にする）
     if (g_fusion.isInitialized()) {
         g_fusion.reset();
-        // ジャイロバイアスを復元（reset()でゼロになるため）
+        // バイアスを復元（reset()でゼロになるため）
+        // Restore biases (reset() zeroes them)
         g_fusion.setGyroBias(g_initial_gyro_bias);
-        ESP_LOGI(TAG, "Sensor fusion reset for binlog, gyro bias restored");
+        g_fusion.setAccelBias(g_initial_accel_bias);
+        ESP_LOGI(TAG, "Sensor fusion reset for binlog, biases restored");
     }
 
     // 姿勢を初期化（バッファの最新値で更新）
@@ -822,6 +824,7 @@ extern "C" void app_main(void)
     if (g_fusion.isInitialized()) {
         g_fusion.reset();
         g_fusion.setGyroBias(g_initial_gyro_bias);
+        g_fusion.setAccelBias(g_initial_accel_bias);
         initializeAttitudeFromBuffers();
 
         // センサーフュージョン処理を開始

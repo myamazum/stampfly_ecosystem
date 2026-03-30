@@ -104,6 +104,7 @@ int g_optflow_buffer_count = 0;
 // =============================================================================
 
 stampfly::math::Vector3 g_initial_gyro_bias = stampfly::math::Vector3::zero();
+stampfly::math::Vector3 g_initial_accel_bias = stampfly::math::Vector3::zero();
 
 // =============================================================================
 // State Flags

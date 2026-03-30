@@ -496,6 +496,7 @@ void IMUTask(void* pvParameters)
                             if (pos_diverged || vel_diverged) {
                                 g_fusion.reset();
                                 g_fusion.setGyroBias(g_initial_gyro_bias);
+                                g_fusion.setAccelBias(g_initial_accel_bias);
                                 initializeAttitudeFromBuffers();
                             }
 
