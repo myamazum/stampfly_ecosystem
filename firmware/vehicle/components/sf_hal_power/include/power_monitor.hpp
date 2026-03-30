@@ -111,6 +111,8 @@ public:
     static constexpr float LOW_BATTERY_THRESHOLD_V = 3.4f;
     static constexpr float FULL_BATTERY_V = 4.2f;
     static constexpr float EMPTY_BATTERY_V = 3.3f;
+    static constexpr float USB_ONLY_THRESHOLD_V = 1.0f;  // Below this = no battery connected
+    // USB給電のみの判定閾値。これ未満はバッテリー未接続
     static constexpr int NUM_CHANNELS = 3;
 
     struct Config {
@@ -155,7 +157,23 @@ public:
      * @brief Check if battery is low (<3.4V)
      * @return true if battery voltage is below threshold
      */
-    bool isLowBattery() const { return last_voltage_v_ < LOW_BATTERY_THRESHOLD_V; }
+    /**
+     * @brief Check if battery is low (<3.4V)
+     * @return true if battery is connected and voltage is below threshold
+     * USB-only power (no battery, <1.0V) does not trigger low battery
+     * USB給電のみ（バッテリー未接続、<1.0V）では低バッテリー警告を出さない
+     */
+    bool isLowBattery() const {
+        return last_voltage_v_ >= USB_ONLY_THRESHOLD_V
+            && last_voltage_v_ < LOW_BATTERY_THRESHOLD_V;
+    }
+
+    /**
+     * @brief Check if running on USB power only (no battery)
+     * @return true if voltage is below USB-only threshold
+     * バッテリー未接続（USB給電のみ）かどうかを判定
+     */
+    bool isUsbOnly() const { return last_voltage_v_ < USB_ONLY_THRESHOLD_V; }
 
     /**
      * @brief Get battery percentage

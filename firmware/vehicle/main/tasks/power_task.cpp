@@ -32,8 +32,12 @@ void PowerTask(void* pvParameters)
 
                 // Log first reading immediately, then every 5 seconds
                 if (first_read || ++log_counter >= 50) {
-                    ESP_LOGI(TAG, "Battery: %.2fV, %.1fmA, LowBat=%d",
-                             power.voltage_v, power.current_ma, g_power.isLowBattery());
+                    if (g_power.isUsbOnly()) {
+                        ESP_LOGI(TAG, "USB power only (no battery): %.2fV", power.voltage_v);
+                    } else {
+                        ESP_LOGI(TAG, "Battery: %.2fV, %.1fmA, LowBat=%d",
+                                 power.voltage_v, power.current_ma, g_power.isLowBattery());
+                    }
                     log_counter = 0;
                     first_read = false;
                 }
