@@ -441,9 +441,12 @@ esp_err_t estimators()
                         float gyro_body_x = gyro.y;     // Roll rate
                         float gyro_body_y = gyro.x;     // Pitch rate
                         float gyro_body_z = -gyro.z;    // Yaw rate
-                        float accel_body_x = accel.y;   // Forward
-                        float accel_body_y = accel.x;   // Right
-                        float accel_body_z = -accel.z;  // Down
+                        // BMI270 outputs in G, convert to m/s²
+                        // BMI270 の出力は G 単位、m/s² に変換
+                        constexpr float G = 9.81f;
+                        float accel_body_x = accel.y * G;   // Forward [m/s²]
+                        float accel_body_y = accel.x * G;   // Right [m/s²]
+                        float accel_body_z = -accel.z * G;  // Down (NED) [m/s²]
 
                         gyro_sum_x += gyro_body_x;
                         gyro_sum_y += gyro_body_y;
