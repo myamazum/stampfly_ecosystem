@@ -88,6 +88,29 @@ esp_err_t Telemetry::init(const Config& config)
     };
     httpd_register_uri_handler(server_, &uri_threejs);
 
+    // Captive portal detection handler (macOS/iOS)
+    // macOS sends GET /hotspot-detect.html after WiFi AP connection.
+    // Returning 200 with expected body tells macOS the network is usable,
+    // preventing it from blocking TCP traffic to this AP.
+    // macOS は WiFi AP 接続後に /hotspot-detect.html にアクセスする。
+    // 期待されるレスポンスを返すことで、macOS がこの AP への TCP をブロックするのを防ぐ。
+    httpd_uri_t uri_captive = {
+        .uri = "/hotspot-detect.html",
+        .method = HTTP_GET,
+        .handler = captive_portal_handler,
+        .user_ctx = nullptr
+    };
+    httpd_register_uri_handler(server_, &uri_captive);
+
+    // Android/Windows captive portal detection
+    httpd_uri_t uri_generate_204 = {
+        .uri = "/generate_204",
+        .method = HTTP_GET,
+        .handler = captive_portal_handler,
+        .user_ctx = nullptr
+    };
+    httpd_register_uri_handler(server_, &uri_generate_204);
+
     // WebSocket endpoint
     httpd_uri_t uri_ws = {
         .uri = "/ws",
@@ -139,6 +162,19 @@ void Telemetry::close_handler(httpd_handle_t hd, int sockfd)
     }
     // Default close behavior
     close(sockfd);
+}
+
+esp_err_t Telemetry::captive_portal_handler(httpd_req_t* req)
+{
+    // macOS expects: HTTP 200 with body containing "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"
+    // iOS expects the same. Android expects 204 No Content.
+    // Returning the Apple-expected response satisfies all platforms.
+    // macOS/iOS: 200 + "Success" ボディで captive portal 検出を通過
+    ESP_LOGI(TAG, "Captive portal check: %s", req->uri);
+    const char* response = "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>";
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_send(req, response, strlen(response));
+    return ESP_OK;
 }
 
 esp_err_t Telemetry::http_get_handler(httpd_req_t* req)
