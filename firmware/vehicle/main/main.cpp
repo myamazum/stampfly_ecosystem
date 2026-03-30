@@ -819,6 +819,43 @@ extern "C" void app_main(void)
         ESP_LOGW(TAG, "Proceeding with initialization anyway...");
     }
 
+    // Recalculate biases from stabilized sensor buffers
+    // 安定化後のセンサーバッファからバイアスを再計算
+    // Phase 2 calibration runs before sensor stabilization; the values may be
+    // inaccurate. Recalculate from the ring buffers that were filled during
+    // the Phase 3 stabilization wait (10 seconds of stable data).
+    // Phase 2 キャリブレーションはセンサー安定化前に実行されるため不正確な可能性がある。
+    // Phase 3 安定化待ち中に蓄積されたリングバッファから再計算する。
+    {
+        int count = std::min(g_gyro_buffer_count, REF_BUFFER_SIZE);
+        if (count > 0) {
+            stampfly::math::Vector3 gyro_sum = stampfly::math::Vector3::zero();
+            stampfly::math::Vector3 accel_sum = stampfly::math::Vector3::zero();
+            for (int i = 0; i < count; i++) {
+                gyro_sum += g_gyro_buffer[i];
+                accel_sum += g_accel_buffer[i];
+            }
+            float n = static_cast<float>(count);
+            // Gyro bias = average of raw gyro (stationary → bias only)
+            // ジャイロバイアス = 生ジャイロの平均（静止時 → バイアス成分のみ）
+            g_initial_gyro_bias = gyro_sum * (1.0f / n);
+            // Accel bias = deviation from gravity [0, 0, -g]
+            // 加速度バイアス = 重力ベクトル [0, 0, -g] からの偏差
+            // Buffer values are already in m/s² (converted by imu_task)
+            // バッファの値は既に m/s² 単位（imu_task で変換済み）
+            g_initial_accel_bias = stampfly::math::Vector3(
+                accel_sum.x / n,
+                accel_sum.y / n,
+                accel_sum.z / n - (-config::eskf::GRAVITY)
+            );
+            ESP_LOGI(TAG, "Bias recalculated from stable buffers (%d samples):", count);
+            ESP_LOGI(TAG, "  Gyro: [%.5f, %.5f, %.5f] rad/s",
+                     g_initial_gyro_bias.x, g_initial_gyro_bias.y, g_initial_gyro_bias.z);
+            ESP_LOGI(TAG, "  Accel: [%.4f, %.4f, %.4f] m/s²",
+                     g_initial_accel_bias.x, g_initial_accel_bias.y, g_initial_accel_bias.z);
+        }
+    }
+
     // Initialize sensor fusion with fresh state and stable sensor data
     // センサーが安定した状態でリセット・キャリブレーション
     if (g_fusion.isInitialized()) {
