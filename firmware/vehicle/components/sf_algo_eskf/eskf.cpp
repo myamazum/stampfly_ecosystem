@@ -825,7 +825,7 @@ void ESKF::updateBaro(float altitude)
     dx[ATT_Z] = 0.0f;  // Yaw not observable from altitude
     // ヨーは高度観測から不可観測 — ジャイロ積分と地磁気に委ねる
 
-    if (std::abs(dx[ATT_X]) > 0.01f || std::abs(dx[ATT_Y]) > 0.01f) {
+    if (std::abs(dx[ATT_X]) >= ATT_CLAMP || std::abs(dx[ATT_Y]) >= ATT_CLAMP) {
         ESP_LOGW(TAG, "Baro att correction clamped: dx_att=[%.4f, %.4f] P(att,posZ)=[%.2e, %.2e, %.2e]",
                  dx[ATT_X], dx[ATT_Y], P_(6, 2), P_(7, 2), P_(8, 2));
     }
@@ -944,7 +944,7 @@ void ESKF::updateToF(float distance)
     dx[ATT_Z] = 0.0f;  // Yaw not observable from altitude
     // ヨーは高度観測から不可観測 — ジャイロ積分と地磁気に委ねる
 
-    if (std::abs(dx[ATT_X]) > 0.01f || std::abs(dx[ATT_Y]) > 0.01f) {
+    if (std::abs(dx[ATT_X]) >= ATT_CLAMP || std::abs(dx[ATT_Y]) >= ATT_CLAMP) {
         ESP_LOGW(TAG, "ToF att correction clamped: dx_att=[%.4f, %.4f] innov=%.4f P(att,posZ)=[%.2e, %.2e, %.2e]",
                  dx[ATT_X], dx[ATT_Y], y, P_(6, 2), P_(7, 2), P_(8, 2));
     }
@@ -1313,7 +1313,7 @@ void ESKF::updateFlowWithGyro(float flow_x, float flow_y, float distance,
     dx[ATT_Z] = 0.0f;  // Yaw not reliably observable from optical flow
     // ヨーはフロー観測から信頼性なし — ジャイロ積分と地磁気に委ねる
 
-    if (std::abs(dx[ATT_X]) > 0.01f || std::abs(dx[ATT_Y]) > 0.01f) {
+    if (std::abs(dx[ATT_X]) >= ATT_CLAMP || std::abs(dx[ATT_Y]) >= ATT_CLAMP) {
         ESP_LOGW(TAG, "Flow att correction clamped: dx_att=[%.4f, %.4f]",
                  dx[ATT_X], dx[ATT_Y]);
     }
@@ -1517,7 +1517,7 @@ void ESKF::updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
     dx[ATT_Z] = 0.0f;  // Yaw not reliably observable from optical flow
     // ヨーはフロー観測から信頼性なし — ジャイロ積分と地磁気に委ねる
 
-    if (std::abs(dx[ATT_X]) > 0.01f || std::abs(dx[ATT_Y]) > 0.01f) {
+    if (std::abs(dx[ATT_X]) >= ATT_CLAMP || std::abs(dx[ATT_Y]) >= ATT_CLAMP) {
         ESP_LOGW(TAG, "FlowRaw att correction clamped: dx_att=[%.4f, %.4f]",
                  dx[ATT_X], dx[ATT_Y]);
     }
