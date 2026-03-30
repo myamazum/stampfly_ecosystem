@@ -513,9 +513,39 @@ class TelemetryCapture:
         self.mode = None  # Detected from first packet
         self.frame_count = 0
 
+    async def _wait_for_tcp(self, max_retries: int = 15, interval: float = 2.0):
+        """Wait for TCP port to become reachable (handles macOS captive portal delay)"""
+        # macOS may block TCP after WiFi AP connection for captive portal detection.
+        # Retry raw TCP connect until the port is reachable.
+        # macOS は WiFi AP 接続後 captive portal 検出のため TCP をブロックすることがある。
+        # TCP ソケット接続をリトライして到達性を確認する。
+        import socket
+        host = self.uri.split('//')[1].split('/')[0].split(':')[0]
+        port = int(self.uri.split('//')[1].split('/')[0].split(':')[1]) if ':' in self.uri.split('//')[1].split('/')[0] else 80
+        for attempt in range(max_retries):
+            try:
+                sock = socket.create_connection((host, port), timeout=2)
+                sock.close()
+                if attempt > 0:
+                    print(f"  Connection established after {attempt + 1} attempts")
+                return True
+            except (OSError, socket.timeout):
+                if attempt == 0:
+                    print("Waiting for WiFi connection to stabilize...")
+                print(f"  Retry {attempt + 1}/{max_retries} (TCP connect to {host}:{port})...")
+                await asyncio.sleep(interval)
+        return False
+
     async def capture(self, duration: float, progress_callback=None):
         """Capture packets for specified duration"""
         print(f"Connecting to {self.uri}...")
+
+        # Ensure TCP is reachable before WebSocket (macOS captive portal workaround)
+        # WebSocket 接続前に TCP 到達性を確認（macOS captive portal 対策）
+        if not await self._wait_for_tcp():
+            print("Error: Could not reach StampFly HTTP server after retries")
+            print("Make sure you are connected to the StampFly WiFi AP")
+            return False
 
         try:
             async with websockets.connect(self.uri, ping_interval=None) as ws:
