@@ -144,12 +144,21 @@ void IMUTask(void* pvParameters)
                     // Check for calibration complete
                     if (g_landing_handler.justCalibrated()) {
                         // Set attitude reference from level calibration
+                        // Use accel reference for level (roll=0, pitch=0) but keep
+                        // current ESKF gyro bias instead of StationaryDetector's value.
+                        // StationaryDetector averages raw gyro which includes the
+                        // (possibly drifted) ESKF bias estimate, producing incorrect
+                        // values after dynamic flight.
+                        // 加速度リファレンスで水平基準を設定するが、ジャイロバイアスは
+                        // ESKFの現在値を維持する。StationaryDetectorの生ジャイロ平均は
+                        // 飛行中にドリフトしたESKFバイアスを含むため不正確。
+                        auto eskf_state = g_fusion.getState();
                         g_fusion.setAttitudeReference(
                             g_landing_handler.getAccelReference(),
-                            g_landing_handler.getGyroBias()
+                            eskf_state.gyro_bias  // Keep ESKF's current gyro bias
                         );
                         g_fusion.resetForLanding();
-                        ESP_LOGI(TAG, "Level calibration complete - attitude reference set");
+                        ESP_LOGI(TAG, "Level calibration complete - attitude reference set (gyro bias preserved)");
                     }
 
                     // Update FlightState based on calibration (LED updates automatically via callback)

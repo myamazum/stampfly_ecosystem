@@ -190,6 +190,25 @@ void ESKF::resetForLanding()
             P_(j, i) = 0.0f;
         }
     }
+
+    // ジャイロバイアスの共分散を縮小（着陸時の推定値を信頼し、
+    // 接地中のドリフトを抑制する）
+    // Reduce gyro bias covariance on landing to prevent drift while grounded.
+    // The gyro bias estimated during flight is trusted; shrinking P prevents
+    // updateAccelAttitude() cross-covariance from drifting it further.
+    float gb_var = config_.init_gyro_bias_std * config_.init_gyro_bias_std * 0.01f;
+    P_(BG_X, BG_X) = gb_var;
+    P_(BG_Y, BG_Y) = gb_var;
+    P_(BG_Z, BG_Z) = gb_var;
+
+    // 姿勢-ジャイロバイアスのクロス共分散をクリア
+    // Clear attitude-gyro bias cross-covariance
+    for (int i = ATT_X; i <= ATT_Z; i++) {
+        for (int j = BG_X; j <= BG_Z; j++) {
+            P_(i, j) = 0.0f;
+            P_(j, i) = 0.0f;
+        }
+    }
 }
 
 void ESKF::setGyroBias(const Vector3& bias)
