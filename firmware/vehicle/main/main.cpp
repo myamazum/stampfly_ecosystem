@@ -644,42 +644,77 @@ extern "C" void app_main(void)
     // デバッグログ用（1秒ごとにログ出力）
     int last_log_sec = 0;
 
-    // ヘルパー: RingBuffer<Vector3,N> の標準偏差ノルムを計算
-    auto calcVector3StdNorm = [](const auto& buf) {
-        int n = buf.count();
-        if (n == 0) return 0.0f;
-        stampfly::math::Vector3 sum = stampfly::math::Vector3::zero();
-        stampfly::math::Vector3 sum_sq = stampfly::math::Vector3::zero();
-        for (int i = 0; i < n; i++) {
-            const auto& v = buf.get(i);
-            sum += v;
-            sum_sq.x += v.x * v.x;
-            sum_sq.y += v.y * v.y;
-            sum_sq.z += v.z * v.z;
+    // Online statistics accumulators (incremental, buffer-size independent)
+    // 逐次統計量アキュムレータ（インクリメンタル、バッファサイズ非依存）
+    struct Vec3Stats {
+        int n = 0;
+        float sx = 0, sy = 0, sz = 0;       // sum
+        float sx2 = 0, sy2 = 0, sz2 = 0;    // sum of squares
+        int read_idx = 0;                     // ring buffer read position
+
+        void reset(int new_read_idx) {
+            n = 0; sx = sy = sz = sx2 = sy2 = sz2 = 0;
+            read_idx = new_read_idx;
         }
-        float fn = static_cast<float>(n);
-        stampfly::math::Vector3 avg = sum * (1.0f / fn);
-        float var_x = std::max(0.0f, sum_sq.x / fn - avg.x * avg.x);
-        float var_y = std::max(0.0f, sum_sq.y / fn - avg.y * avg.y);
-        float var_z = std::max(0.0f, sum_sq.z / fn - avg.z * avg.z);
-        return std::sqrt(var_x + var_y + var_z);
+        void add(const stampfly::math::Vector3& v) {
+            n++; sx += v.x; sy += v.y; sz += v.z;
+            sx2 += v.x * v.x; sy2 += v.y * v.y; sz2 += v.z * v.z;
+        }
+        float std_norm() const {
+            if (n < 2) return 0.0f;
+            float fn = static_cast<float>(n);
+            float vx = std::max(0.0f, sx2 / fn - (sx / fn) * (sx / fn));
+            float vy = std::max(0.0f, sy2 / fn - (sy / fn) * (sy / fn));
+            float vz = std::max(0.0f, sz2 / fn - (sz / fn) * (sz / fn));
+            return std::sqrt(vx + vy + vz);
+        }
     };
 
-    // ヘルパー: RingBuffer<float,N> の標準偏差を計算
-    auto calcScalarStd = [](const auto& buf) {
-        int n = buf.count();
-        if (n == 0) return 0.0f;
-        float sum = 0.0f, sum_sq = 0.0f;
-        for (int i = 0; i < n; i++) {
-            float v = buf.get(i);
-            sum += v;
-            sum_sq += v * v;
+    struct ScalarStats {
+        int n = 0;
+        float s = 0, s2 = 0;
+        int read_idx = 0;
+
+        void reset(int new_read_idx) {
+            n = 0; s = s2 = 0;
+            read_idx = new_read_idx;
         }
-        float fn = static_cast<float>(n);
-        float avg = sum / fn;
-        float var = std::max(0.0f, sum_sq / fn - avg * avg);
-        return std::sqrt(var);
+        void add(float v) {
+            n++; s += v; s2 += v * v;
+        }
+        float std_val() const {
+            if (n < 2) return 0.0f;
+            float fn = static_cast<float>(n);
+            float var = std::max(0.0f, s2 / fn - (s / fn) * (s / fn));
+            return std::sqrt(var);
+        }
     };
+
+    // Consume new samples from ring buffer into accumulator
+    // リングバッファから新しいサンプルをアキュムレータに取り込む
+    auto consumeVec3 = [](Vec3Stats& st, const auto& buf) {
+        int write_idx = buf.raw_index();
+        while (st.read_idx != write_idx) {
+            st.add(buf.raw_at(st.read_idx));
+            st.read_idx = (st.read_idx + 1) % buf.capacity();
+        }
+    };
+
+    auto consumeScalar = [](ScalarStats& st, const auto& buf) {
+        int write_idx = buf.raw_index();
+        while (st.read_idx != write_idx) {
+            st.add(buf.raw_at(st.read_idx));
+            st.read_idx = (st.read_idx + 1) % buf.capacity();
+        }
+    };
+
+    Vec3Stats accel_st, gyro_st, mag_st;
+    ScalarStats baro_st, tof_st;
+    accel_st.read_idx = g_accel_buf.raw_index();
+    gyro_st.read_idx  = g_gyro_buf.raw_index();
+    mag_st.read_idx   = g_mag_buf.raw_index();
+    baro_st.read_idx  = g_baro_buf.raw_index();
+    tof_st.read_idx   = g_tof_bottom_buf.raw_index();
 
     while (elapsed_ms < MAX_WAIT_MS) {
         vTaskDelay(pdMS_TO_TICKS(CHECK_INTERVAL_MS));
@@ -694,80 +729,87 @@ extern "C" void app_main(void)
             ESP_LOGI(TAG, "Stabilization t=%ds:", current_sec);
         }
 
+        // Consume new samples from ring buffers into accumulators
+        // リングバッファの新サンプルをアキュムレータに取り込む
+        if (!accel_passed) consumeVec3(accel_st, g_accel_buf);
+        if (!gyro_passed)  consumeVec3(gyro_st, g_gyro_buf);
+        if (!mag_passed)   consumeVec3(mag_st, g_mag_buf);
+        if (!baro_passed)  consumeScalar(baro_st, g_baro_buf);
+        if (!tof_passed)   consumeScalar(tof_st, g_tof_bottom_buf);
+
         // === 加速度 ===
-        if (!accel_passed && g_accel_buf.count() >= MIN_ACCEL_SAMPLES) {
-            float std_norm = calcVector3StdNorm(g_accel_buf);
+        if (!accel_passed && accel_st.n >= MIN_ACCEL_SAMPLES) {
+            float std_norm = accel_st.std_norm();
             last_accel_std_norm = std_norm;
             if (std_norm < ACCEL_STD_THRESHOLD) {
                 accel_passed = true;
-                ESP_LOGI(TAG, "  Accel: PASSED (%.4f < %.3f)", std_norm, ACCEL_STD_THRESHOLD);
+                ESP_LOGI(TAG, "  Accel: PASSED (%.4f < %.3f, n=%d)", std_norm, ACCEL_STD_THRESHOLD, accel_st.n);
             } else {
-                // 不合格: バッファクリアして再サンプリング
-                g_accel_buf.reset();
-                if (do_log) ESP_LOGW(TAG, "  Accel: NG (%.4f > %.3f) -> retry", std_norm, ACCEL_STD_THRESHOLD);
+                if (do_log) ESP_LOGW(TAG, "  Accel: NG (%.4f > %.3f, n=%d) -> retry", std_norm, ACCEL_STD_THRESHOLD, accel_st.n);
+                accel_st.reset(g_accel_buf.raw_index());
             }
         } else if (do_log && !accel_passed) {
-            ESP_LOGI(TAG, "  Accel: waiting (%d/%d samples)", g_accel_buf.count(), MIN_ACCEL_SAMPLES);
+            ESP_LOGI(TAG, "  Accel: waiting (%d/%d samples)", accel_st.n, MIN_ACCEL_SAMPLES);
         }
 
         // === ジャイロ ===
-        if (!gyro_passed && g_gyro_buf.count() >= MIN_GYRO_SAMPLES) {
-            float std_norm = calcVector3StdNorm(g_gyro_buf);
+        if (!gyro_passed && gyro_st.n >= MIN_GYRO_SAMPLES) {
+            float std_norm = gyro_st.std_norm();
             last_gyro_std_norm = std_norm;
             if (std_norm < GYRO_STD_THRESHOLD) {
                 gyro_passed = true;
-                ESP_LOGI(TAG, "  Gyro:  PASSED (%.5f < %.3f)", std_norm, GYRO_STD_THRESHOLD);
+                ESP_LOGI(TAG, "  Gyro:  PASSED (%.5f < %.3f, n=%d)", std_norm, GYRO_STD_THRESHOLD, gyro_st.n);
             } else {
-                g_gyro_buf.reset();
-                if (do_log) ESP_LOGW(TAG, "  Gyro:  NG (%.5f > %.3f) -> retry", std_norm, GYRO_STD_THRESHOLD);
+                if (do_log) ESP_LOGW(TAG, "  Gyro:  NG (%.5f > %.3f, n=%d) -> retry", std_norm, GYRO_STD_THRESHOLD, gyro_st.n);
+                gyro_st.reset(g_gyro_buf.raw_index());
             }
         } else if (do_log && !gyro_passed) {
-            ESP_LOGI(TAG, "  Gyro:  waiting (%d/%d samples)", g_gyro_buf.count(), MIN_GYRO_SAMPLES);
+            ESP_LOGI(TAG, "  Gyro:  waiting (%d/%d samples)", gyro_st.n, MIN_GYRO_SAMPLES);
         }
 
         // === 地磁気 ===
-        if (!mag_passed && g_mag_buf.count() >= MIN_MAG_SAMPLES) {
-            float std_norm = calcVector3StdNorm(g_mag_buf);
+        if (!mag_passed && mag_st.n >= MIN_MAG_SAMPLES) {
+            float std_norm = mag_st.std_norm();
             last_mag_std_norm = std_norm;
             if (std_norm < MAG_STD_THRESHOLD) {
                 mag_passed = true;
-                ESP_LOGI(TAG, "  Mag:   PASSED (%.3f < %.1f)", std_norm, MAG_STD_THRESHOLD);
+                ESP_LOGI(TAG, "  Mag:   PASSED (%.3f < %.1f, n=%d)", std_norm, MAG_STD_THRESHOLD, mag_st.n);
             } else {
-                g_mag_buf.reset();
-                if (do_log) ESP_LOGW(TAG, "  Mag:   NG (%.3f > %.1f) -> retry", std_norm, MAG_STD_THRESHOLD);
+                if (do_log) ESP_LOGW(TAG, "  Mag:   NG (%.3f > %.1f, n=%d) -> retry", std_norm, MAG_STD_THRESHOLD, mag_st.n);
+                mag_st.reset(g_mag_buf.raw_index());
             }
         } else if (do_log && !mag_passed) {
-            ESP_LOGI(TAG, "  Mag:   waiting (%d/%d samples)", g_mag_buf.count(), MIN_MAG_SAMPLES);
+            ESP_LOGI(TAG, "  Mag:   waiting (%d/%d samples)", mag_st.n, MIN_MAG_SAMPLES);
         }
 
         // === 気圧 ===
-        if (!baro_passed && g_baro_buf.count() >= MIN_BARO_SAMPLES) {
-            float std_val = calcScalarStd(g_baro_buf);
+        if (!baro_passed && baro_st.n >= MIN_BARO_SAMPLES) {
+            float std_val = baro_st.std_val();
             last_baro_std = std_val;
             if (std_val < BARO_STD_THRESHOLD) {
                 baro_passed = true;
-                ESP_LOGI(TAG, "  Baro:  PASSED (%.4f < %.2f)", std_val, BARO_STD_THRESHOLD);
+                ESP_LOGI(TAG, "  Baro:  PASSED (%.4f < %.2f, n=%d)", std_val, BARO_STD_THRESHOLD, baro_st.n);
             } else {
-                g_baro_buf.reset();
-                if (do_log) ESP_LOGW(TAG, "  Baro:  NG (%.4f > %.2f) -> retry", std_val, BARO_STD_THRESHOLD);
+                if (do_log) ESP_LOGW(TAG, "  Baro:  NG (%.4f > %.2f, n=%d) -> retry", std_val, BARO_STD_THRESHOLD, baro_st.n);
+                baro_st.reset(g_baro_buf.raw_index());
             }
         } else if (do_log && !baro_passed) {
-            ESP_LOGI(TAG, "  Baro:  waiting (%d/%d samples)", g_baro_buf.count(), MIN_BARO_SAMPLES);
+            ESP_LOGI(TAG, "  Baro:  waiting (%d/%d samples)", baro_st.n, MIN_BARO_SAMPLES);
         }
 
         // === ToF ===
-        if (!tof_passed && g_tof_bottom_buf.count() >= MIN_TOF_SAMPLES) {
-            float std_val = calcScalarStd(g_tof_bottom_buf);
+        if (!tof_passed && tof_st.n >= MIN_TOF_SAMPLES) {
+            float std_val = tof_st.std_val();
             last_tof_std = std_val;
             if (std_val < TOF_STD_THRESHOLD) {
                 tof_passed = true;
-                ESP_LOGI(TAG, "  ToF:   PASSED (%.4f < %.3f)", std_val, TOF_STD_THRESHOLD);
+                ESP_LOGI(TAG, "  ToF:   PASSED (%.4f < %.3f, n=%d)", std_val, TOF_STD_THRESHOLD, tof_st.n);
             } else {
-                g_tof_bottom_buf.reset();
-                if (do_log) ESP_LOGW(TAG, "  ToF:   NG (%.4f > %.3f) -> retry", std_val, TOF_STD_THRESHOLD);
+                if (do_log) ESP_LOGW(TAG, "  ToF:   NG (%.4f > %.3f, n=%d) -> retry", std_val, TOF_STD_THRESHOLD, tof_st.n);
+                tof_st.reset(g_tof_bottom_buf.raw_index());
             }
         } else if (do_log && !tof_passed) {
-            ESP_LOGI(TAG, "  ToF:   waiting (%d/%d samples)", g_tof_bottom_buf.count(), MIN_TOF_SAMPLES);
+            ESP_LOGI(TAG, "  ToF:   waiting (%d/%d samples)", tof_st.n, MIN_TOF_SAMPLES);
         }
 
         // 全センサー合格したら終了
