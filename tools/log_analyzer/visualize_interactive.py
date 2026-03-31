@@ -459,6 +459,11 @@ def generate_html(data: dict, title: str) -> str:
     duration = data['time_s'][-1] if 'time_s' in data and n_samples > 0 else 0
     rate = n_samples / duration if duration > 0 else 0
 
+    # Round up duration to nearest integer for clean X-axis range
+    # X軸範囲を整数秒に切り上げ
+    import math as _math
+    duration_ceil = _math.ceil(duration) if duration > 0 else 10
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -574,6 +579,7 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
 const DATA = {data_json};
 const CATEGORIES = {categories_json};
 const SIGNAL_TIME_MAP = {signal_time_map_json};
+const DURATION = {duration_ceil};
 const COLORS = {colors_json};
 
 let plots = [];  // [{{ id, div, traces: [{{key, label}}] }}]
@@ -753,6 +759,7 @@ function addPlot() {{
         margin: {{ l: 60, r: 20, t: 10, b: 40 }},
         xaxis: {{
             title: 'Time [s]',
+            range: [0, DURATION],
             showspikes: true,
             spikemode: 'across',
             spikesnap: 'cursor',
