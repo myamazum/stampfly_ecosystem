@@ -106,7 +106,7 @@ extern bool g_baro_reference_set;
 
 // Buffer sizes (each sized for ~0.5s at sensor rate)
 // バッファサイズ（各センサーレートで約0.5秒分）
-inline constexpr int IMU_BUFFER_SIZE  = 400;  // 400Hz × 1.0s (absorbs WiFi TX stalls)
+inline constexpr int IMU_BUFFER_SIZE  = 200;  // 400Hz × 0.5s
 inline constexpr int MAG_BUFFER_SIZE  = 16;   // 25Hz × 0.64s
 inline constexpr int BARO_BUFFER_SIZE = 32;   // 50Hz × 0.64s
 inline constexpr int TOF_BUFFER_SIZE  = 16;   // 30Hz × 0.53s
