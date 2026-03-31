@@ -843,13 +843,12 @@ extern "C" void app_main(void)
         ESP_LOGW(TAG, "Proceeding with initialization anyway...");
     }
 
-    // Recalculate biases from stabilized sensor buffers
-    // 安定化後のセンサーバッファからバイアスを再計算
-    // Phase 2 calibration runs before sensor stabilization; the values may be
-    // inaccurate. Recalculate from the ring buffers that were filled during
-    // the Phase 3 stabilization wait (10 seconds of stable data).
-    // Phase 2 キャリブレーションはセンサー安定化前に実行されるため不正確な可能性がある。
-    // Phase 3 安定化待ち中に蓄積されたリングバッファから再計算する。
+    // Calculate biases from stabilized sensor buffers
+    // 安定化後のセンサーバッファからバイアスを計算
+    // Sensor tasks have been filling ring buffers during Phase 3.
+    // Use the stable data to compute gyro/accel bias.
+    // Phase 3 中にセンサータスクがリングバッファを蓄積済み。
+    // 安定データからジャイロ/加速度バイアスを計算する。
     {
         int count = g_gyro_buf.count();
         if (count > 0) {
