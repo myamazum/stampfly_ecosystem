@@ -427,9 +427,8 @@ static void startTasks()
     xTaskCreatePinnedToCore(CommTask, "CommTask", STACK_SIZE_COMM, nullptr,
                             PRIORITY_COMM_TASK, &g_comm_task_handle, 0);
 
-    // CLI task (Core 0)
-    xTaskCreatePinnedToCore(CLITask, "CLITask", STACK_SIZE_CLI, nullptr,
-                            PRIORITY_CLI_TASK, &g_cli_task_handle, 0);
+    // CLI task: deferred to after Phase 3 stabilization (no prompt during boot)
+    // CLIタスク: Phase 3 安定化後に起動（ブート中にプロンプトを出さない）
 
     // Telemetry task (Core 0) - WebSocket broadcast at 50Hz
     xTaskCreatePinnedToCore(TelemetryTask, "TelemetryTask", STACK_SIZE_TELEMETRY, nullptr,
@@ -949,8 +948,11 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "ESKF ready - you can start logging now");
     ESP_LOGI(TAG, "Free heap: %lu bytes", esp_get_free_heap_size());
     ESP_LOGI(TAG, "========================================");
-    // Log level is now managed by CLI (loaded from NVS at CLI::init())
-    // Use 'loglevel' command to change. Default (no NVS): none
+
+    // Start CLI task after stabilization complete (no prompt during boot)
+    // 安定化完了後にCLIタスクを起動（ブート中にプロンプトを出さない）
+    xTaskCreatePinnedToCore(CLITask, "CLITask", config::STACK_SIZE_CLI, nullptr,
+                            config::PRIORITY_CLI_TASK, &g_cli_task_handle, 0);
 
     // Main loop - just monitor system health
     while (true) {
