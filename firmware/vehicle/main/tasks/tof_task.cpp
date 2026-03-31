@@ -55,6 +55,10 @@ void ToFTask(void* pvParameters)
                 esp_err_t ret = g_tof_bottom.getDistance(distance_mm, status);
                 if (ret == ESP_OK) {
                     bottom_errors = 0;  // Reset on success
+                    // Timestamp on every successful read (regardless of validity)
+                    // for telemetry visibility. Validity is indicated by status.
+                    // 読み取り成功ごとにタイムスタンプ更新（有効性は status で判断）
+                    g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
 
                     // Only update if completely valid measurement (status == 0)
                     // status 0 = valid, 1-7 = various errors, 14 = unknown
@@ -115,7 +119,6 @@ void ToFTask(void* pvParameters)
                             jump_candidate_sum = 0.0f;
                             g_health.tof.recordSuccess();
                             g_tof_task_healthy = g_health.tof.isHealthy();
-                            g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
 
                             // リングバッファに追加
                             g_tof_bottom_buf.push(distance_m);
@@ -173,11 +176,11 @@ void ToFTask(void* pvParameters)
                 uint8_t status;
                 if (g_tof_front.getDistance(distance_mm, status) == ESP_OK) {
                     front_errors = 0;  // Reset on success
+                    g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
                     // Only valid if status == 0 and distance > 0
                     if (status == 0 && distance_mm > 0) {
                         float distance_m = distance_mm * 0.001f;
                         state.updateToF(stampfly::ToFPosition::FRONT, distance_m, status);
-                        g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
 
                         // リングバッファに追加（常時更新）
                         g_tof_front_buf.push(distance_m);
