@@ -127,6 +127,9 @@ SIGNAL_CATEGORIES = {
         ('imu_interval_us', 'IMU Interval [μs] (should be ~2500)'),
         ('telemetry_interval_us', 'Telemetry Interval [μs]'),
     ],
+    'Timing - Telemetry Delay': [
+        ('telemetry_delay_us', 'Telemetry Delay [μs] (WiFi pipeline)'),
+    ],
     'Computed - Gyro Int (raw)': [
         ('gyro_int_roll', 'Gyro Int Roll [deg]'),
         ('gyro_int_pitch', 'Gyro Int Pitch [deg]'),
@@ -264,6 +267,15 @@ def load_csv(filepath: str) -> dict:
         data['telemetry_interval_us'] = [0.0] + [
             data['timestamp_us'][i] - data['timestamp_us'][i - 1]
             for i in range(1, n)
+        ]
+
+    # Compute telemetry delay (WiFi pipeline latency)
+    # テレメトリ遅延（WiFi パイプラインのレイテンシ）
+    # delay = telemetry capture time - IMU internal time
+    if 'timestamp_us' in data and 'imu_timestamp_us' in data and n > 0:
+        data['telemetry_delay_us'] = [
+            data['timestamp_us'][i] - data['imu_timestamp_us'][i]
+            for i in range(n)
         ]
 
     # Choose best time axis for gyro integration
@@ -405,17 +417,36 @@ def generate_html(data: dict, title: str) -> str:
                 if dedup_key in data:
                     signal_time_map[sig] = {'time': time_key, 'data': dedup_key}
 
-    # IMU signals use IMU timestamp
-    imu_signals = [
+    # All 400Hz signals use IMU timestamp (they are all computed in the IMU loop)
+    # 全ての400Hz信号はIMUタイムスタンプを使用（全てIMUループ内で計算される）
+    imu_loop_signals = [
+        # IMU raw and filtered
         'gyro_x', 'gyro_y', 'gyro_z',
         'accel_x', 'accel_y', 'accel_z',
         'gyro_raw_x', 'gyro_raw_y', 'gyro_raw_z',
         'accel_raw_x', 'accel_raw_y', 'accel_raw_z',
         'gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z',
         'accel_corrected_x', 'accel_corrected_y', 'accel_corrected_z',
+        # ESKF output (computed in IMU loop)
+        'roll_deg', 'pitch_deg', 'yaw_deg',
+        'quat_w', 'quat_x', 'quat_y', 'quat_z',
+        'pos_x', 'pos_y', 'pos_z',
+        'vel_x', 'vel_y', 'vel_z',
+        'gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z',
+        'accel_bias_x', 'accel_bias_y', 'accel_bias_z',
+        # Controller inputs (read in IMU loop)
+        'ctrl_throttle', 'ctrl_roll', 'ctrl_pitch', 'ctrl_yaw',
+        # Computed signals (derived from IMU data)
+        'gyro_int_roll', 'gyro_int_pitch', 'gyro_int_yaw',
+        'gyro_corr_int_roll', 'gyro_corr_int_pitch', 'gyro_corr_int_yaw',
+        'accel_roll', 'accel_pitch',
+        'accel_corr_roll', 'accel_corr_pitch',
+        # Timing analysis
+        'imu_interval_us', 'telemetry_interval_us',
+        'telemetry_delay_us',
     ]
     if '_time_imu' in data:
-        for sig in imu_signals:
+        for sig in imu_loop_signals:
             if sig in data:
                 signal_time_map[sig] = {'time': '_time_imu', 'data': sig}
 
