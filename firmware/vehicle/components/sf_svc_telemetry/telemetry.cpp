@@ -208,9 +208,29 @@ esp_err_t Telemetry::ws_handler(httpd_req_t* req)
 
     // Handle WebSocket handshake (HTTP GET request)
     if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "WebSocket handshake from client (fd=%d)", fd);
+        // Check for log client subprotocol: "Sec-WebSocket-Protocol: sf-log"
+        // ログクライアント識別: サブプロトコル "sf-log" をチェック
+        bool is_log_client = false;
+        char proto_buf[32] = {};
+        if (httpd_req_get_hdr_value_str(req, "Sec-WebSocket-Protocol",
+                                         proto_buf, sizeof(proto_buf)) == ESP_OK) {
+            is_log_client = (strncmp(proto_buf, "sf-log", 6) == 0);
+        }
+
+        if (is_log_client) {
+            ESP_LOGI(TAG, "Log client handshake (fd=%d) — entering exclusive mode", fd);
+            // Respond with matching subprotocol to complete handshake
+            // サブプロトコルを返してハンドシェイクを完了
+            httpd_resp_set_hdr(req, "Sec-WebSocket-Protocol", "sf-log");
+            // Disconnect existing non-log clients for exclusive access
+            // 専用アクセスのため既存の非ログクライアントを切断
+            s_instance->disconnectNonLogClients();
+        } else {
+            ESP_LOGI(TAG, "WebSocket handshake from client (fd=%d)", fd);
+        }
+
         // Register client on successful handshake
-        s_instance->addClient(fd);
+        s_instance->addClient(fd, is_log_client);
         return ESP_OK;
     }
 
@@ -260,15 +280,20 @@ esp_err_t Telemetry::ws_handler(httpd_req_t* req)
     return ESP_OK;
 }
 
-void Telemetry::addClient(int fd)
+void Telemetry::addClient(int fd, bool is_log)
 {
     xSemaphoreTake(client_mutex_, portMAX_DELAY);
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (client_fds_[i] == -1) {
             client_fds_[i] = fd;
+            client_is_log_[i] = is_log;
             client_count_++;
-            ESP_LOGI(TAG, "Client connected (fd=%d, total=%d)", fd, client_count_);
+            if (is_log) {
+                log_client_fd_ = fd;
+            }
+            ESP_LOGI(TAG, "Client connected (fd=%d, log=%d, total=%d)",
+                     fd, is_log, client_count_);
             break;
         }
     }
@@ -283,10 +308,46 @@ void Telemetry::removeClient(int fd)
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (client_fds_[i] == fd) {
             client_fds_[i] = -1;
+            client_is_log_[i] = false;
             client_count_--;
+            if (log_client_fd_ == fd) {
+                log_client_fd_ = -1;
+                ESP_LOGI(TAG, "Log client disconnected — exclusive mode ended");
+            }
             ESP_LOGI(TAG, "Client disconnected (fd=%d, total=%d)", fd, client_count_);
             break;
         }
+    }
+
+    xSemaphoreGive(client_mutex_);
+}
+
+void Telemetry::disconnectNonLogClients()
+{
+    // Called BEFORE addClient for the new log client, so mutex is not held yet
+    // 新ログクライアントの addClient 前に呼ばれるため、mutex はまだ保持していない
+    xSemaphoreTake(client_mutex_, portMAX_DELAY);
+
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        int fd = client_fds_[i];
+        if (fd == -1 || client_is_log_[i]) continue;
+
+        ESP_LOGI(TAG, "Disconnecting non-log client fd=%d for exclusive log mode", fd);
+
+        // Send WebSocket close frame to notify the browser
+        // ブラウザに通知するため WebSocket close フレームを送信
+        httpd_ws_frame_t close_pkt = {};
+        close_pkt.type = HTTPD_WS_TYPE_CLOSE;
+        close_pkt.final = true;
+        httpd_ws_send_frame_async(server_, fd, &close_pkt);
+
+        // Trigger httpd to close the socket (which calls close_handler → removeClient)
+        // httpd にソケットクローズを依頼（close_handler → removeClient が呼ばれる）
+        httpd_sess_trigger_close(server_, fd);
+
+        client_fds_[i] = -1;
+        client_is_log_[i] = false;
+        client_count_--;
     }
 
     xSemaphoreGive(client_mutex_);
@@ -300,7 +361,14 @@ int Telemetry::broadcast(const void* data, size_t len)
 
     int sent_count = 0;
 
-    xSemaphoreTake(client_mutex_, portMAX_DELAY);
+    // Use finite timeout to prevent telemetry task from blocking
+    // テレメトリタスクのブロックを防ぐため有限タイムアウトを使用
+    if (xSemaphoreTake(client_mutex_, pdMS_TO_TICKS(5)) != pdTRUE) {
+        // Mutex busy (client connect/disconnect in progress) — drop this frame
+        // Mutex取得失敗（クライアント接続/切断中）— フレームをドロップ
+        drop_count_++;
+        return 0;
+    }
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
         int fd = client_fds_[i];

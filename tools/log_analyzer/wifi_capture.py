@@ -200,6 +200,7 @@ EXTENDED_CSV_COLUMNS = [
     'accel_raw_x', 'accel_raw_y', 'accel_raw_z',
     'imu_timestamp_us', 'baro_timestamp_us', 'tof_timestamp_us',
     'mag_timestamp_us', 'flow_timestamp_us',
+    'gap',
 ]
 
 # CSV columns for FFT mode (with bias-corrected gyro + controller inputs)
@@ -249,6 +250,10 @@ def parse_extended_batch_packet(data: bytes) -> list:
     if checksum != data[checksum_offset]:
         return None
 
+    # Check gap marker in reserved byte (bit0 = ring buffer overrun gap)
+    # reserved バイトの欠損マーカー確認（bit0 = リングバッファオーバーラン）
+    has_gap = (data[3] & 0x01) != 0
+
     # Parse samples
     samples = []
     for i in range(EXTENDED_BATCH_SIZE):
@@ -260,6 +265,7 @@ def parse_extended_batch_packet(data: bytes) -> list:
         idx = 0
         sample = {
             'timestamp_us': values[idx],
+            'gap': has_gap,  # True if this batch contains a data gap
         }
         idx += 1
 
@@ -609,8 +615,12 @@ class TelemetryCapture:
             return False
 
         try:
-            async with websockets.connect(self.uri, ping_interval=None) as ws:
-                print(f"Connected! Capturing for {duration}s...")
+            async with websockets.connect(
+                self.uri,
+                ping_interval=None,
+                subprotocols=["sf-log"],
+            ) as ws:
+                print(f"Connected in exclusive log mode! Capturing for {duration}s...")
                 self.start_time = time.time()
                 end_time = self.start_time + duration
 
@@ -736,11 +746,17 @@ class TelemetryCapture:
             "fft_legacy": "FFT Legacy (32B)"
         }.get(self.mode, self.mode)
 
+        # Count data gaps (ring buffer overrun markers)
+        # データ欠損数（リングバッファオーバーランマーカー）
+        gap_count = sum(1 for p in self.packets if p.get('gap', False))
+
         print(f"\n=== Capture Statistics ===")
         print(f"Mode: {mode_str}")
         print(f"Samples: {n}")
         print(f"Frames: {self.frame_count}")
         print(f"Errors: {self.errors}")
+        if gap_count > 0:
+            print(f"Data gaps: {gap_count} samples (ring buffer overrun)")
         print(f"Duration: {duration:.2f}s")
         print(f"Sample rate: {sample_rate:.1f} Hz")
         print(f"Frame rate: {frame_rate:.1f} Hz")

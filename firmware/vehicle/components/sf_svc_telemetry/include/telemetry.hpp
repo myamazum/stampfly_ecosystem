@@ -424,6 +424,18 @@ public:
      */
     uint32_t getRateHz() const { return config_.rate_hz; }
 
+    /**
+     * @brief Get number of dropped frames (broadcast mutex timeout)
+     * ドロップされたフレーム数を取得（broadcast mutex タイムアウト）
+     */
+    uint32_t dropCount() const { return drop_count_; }
+
+    /**
+     * @brief Check if exclusive log mode is active
+     * 専用ログモードが有効かどうか
+     */
+    bool isLogModeActive() const { return log_client_fd_ >= 0; }
+
 private:
     Telemetry() = default;
 
@@ -435,8 +447,9 @@ private:
     static esp_err_t captive_portal_handler(httpd_req_t* req);
 
     // Client management
-    void addClient(int fd);
+    void addClient(int fd, bool is_log = false);
     void removeClient(int fd);
+    void disconnectNonLogClients();
 
     bool initialized_ = false;
     httpd_handle_t server_ = nullptr;
@@ -446,7 +459,16 @@ private:
     // Connected client FDs (max 4 clients)
     static constexpr int MAX_CLIENTS = 4;
     int client_fds_[MAX_CLIENTS] = {-1, -1, -1, -1};
+    bool client_is_log_[MAX_CLIENTS] = {};  // true if log client
     SemaphoreHandle_t client_mutex_ = nullptr;
+
+    // Exclusive log mode: fd of the active log client (-1 = none)
+    // 専用ログモード: アクティブなログクライアントの fd (-1 = なし)
+    int log_client_fd_ = -1;
+
+    // Broadcast drop counter (mutex timeout)
+    // broadcast ドロップカウンタ（mutex タイムアウト）
+    uint32_t drop_count_ = 0;
 };
 
 }  // namespace stampfly

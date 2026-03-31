@@ -140,6 +140,32 @@ public:
     /// インデックス指定でタイムスタンプ直接アクセス
     uint32_t raw_timestamp_at(int idx) const { return timestamps_[idx]; }
 
+    /// Check if a reader's index has been overrun by the writer.
+    /// Returns true if the writer has lapped the reader, meaning data at
+    /// read_idx is stale/overwritten.
+    /// リーダーのインデックスがライターに追い越されたか判定。
+    /// true の場合、read_idx のデータは上書き済みで不正。
+    bool is_overrun(int read_idx) const {
+        if (count_ < N) return false;  // Buffer hasn't wrapped yet
+        // Distance from read_idx to head (write pointer)
+        int distance = (head_ - read_idx + N) % N;
+        // If distance is 0 the reader caught up to the writer (also overrun)
+        // If distance > N/2 it means read is far behind (likely overrun)
+        // Exact condition: buffer is full and distance is 0 (reader == writer)
+        // But since writer advances continuously, any distance < safety_margin
+        // means risk of reading partially-overwritten data.
+        // Practical threshold: treat as overrun if reader is within 10 samples
+        // of the write head (2.5% of buffer at size 400).
+        return distance == 0 || distance > (N - 10);
+    }
+
+    /// Reset a reader's index to a safe position (latest minus margin).
+    /// Returns the new read index.
+    /// リーダーのインデックスを安全な位置にリセット（最新から margin 分戻す）。
+    int safe_read_index(int margin = 10) const {
+        return (head_ - margin + N) % N;
+    }
+
     // =========================================================================
     // Reset
     // =========================================================================

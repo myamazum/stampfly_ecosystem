@@ -40,6 +40,11 @@ void TelemetryTask(void* pvParameters)
     // デバッグ用送信カウンタ
     static uint32_t send_counter = 0;
 
+    // Overrun tracking
+    // オーバーラン追跡
+    uint32_t overrun_count = 0;
+    bool batch_has_gap = false;
+
     ESP_LOGI(TAG, "400Hz IMU-synced sampling, batch of %d, frame rate ~100Hz",
              stampfly::FFT_BATCH_SIZE);
     ESP_LOGI(TAG, "Extended packet: %d bytes/sample, %d bytes/batch",
@@ -57,6 +62,17 @@ void TelemetryTask(void* pvParameters)
         if (xSemaphoreTake(g_telemetry_imu_semaphore, pdMS_TO_TICKS(10)) != pdTRUE) {
             // Timeout - IMU task might be stuck, skip this iteration
             continue;
+        }
+
+        // Detect ring buffer overrun: read_index lapped by writer
+        // リングバッファオーバーラン検出: read_index がライターに追い越された
+        if (g_accel_buf.is_overrun(telemetry_read_index)) {
+            overrun_count++;
+            batch_has_gap = true;
+            int new_idx = g_accel_buf.safe_read_index(10);
+            ESP_LOGW(TAG, "Ring buffer overrun #%lu, resetting read index %d→%d",
+                     overrun_count, telemetry_read_index, new_idx);
+            telemetry_read_index = new_idx;
         }
 
         // Get current sample slot
@@ -233,7 +249,10 @@ void TelemetryTask(void* pvParameters)
                 batch_pkt.header = 0xBD;  // Extended batch packet
                 batch_pkt.packet_type = 0x32;
                 batch_pkt.sample_count = stampfly::FFT_BATCH_SIZE;
-                batch_pkt.reserved = 0;
+                // Gap marker: bit0 = data gap due to ring buffer overrun
+                // 欠損マーカー: bit0 = リングバッファオーバーランによるデータ欠損
+                batch_pkt.reserved = batch_has_gap ? 0x01 : 0x00;
+                batch_has_gap = false;  // Reset for next batch
 
                 // Calculate checksum (XOR of bytes before checksum)
                 // チェックサム計算（checksum前のバイトのXOR）
