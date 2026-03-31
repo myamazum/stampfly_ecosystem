@@ -512,17 +512,15 @@ extern "C" void app_main(void)
     // Phase 1: Boot notification (brief buzzer, no countdown)
     // =========================================================================
     ESP_LOGI(TAG, "Phase 1: Boot notification...");
-    g_buzzer.startTone();
-
-    // =========================================================================
-    // Phase 2: Sensor initialization (White solid)
-    // =========================================================================
-    // LEDTask is not running yet — use SOLID (no animation update needed)
-    // LEDTask 未起動のため SOLID を使用（アニメーション更新不要）
-    ESP_LOGI(TAG, "Phase 2: Initializing sensors...");
     led_mgr.requestChannel(stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::BOOT,
                            stampfly::LEDPattern::SOLID, 0xFFFFFF);  // White solid
     led_mgr.update();  // Apply once (SOLID needs no periodic update)
+    g_buzzer.startTone();
+
+    // =========================================================================
+    // Phase 2: Sensor initialization (LED already white from Phase 1)
+    // =========================================================================
+    ESP_LOGI(TAG, "Phase 2: Initializing sensors...");
 
     init::sensors();
 
