@@ -177,6 +177,7 @@ void ToFTask(void* pvParameters)
                     if (status == 0 && distance_mm > 0) {
                         float distance_m = distance_mm * 0.001f;
                         state.updateToF(stampfly::ToFPosition::FRONT, distance_m, status);
+                        g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
 
                         // リングバッファに追加（常時更新）
                         g_tof_front_buf.push(distance_m);
