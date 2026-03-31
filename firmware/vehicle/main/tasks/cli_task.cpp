@@ -24,7 +24,13 @@ using namespace globals;
 
 void CLITask(void* pvParameters)
 {
-    ESP_LOGI(TAG, "CLITask started");
+    ESP_LOGI(TAG, "CLITask started, waiting for boot complete...");
+
+    // Wait for boot sequence to finish before showing prompt
+    // ブートシーケンス完了までプロンプト表示を待機
+    while (!g_boot_complete) {
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
 
     // Get SerialCLI singleton instance
     // SerialCLIシングルトンインスタンスを取得

@@ -157,6 +157,7 @@ extern stampfly::math::Vector3 g_initial_accel_bias;
 // =============================================================================
 
 extern volatile bool g_eskf_ready;
+extern volatile bool g_boot_complete;
 
 // Sensor health flags (for cross-task communication)
 extern volatile bool g_imu_task_healthy;
