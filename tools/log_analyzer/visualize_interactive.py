@@ -173,13 +173,63 @@ def load_csv(filepath: str) -> dict:
         except (ValueError, KeyError):
             pass
 
-    # Compute time in seconds
+    # Compute time in seconds (telemetry capture time)
     if 'timestamp_us' in data:
         t0 = data['timestamp_us'][0]
         data['time_s'] = [(t - t0) / 1e6 for t in data['timestamp_us']]
     elif 'timestamp_ms' in data:
         t0 = data['timestamp_ms'][0]
         data['time_s'] = [(t - t0) / 1e3 for t in data['timestamp_ms']]
+
+    # Compute sensor-specific time axes (using internal timestamps)
+    # 各センサー固有の時間軸を生成（内部タイムスタンプ使用）
+    # Use the first available timestamp as t0 reference
+    if 'imu_timestamp_us' in data:
+        t0_internal = data['imu_timestamp_us'][0]
+    elif 'timestamp_us' in data:
+        t0_internal = data['timestamp_us'][0]
+    else:
+        t0_internal = 0
+
+    # IMU time axis
+    if 'imu_timestamp_us' in data:
+        data['_time_imu'] = [(t - t0_internal) / 1e6 for t in data['imu_timestamp_us']]
+
+    # Sensor time axes with deduplication
+    # 重複除去付きセンサー時間軸
+    # For sensors that update slower than 400Hz, the same timestamp repeats.
+    # We create deduplicated time+value arrays (suffix _dedup).
+    sensor_ts_map = {
+        'baro': ('baro_timestamp_us', ['baro_altitude', 'baro_pressure']),
+        'tof': ('tof_timestamp_us', ['tof_bottom', 'tof_front', 'tof_bottom_status', 'tof_front_status']),
+        'mag': ('mag_timestamp_us', ['mag_x', 'mag_y', 'mag_z']),
+        'flow': ('flow_timestamp_us', ['flow_x', 'flow_y', 'flow_quality']),
+    }
+
+    for sensor_name, (ts_key, signal_keys) in sensor_ts_map.items():
+        if ts_key not in data:
+            continue
+        timestamps = data[ts_key]
+        n = len(timestamps)
+        if n == 0:
+            continue
+
+        # Find indices where timestamp changes (= new sensor reading)
+        # タイムスタンプが変わったインデックス（= 新しいセンサー読み取り）
+        unique_indices = [0]
+        for i in range(1, n):
+            if timestamps[i] != timestamps[i - 1]:
+                unique_indices.append(i)
+
+        # Create deduplicated time axis
+        time_key = f'_time_{sensor_name}'
+        data[time_key] = [(timestamps[i] - t0_internal) / 1e6 for i in unique_indices]
+
+        # Create deduplicated signal arrays
+        for sig_key in signal_keys:
+            if sig_key in data:
+                dedup_key = f'{sig_key}_dedup'
+                data[dedup_key] = [data[sig_key][i] for i in unique_indices]
 
     # Compute attitude from quaternion (ESKF output)
     # クォータニオンから姿勢角を計算（ESKF出力）
@@ -318,18 +368,57 @@ def generate_html(data: dict, title: str) -> str:
         if available:
             categories[cat] = available
 
-    # Serialize data to JSON (only signals that exist + time)
+    # Serialize data to JSON (only signals that exist + time axes)
     all_keys = set()
     for sigs in categories.values():
         for key, _ in sigs:
             all_keys.add(key)
     all_keys.add('time_s')
 
+    # Add internal time axes and dedup signals
+    # 内部時間軸と重複除去済み信号を追加
+    for k in list(data.keys()):
+        if k.startswith('_time_') or k.endswith('_dedup'):
+            all_keys.add(k)
+
     export_data = {k: data[k] for k in all_keys if k in data}
+
+    # Build signal-to-time-axis mapping
+    # 信号→時間軸のマッピングを構築
+    # Sensors with dedicated timestamps use their own time axis + dedup data
+    signal_time_map = {}
+    sensor_signal_map = {
+        'baro': ['baro_altitude', 'baro_pressure'],
+        'tof': ['tof_bottom', 'tof_front', 'tof_bottom_status', 'tof_front_status'],
+        'mag': ['mag_x', 'mag_y', 'mag_z'],
+        'flow': ['flow_x', 'flow_y', 'flow_quality'],
+    }
+    for sensor_name, signals in sensor_signal_map.items():
+        time_key = f'_time_{sensor_name}'
+        if time_key in data:
+            for sig in signals:
+                dedup_key = f'{sig}_dedup'
+                if dedup_key in data:
+                    signal_time_map[sig] = {'time': time_key, 'data': dedup_key}
+
+    # IMU signals use IMU timestamp
+    imu_signals = [
+        'gyro_x', 'gyro_y', 'gyro_z',
+        'accel_x', 'accel_y', 'accel_z',
+        'gyro_raw_x', 'gyro_raw_y', 'gyro_raw_z',
+        'accel_raw_x', 'accel_raw_y', 'accel_raw_z',
+        'gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z',
+        'accel_corrected_x', 'accel_corrected_y', 'accel_corrected_z',
+    ]
+    if '_time_imu' in data:
+        for sig in imu_signals:
+            if sig in data:
+                signal_time_map[sig] = {'time': '_time_imu', 'data': sig}
 
     data_json = json.dumps(export_data, separators=(',', ':'))
     categories_json = json.dumps(categories, ensure_ascii=False)
     colors_json = json.dumps(COLORS)
+    signal_time_map_json = json.dumps(signal_time_map)
 
     n_samples = len(data.get('time_s', []))
     duration = data['time_s'][-1] if 'time_s' in data and n_samples > 0 else 0
@@ -441,6 +530,7 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
 <script>
 const DATA = {data_json};
 const CATEGORIES = {categories_json};
+const SIGNAL_TIME_MAP = {signal_time_map_json};
 const COLORS = {colors_json};
 
 let plots = [];  // [{{ id, div, traces: [{{key, label}}] }}]
@@ -687,10 +777,20 @@ function addSignalToPlot(plot, key, label) {{
     // Check if already added
     if (plot.traces.find(t => t.key === key)) return;
 
+    // Use sensor-specific time axis and deduped data if available
+    // 利用可能なら各センサー固有の時間軸と重複除去済みデータを使用
+    let xData = DATA.time_s;
+    let yData = DATA[key];
+    const mapping = SIGNAL_TIME_MAP[key];
+    if (mapping && DATA[mapping.time] && DATA[mapping.data]) {{
+        xData = DATA[mapping.time];
+        yData = DATA[mapping.data];
+    }}
+
     const color = nextColor();
     const trace = {{
-        x: DATA.time_s,
-        y: DATA[key],
+        x: xData,
+        y: yData,
         name: label,
         type: 'scattergl',
         mode: 'lines',
