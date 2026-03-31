@@ -100,7 +100,7 @@ extern bool g_baro_reference_set;
 // Sensor Reference Buffers (for attitude initialization)
 // =============================================================================
 
-inline constexpr int REF_BUFFER_SIZE = 100;
+inline constexpr int REF_BUFFER_SIZE = 200;  // 500ms @ 400Hz (was 100 = 250ms)
 
 // Accelerometer buffer (LPF filtered, for ESKF)
 extern stampfly::math::Vector3 g_accel_buffer[REF_BUFFER_SIZE];
