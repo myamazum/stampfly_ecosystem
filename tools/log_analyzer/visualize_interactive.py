@@ -228,8 +228,11 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
     display: flex; justify-content: space-between; align-items: center;
     padding: 4px 10px; border-bottom: 1px solid #eee; font-size: 12px;
     color: #555; background: #fafafa; border-radius: 6px 6px 0 0;
+    cursor: pointer;
 }}
 .plot-header span {{ font-weight: 600; }}
+.plot-container.active {{ border: 2px solid #4363d8; }}
+.plot-container.active .plot-header {{ background: #e8ecf8; }}
 .plot-div {{ width: 100%; }}
 </style>
 </head>
@@ -249,7 +252,7 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
         <button onclick="clearAll()">Clear All</button>
         <div style="margin-top:8px">
             <label>Target plot:</label>
-            <select id="target-plot" style="width:100%"></select>
+            <select id="target-plot" style="width:100%" onchange="selectPlot(this.value)"></select>
         </div>
     </div>
 </div>
@@ -353,6 +356,17 @@ function updateTargetSelect() {{
     }}
 }}
 
+function selectPlot(id) {{
+    // Set target plot and highlight
+    // ターゲットプロットを設定してハイライト
+    const sel = document.getElementById('target-plot');
+    sel.value = id;
+    // Update visual highlight
+    document.querySelectorAll('.plot-container').forEach(el => el.classList.remove('active'));
+    const container = document.getElementById(`container_${{id}}`);
+    if (container) container.classList.add('active');
+}}
+
 function addPlot() {{
     plotCounter++;
     const id = `plot_${{plotCounter}}`;
@@ -363,14 +377,23 @@ function addPlot() {{
     container.className = 'plot-container';
     container.id = `container_${{id}}`;
     container.innerHTML = `
-        <div class="plot-header">
+        <div class="plot-header" onclick="selectPlot('${{id}}')">
+            <span style="color:#4363d8;font-size:11px;margin-right:6px">[${{plotCounter}}]</span>
             <span id="title_${{id}}">${{title}}</span>
             <span id="cursor_${{id}}" style="font-family:monospace;font-size:11px;color:#888;margin-left:auto;margin-right:12px"></span>
-            <button class="danger" onclick="removePlot('${{id}}')" style="font-size:11px;padding:2px 8px">✕ Remove</button>
+            <button class="danger" onclick="event.stopPropagation();removePlot('${{id}}')" style="font-size:11px;padding:2px 8px">✕ Remove</button>
         </div>
         <div id="${{id}}" class="plot-div"></div>
     `;
     area.appendChild(container);
+
+    // Click anywhere on plot area to select as target
+    // プロットエリアのクリックでターゲットに選択
+    container.addEventListener('click', function(e) {{
+        // Don't select if clicking remove button
+        if (e.target.tagName === 'BUTTON') return;
+        selectPlot(id);
+    }});
 
     const layout = {{
         height: 280,
@@ -439,6 +462,7 @@ function addPlot() {{
     const plot = {{ id, title, div: plotDiv, traces: [] }};
     plots.push(plot);
     updateTargetSelect();
+    selectPlot(id);  // Auto-select new plot as target
     return plot;
 }}
 
