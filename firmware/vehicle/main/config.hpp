@@ -117,7 +117,7 @@ namespace eskf {
 inline constexpr bool USE_OPTICAL_FLOW = true;     // オプティカルフロー（姿勢保護追加済み）
 inline constexpr bool USE_BAROMETER = true;        // 気圧センサー（姿勢保護追加済み）
 inline constexpr bool USE_TOF = true;              // ToFセンサー（姿勢保護追加済み）
-inline constexpr bool USE_MAGNETOMETER = true;     // 地磁気観測更新（ヨー補正）
+inline constexpr bool USE_MAGNETOMETER = false;    // 地磁気無効（モータ磁気干渉が大きいため）
 inline constexpr bool ENABLE_YAW_ESTIMATION = true; // ヨー推定（ジャイロ積分）※falseで0固定
 
 // -----------------------------------------------------------------------------
