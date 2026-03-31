@@ -245,26 +245,35 @@ void TelemetryTask(void* pvParameters)
         // バッチが満杯（4サンプル）になったら送信
         if (batch_index >= stampfly::FFT_BATCH_SIZE) {
             if (telemetry.hasClients()) {
-                // Fill header
-                batch_pkt.header = 0xBD;  // Extended batch packet
-                batch_pkt.packet_type = 0x32;
-                batch_pkt.sample_count = stampfly::FFT_BATCH_SIZE;
-                // Gap marker: bit0 = data gap due to ring buffer overrun
-                // 欠損マーカー: bit0 = リングバッファオーバーランによるデータ欠損
-                batch_pkt.reserved = batch_has_gap ? 0x01 : 0x00;
-                batch_has_gap = false;  // Reset for next batch
+                // Rate control: log mode = every frame (100fps=400Hz),
+                // browser only = every 8th frame (12.5fps≈50Hz)
+                // レート制御: ログモード=全フレーム(100fps=400Hz),
+                // ブラウザのみ=8フレームに1回(12.5fps≈50Hz)
+                bool should_send = telemetry.isLogModeActive()
+                                 || (send_counter % 8 == 0);
 
-                // Calculate checksum (XOR of bytes before checksum)
-                // チェックサム計算（checksum前のバイトのXOR）
-                uint8_t checksum = 0;
-                const uint8_t* data = reinterpret_cast<const uint8_t*>(&batch_pkt);
-                constexpr size_t checksum_offset = offsetof(stampfly::TelemetryExtendedBatchPacket, checksum);
-                for (size_t i = 0; i < checksum_offset; i++) {
-                    checksum ^= data[i];
+                if (should_send) {
+                    // Fill header
+                    batch_pkt.header = 0xBD;  // Extended batch packet
+                    batch_pkt.packet_type = 0x32;
+                    batch_pkt.sample_count = stampfly::FFT_BATCH_SIZE;
+                    // Gap marker: bit0 = data gap due to ring buffer overrun
+                    // 欠損マーカー: bit0 = リングバッファオーバーランによるデータ欠損
+                    batch_pkt.reserved = batch_has_gap ? 0x01 : 0x00;
+                    batch_has_gap = false;  // Reset for next batch
+
+                    // Calculate checksum (XOR of bytes before checksum)
+                    // チェックサム計算（checksum前のバイトのXOR）
+                    uint8_t checksum = 0;
+                    const uint8_t* data = reinterpret_cast<const uint8_t*>(&batch_pkt);
+                    constexpr size_t checksum_offset = offsetof(stampfly::TelemetryExtendedBatchPacket, checksum);
+                    for (size_t i = 0; i < checksum_offset; i++) {
+                        checksum ^= data[i];
+                    }
+                    batch_pkt.checksum = checksum;
+
+                    telemetry.broadcast(&batch_pkt, sizeof(batch_pkt));
                 }
-                batch_pkt.checksum = checksum;
-
-                telemetry.broadcast(&batch_pkt, sizeof(batch_pkt));
                 send_counter++;
             }
 

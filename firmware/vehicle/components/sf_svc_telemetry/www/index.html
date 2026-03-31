@@ -536,14 +536,14 @@ const PKT = {
 // V3.0 Extended Batch Packet (552 bytes) - 400Hz unified telemetry
 // 4 samples × 136 bytes per batch, sent at 100fps
 const PKT_EXT = {
-    SIZE: 552,
+    SIZE: 840,          // 4 + 208*4 + 4
     HEADER: 0,          // 0xBD
     TYPE: 1,            // 0x32
     SAMPLE_COUNT: 2,
     RESERVED: 3,
     SAMPLES_START: 4,
-    SAMPLE_SIZE: 136,
-    CHECKSUM: 548,
+    SAMPLE_SIZE: 208,   // ExtendedSample: 208 bytes
+    CHECKSUM: 836,      // 4 + 208*4
 };
 
 // ExtendedSample offsets within each sample (136 bytes)
@@ -579,14 +579,35 @@ const SAMPLE = {
     ACCEL_BIAS_Y: 104,
     ACCEL_BIAS_Z: 106,
     ESKF_STATUS: 108,       // uint8_t
-    PADDING1: 109,          // 7 bytes
-    BARO_ALT: 116,          // float [m]
-    TOF_BOTTOM: 120,        // float [m]
-    TOF_FRONT: 124,         // float [m]
-    FLOW_X: 128,            // int16_t
-    FLOW_Y: 130,            // int16_t
-    FLOW_QUALITY: 132,      // uint8_t
-    PADDING2: 133,          // 3 bytes -> total 136
+    // padding1[3] at 109-111
+    ACCEL_CORR_X: 112,     // float [m/s²] bias-corrected
+    ACCEL_CORR_Y: 116,
+    ACCEL_CORR_Z: 120,
+    BARO_ALT: 124,          // float [m]
+    BARO_PRESS: 128,        // float [hPa]
+    TOF_BOTTOM: 132,        // float [m]
+    TOF_FRONT: 136,         // float [m]
+    TOF_BOTTOM_STATUS: 140, // uint8_t
+    TOF_FRONT_STATUS: 141,  // uint8_t
+    FLOW_X: 142,            // int16_t
+    FLOW_Y: 144,            // int16_t
+    FLOW_QUALITY: 146,      // uint8_t
+    // padding2 at 147
+    MAG_X: 148,             // float [uT]
+    MAG_Y: 152,
+    MAG_Z: 156,
+    GYRO_RAW_X: 160,        // float [rad/s] pre-LPF
+    GYRO_RAW_Y: 164,
+    GYRO_RAW_Z: 168,
+    ACCEL_RAW_X: 172,       // float [m/s²] pre-LPF
+    ACCEL_RAW_Y: 176,
+    ACCEL_RAW_Z: 180,
+    IMU_TS: 184,            // uint32_t [μs]
+    BARO_TS: 188,           // uint32_t [μs]
+    TOF_TS: 192,            // uint32_t [μs]
+    MAG_TS: 196,            // uint32_t [μs]
+    FLOW_TS: 200,           // uint32_t [μs]
+    // padding3 at 204-207 -> total 208
 };
 
 const HISTORY_SIZE = 500;
