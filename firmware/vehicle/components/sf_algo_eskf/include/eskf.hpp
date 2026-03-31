@@ -430,6 +430,7 @@ public:
      * @brief 共分散行列取得 (デバッグ用)
      */
     const Matrix<15, 15>& getCovariance() const { return P_; }
+    Matrix<15, 15>& getCovariance() { return P_; }
 
     /**
      * @brief 地磁気参照ベクトル取得 (デバッグ用)

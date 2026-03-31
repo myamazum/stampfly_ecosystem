@@ -862,6 +862,29 @@ extern "C" void app_main(void)
         g_fusion.reset();
         g_fusion.setGyroBias(g_initial_gyro_bias);
         g_fusion.setAccelBias(g_initial_accel_bias);
+
+        // Shrink bias covariance after setting calibrated values.
+        // reset() sets P(bg) = init_gyro_bias_std² = 1e-4 which is too large;
+        // ESKF observation updates (accel attitude, mag) drag the bias away
+        // from the calibrated value within seconds. Use smaller P to trust
+        // the calibration data which was computed from 100 stable samples.
+        // キャリブレーション値設定後にバイアス共分散を縮小。
+        // reset() の P(bg) = 1e-4 は大きすぎ、観測更新が数秒でバイアスを
+        // 不正な方向に引っ張る。安定データ100サンプルのキャリブレーション値を信頼する。
+        {
+            auto& P = g_fusion.getESKF().getCovariance();
+            // Gyro bias: trust calibration, reduce P by 100x
+            float gb_var = config::eskf::INIT_GYRO_BIAS_STD * config::eskf::INIT_GYRO_BIAS_STD * 0.01f;
+            P(9, 9) = gb_var;   // BG_X
+            P(10, 10) = gb_var; // BG_Y
+            P(11, 11) = gb_var; // BG_Z
+            // Accel bias: trust calibration, reduce P by 100x
+            float ab_var = config::eskf::INIT_ACCEL_BIAS_STD * config::eskf::INIT_ACCEL_BIAS_STD * 0.01f;
+            P(12, 12) = ab_var; // BA_X
+            P(13, 13) = ab_var; // BA_Y
+            P(14, 14) = ab_var; // BA_Z
+        }
+
         initializeAttitudeFromBuffers();
 
         // センサーフュージョン処理を開始
