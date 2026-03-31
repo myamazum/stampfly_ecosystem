@@ -226,6 +226,15 @@ esp_err_t Telemetry::ws_handler(httpd_req_t* req)
             // Disconnect existing non-log clients for exclusive access
             // 専用アクセスのため既存の非ログクライアントを切断
             s_instance->disconnectNonLogClients();
+        } else if (s_instance->log_client_fd_ >= 0) {
+            // Reject non-log connections while exclusive log mode is active.
+            // Browser auto-reconnects after onclose, so we must refuse here.
+            // 専用ログモード中は非ログ接続を拒否。
+            // ブラウザは onclose 後に自動再接続するため、ここで拒否が必要。
+            ESP_LOGI(TAG, "Rejecting non-log client (fd=%d) — log mode active", fd);
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_send(req, "Log capture in progress", -1);
+            return ESP_FAIL;
         } else {
             ESP_LOGI(TAG, "WebSocket handshake from client (fd=%d)", fd);
         }
@@ -348,23 +357,17 @@ void Telemetry::disconnectNonLogClients()
 
     xSemaphoreGive(client_mutex_);
 
-    // Close sockets outside mutex — close() triggers close_handler callback,
-    // which calls removeClient(), but we already cleared the slot above.
-    // mutex 外でソケットをクローズ — close() は close_handler → removeClient() を
-    // トリガするが、スロットは上で既にクリア済み。
+    // Close sockets outside mutex via httpd API.
+    // Direct close(fd) causes EBADF in httpd's select() loop, so we use
+    // httpd_sess_trigger_close which schedules a clean close on next tick.
+    // The browser will auto-reconnect, but ws_handler now rejects non-log
+    // clients while log mode is active.
+    // mutex 外で httpd API 経由でソケットをクローズ。
+    // 直接 close(fd) すると httpd の select() で EBADF が発生するため、
+    // httpd_sess_trigger_close で次のティックでクリーンにクローズする。
+    // ブラウザは自動再接続するが、ws_handler がログモード中は拒否する。
     for (int i = 0; i < close_count; i++) {
-        // Send WS close frame first (best-effort, may fail if TCP buffer full)
-        // 先に WS close フレームを送信（ベストエフォート、TCP バッファ満杯時は失敗可能）
-        httpd_ws_frame_t close_pkt = {};
-        close_pkt.type = HTTPD_WS_TYPE_CLOSE;
-        close_pkt.final = true;
-        httpd_ws_send_frame_async(server_, fds_to_close[i], &close_pkt);
-
-        // Force-close the TCP socket — this is the reliable disconnect path.
-        // TCP ソケットを強制クローズ — これが確実な切断経路。
-        // httpd_sess_trigger_close schedules close for next server tick,
-        // but direct close() ensures immediate disconnection.
-        close(fds_to_close[i]);
+        httpd_sess_trigger_close(server_, fds_to_close[i]);
     }
 }
 
