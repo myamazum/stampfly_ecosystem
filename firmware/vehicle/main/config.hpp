@@ -510,7 +510,7 @@ namespace altitude_control {
 
 // 機体パラメータ
 // Vehicle parameters
-inline constexpr float MASS = 0.035f;                    // [kg]
+inline constexpr float MASS = 0.037f;                    // [kg]
 inline constexpr float GRAVITY = 9.81f;                  // [m/s²]
 inline constexpr float MAX_TOTAL_THRUST = 4.0f * 0.15f;  // 0.60N (4 motors)
 
