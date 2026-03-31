@@ -354,8 +354,8 @@ static void startTasks()
     ESP_LOGI(TAG, "Starting FreeRTOS tasks...");
 
     // Peripheral tasks (Core 0)
-    xTaskCreatePinnedToCore(LEDTask, "LEDTask", STACK_SIZE_LED, nullptr,
-                            PRIORITY_LED_TASK, &g_led_task_handle, 0);
+    // Note: LEDTask is started earlier (before Phase 2) for boot animation
+    // 注: LEDTask はブートアニメーションのため Phase 2 前に起動済み
 
     xTaskCreatePinnedToCore(ButtonTask, "ButtonTask", STACK_SIZE_BUTTON, nullptr,
                             PRIORITY_BUTTON_TASK, &g_button_task_handle, 0);
@@ -506,8 +506,10 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "Initializing actuators...");
     init::actuators();
 
-    // LEDManagerを取得
+    // LEDManagerを取得し、LEDTaskを先行起動（アニメーション駆動用）
     auto& led_mgr = stampfly::LEDManager::getInstance();
+    xTaskCreatePinnedToCore(LEDTask, "LEDTask", config::STACK_SIZE_LED, nullptr,
+                            config::PRIORITY_LED_TASK, &g_led_task_handle, 0);
 
     // =========================================================================
     // Phase 1: Boot notification (brief buzzer, no countdown)
@@ -518,52 +520,30 @@ extern "C" void app_main(void)
     // =========================================================================
     // Phase 2: Sensor initialization (Blue breathing)
     // =========================================================================
+    // LEDTask が既に動いているのでアニメーションは自動更新される
     ESP_LOGI(TAG, "Phase 2: Initializing sensors...");
     led_mgr.requestChannel(stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::BOOT,
                            stampfly::LEDPattern::BREATHE, 0x0000FF);  // Blue
 
-    // LED更新ヘルパー（初期化中に数回呼び出す）
-    auto updateLedDuringInit = [&]() {
-        for (int i = 0; i < 10; i++) {
-            led_mgr.update();
-            vTaskDelay(pdMS_TO_TICKS(20));
-        }
-    };
-
-    updateLedDuringInit();
     init::sensors();
-    updateLedDuringInit();
 
-    // Initialize estimators
     ESP_LOGI(TAG, "Initializing estimators...");
     init::estimators();
-    updateLedDuringInit();
 
-    // Initialize communication (ESP-NOW)
     ESP_LOGI(TAG, "Initializing communication...");
     init::communication();
-    updateLedDuringInit();
 
-    // Initialize Console (esp_console - shared by Serial REPL and WiFi CLI)
     ESP_LOGI(TAG, "Initializing Console...");
     init::console();
-    updateLedDuringInit();
 
-    // Initialize Logger (400Hz binary log)
     ESP_LOGI(TAG, "Initializing Logger...");
     init::logger();
-    updateLedDuringInit();
 
-    // Initialize Telemetry (WebSocket server)
     ESP_LOGI(TAG, "Initializing Telemetry...");
     init::telemetry();
-    updateLedDuringInit();
 
-    // Initialize WiFi CLI (Telnet server)
-    // WiFi CLI初期化（Telnetサーバー）
     ESP_LOGI(TAG, "Initializing WiFi CLI...");
     init::wifi_cli();
-    updateLedDuringInit();
 
     // Start all tasks
     ESP_LOGI(TAG, "Starting tasks...");
