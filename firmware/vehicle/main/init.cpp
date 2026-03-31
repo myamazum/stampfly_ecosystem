@@ -423,10 +423,10 @@ esp_err_t estimators()
             state.setESKFInitialized(true);
             g_fusion_ptr = &g_fusion;  // Set pointer for CLI access
 
-            // Gyro/accel bias and mag reference are set after Phase 3
+            // Gyro/accel bias and mag reference are set after Phase 2
             // stabilization in main.cpp (using stable sensor data)
             // ジャイロ/加速度バイアスと磁気リファレンスは main.cpp の
-            // Phase 3 安定化後に安定データから設定する
+            // Phase 2 安定化後に安定データから設定する
         }
     }
 

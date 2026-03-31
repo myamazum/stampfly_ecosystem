@@ -509,18 +509,15 @@ extern "C" void app_main(void)
     auto& led_mgr = stampfly::LEDManager::getInstance();
 
     // =========================================================================
-    // Phase 1: Boot notification (brief buzzer, no countdown)
     // =========================================================================
-    ESP_LOGI(TAG, "Phase 1: Boot notification...");
+    // Phase 1: Peripheral & sensor initialization (White solid LED)
+    // Phase 1: ペリフェラル・センサー初期化（白LED点灯）
+    // =========================================================================
+    ESP_LOGI(TAG, "Phase 1: Initializing peripherals and sensors...");
     led_mgr.requestChannel(stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::BOOT,
                            stampfly::LEDPattern::SOLID, 0xFFFFFF);  // White solid
     led_mgr.update();  // Apply once (SOLID needs no periodic update)
     g_buzzer.startTone();
-
-    // =========================================================================
-    // Phase 2: Sensor initialization (LED already white from Phase 1)
-    // =========================================================================
-    ESP_LOGI(TAG, "Phase 2: Initializing sensors...");
 
     init::sensors();
 
@@ -593,10 +590,11 @@ extern "C" void app_main(void)
     }
 
     // =========================================================================
-    // Phase 3: Sensor stabilization (Magenta blinking)
+    // Phase 2: Task startup & sensor stabilization (Magenta blinking)
+    // Phase 2: タスク起動 & センサー安定化（マゼンタ点滅）
     // =========================================================================
     // g_eskf_ready = false なので IMUTask は sensor fusion 処理をスキップしている
-    ESP_LOGI(TAG, "Phase 3: Waiting for sensors to stabilize...");
+    ESP_LOGI(TAG, "Phase 2: Waiting for sensors to stabilize...");
     led_mgr.requestChannel(stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::BOOT,
                            stampfly::LEDPattern::BLINK_SLOW, 0xFF00FF);  // Magenta blink
 
@@ -842,9 +840,9 @@ extern "C" void app_main(void)
 
     // Calculate biases from stabilized sensor buffers
     // 安定化後のセンサーバッファからバイアスを計算
-    // Sensor tasks have been filling ring buffers during Phase 3.
+    // Sensor tasks have been filling ring buffers during Phase 2.
     // Use the stable data to compute gyro/accel bias.
-    // Phase 3 中にセンサータスクがリングバッファを蓄積済み。
+    // Phase 2 中にセンサータスクがリングバッファを蓄積済み。
     // 安定データからジャイロ/加速度バイアスを計算する。
     {
         int count = g_gyro_buf.count();
@@ -905,9 +903,10 @@ extern "C" void app_main(void)
     }
 
     // =========================================================================
-    // Phase 4: Ready (Green solid)
+    // Phase 3: System ready (Green solid)
+    // Phase 3: システム準備完了（緑LED）
     // =========================================================================
-    ESP_LOGI(TAG, "Phase 4: System ready!");
+    ESP_LOGI(TAG, "Phase 3: System ready!");
     g_buzzer.beep();
     vTaskDelay(pdMS_TO_TICKS(150));
     g_buzzer.beep();
