@@ -64,6 +64,16 @@ void TelemetryTask(void* pvParameters)
             continue;
         }
 
+        // Resync read_index on new client connection to avoid initial backlog
+        // 新クライアント接続時に read_index を最新位置にリセットし、初期バックログを回避
+        if (telemetry.consumeResyncRequest()) {
+            int new_idx = g_accel_buf.safe_read_index(4);
+            ESP_LOGI(TAG, "Client connected — resync read index %d→%d",
+                     telemetry_read_index, new_idx);
+            telemetry_read_index = new_idx;
+            batch_index = 0;
+        }
+
         // Detect ring buffer overrun: read_index lapped by writer
         // リングバッファオーバーラン検出: read_index がライターに追い越された
         if (g_accel_buf.is_overrun(telemetry_read_index)) {

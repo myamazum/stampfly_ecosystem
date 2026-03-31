@@ -13,6 +13,7 @@
 #include "esp_http_server.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include <atomic>
 
 namespace stampfly {
 
@@ -436,6 +437,15 @@ public:
      */
     bool isLogModeActive() const { return log_client_fd_ >= 0; }
 
+    /**
+     * @brief Check and clear resync request flag
+     * テレメトリタスクが新クライアント接続後に read_index をリセットするためのフラグ
+     */
+    bool consumeResyncRequest() {
+        bool expected = true;
+        return needs_resync_.compare_exchange_strong(expected, false);
+    }
+
 private:
     Telemetry() = default;
 
@@ -469,6 +479,10 @@ private:
     // Broadcast drop counter (mutex timeout)
     // broadcast ドロップカウンタ（mutex タイムアウト）
     uint32_t drop_count_ = 0;
+
+    // Resync flag: set on new client connect, consumed by telemetry task
+    // リセットフラグ: 新クライアント接続時にセット、テレメトリタスクが消費
+    std::atomic<bool> needs_resync_{false};
 };
 
 }  // namespace stampfly

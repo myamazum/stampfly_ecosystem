@@ -302,6 +302,9 @@ void Telemetry::addClient(int fd, bool is_log)
             if (is_log) {
                 log_client_fd_ = fd;
             }
+            // Signal telemetry task to resync read_index to latest
+            // テレメトリタスクに read_index を最新位置にリセットするよう通知
+            needs_resync_.store(true);
             ESP_LOGI(TAG, "Client connected (fd=%d, log=%d, total=%d)",
                      fd, is_log, client_count_);
             break;
