@@ -106,14 +106,23 @@ SIGNAL_CATEGORIES = {
         ('mag_y', 'Mag Y [uT]'),
         ('mag_z', 'Mag Z [uT]'),
     ],
-    'Computed - Gyro Integrated': [
+    'Computed - Gyro Int (raw)': [
         ('gyro_int_roll', 'Gyro Int Roll [deg]'),
         ('gyro_int_pitch', 'Gyro Int Pitch [deg]'),
         ('gyro_int_yaw', 'Gyro Int Yaw [deg]'),
     ],
-    'Computed - Accel Attitude': [
+    'Computed - Gyro Int (corrected)': [
+        ('gyro_corr_int_roll', 'Gyro Corr Int Roll [deg]'),
+        ('gyro_corr_int_pitch', 'Gyro Corr Int Pitch [deg]'),
+        ('gyro_corr_int_yaw', 'Gyro Corr Int Yaw [deg]'),
+    ],
+    'Computed - Accel Att (raw)': [
         ('accel_roll', 'Accel Roll [deg]'),
         ('accel_pitch', 'Accel Pitch [deg]'),
+    ],
+    'Computed - Accel Att (corrected)': [
+        ('accel_corr_roll', 'Accel Corr Roll [deg]'),
+        ('accel_corr_pitch', 'Accel Corr Pitch [deg]'),
     ],
     'Computed - Mag Heading': [
         ('mag_yaw', 'Mag Yaw [deg]'),
@@ -171,8 +180,8 @@ def load_csv(filepath: str) -> dict:
 
     n = len(data.get('time_s', []))
 
-    # 1. Gyro integration: cumulative integration of angular rate → angle
-    #    ジャイロ積分: 角速度を積分して角度を算出
+    # 1a. Gyro integration (raw): cumulative integration of raw angular rate
+    #     ジャイロ積分（生値）: 生の角速度を積分して角度を算出
     if all(k in data for k in ['gyro_x', 'gyro_y', 'gyro_z', 'time_s']) and n > 1:
         data['gyro_int_roll'] = [0.0] * n
         data['gyro_int_pitch'] = [0.0] * n
@@ -189,10 +198,28 @@ def load_csv(filepath: str) -> dict:
             data['gyro_int_pitch'][i] = math.degrees(pitch)
             data['gyro_int_yaw'][i] = math.degrees(yaw)
 
-    # 2. Accel-based attitude: roll/pitch from gravity direction
-    #    加速度ベースの姿勢: 重力方向からロール・ピッチを算出
-    #    NED body frame: static accel ≈ [0, 0, -g]
-    #    roll = atan2(-ay, -az), pitch = atan2(ax, sqrt(ay² + az²))
+    # 1b. Gyro integration (corrected): cumulative integration of bias-corrected gyro
+    #     ジャイロ積分（補正値）: バイアス補正済み角速度を積分して角度を算出
+    if all(k in data for k in ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z', 'time_s']) and n > 1:
+        data['gyro_corr_int_roll'] = [0.0] * n
+        data['gyro_corr_int_pitch'] = [0.0] * n
+        data['gyro_corr_int_yaw'] = [0.0] * n
+        roll, pitch, yaw = 0.0, 0.0, 0.0
+        for i in range(1, n):
+            dt = data['time_s'][i] - data['time_s'][i - 1]
+            if dt <= 0 or dt > 0.1:
+                dt = 0.0025
+            roll += data['gyro_corrected_x'][i] * dt
+            pitch += data['gyro_corrected_y'][i] * dt
+            yaw += data['gyro_corrected_z'][i] * dt
+            data['gyro_corr_int_roll'][i] = math.degrees(roll)
+            data['gyro_corr_int_pitch'][i] = math.degrees(pitch)
+            data['gyro_corr_int_yaw'][i] = math.degrees(yaw)
+
+    # 2a. Accel-based attitude (raw): roll/pitch from raw accel gravity direction
+    #     加速度ベースの姿勢（生値）: 生の加速度の重力方向からロール・ピッチ
+    #     NED body frame: static accel ≈ [0, 0, -g]
+    #     roll = atan2(-ay, -az), pitch = atan2(ax, sqrt(ay² + az²))
     if all(k in data for k in ['accel_x', 'accel_y', 'accel_z']) and n > 0:
         data['accel_roll'] = [0.0] * n
         data['accel_pitch'] = [0.0] * n
@@ -202,6 +229,19 @@ def load_csv(filepath: str) -> dict:
             az = data['accel_z'][i]
             data['accel_roll'][i] = math.degrees(math.atan2(-ay, -az))
             data['accel_pitch'][i] = math.degrees(
+                math.atan2(ax, math.sqrt(ay * ay + az * az)))
+
+    # 2b. Accel-based attitude (corrected): roll/pitch from bias-corrected accel
+    #     加速度ベースの姿勢（補正値）: バイアス補正済み加速度からロール・ピッチ
+    if all(k in data for k in ['accel_corrected_x', 'accel_corrected_y', 'accel_corrected_z']) and n > 0:
+        data['accel_corr_roll'] = [0.0] * n
+        data['accel_corr_pitch'] = [0.0] * n
+        for i in range(n):
+            ax = data['accel_corrected_x'][i]
+            ay = data['accel_corrected_y'][i]
+            az = data['accel_corrected_z'][i]
+            data['accel_corr_roll'][i] = math.degrees(math.atan2(-ay, -az))
+            data['accel_corr_pitch'][i] = math.degrees(
                 math.atan2(ax, math.sqrt(ay * ay + az * az)))
 
     # 3. Mag-based heading: yaw from magnetometer (tilt-compensated)
