@@ -585,18 +585,22 @@ extern "C" void app_main(void)
         ESP_LOGI(TAG, "  Sensors: IMU=%d MAG=%d BARO=%d ToF=%d FLOW=%d",
                  has_imu, has_mag, has_baro, has_tof, has_flow);
 
+        // Wait for required sensors (ToF is optional — may have no valid target)
+        // 必須センサーを待つ（ToF はオプション — 有効ターゲットがない場合あり）
         int wait_ms = 0;
         constexpr int MAX_SENSOR_INIT_WAIT_MS = 2000;
         while (wait_ms < MAX_SENSOR_INIT_WAIT_MS) {
-            bool all_started =
+            bool required_started =
                 (!has_imu  || (g_accel_buf.count() > 0 && g_gyro_buf.count() > 0)) &&
                 (!has_mag  || g_mag_buf.count() > 0) &&
                 (!has_baro || g_baro_buf.count() > 0) &&
-                (!has_tof  || g_tof_bottom_buf.count() > 0) &&
                 (!has_flow || g_flow_buf.count() > 0);
+            // ToF: check but don't block — report status
+            // ToF: 確認するがブロックしない
 
-            if (all_started) {
-                ESP_LOGI(TAG, "All present sensor buffers started filling after %d ms", wait_ms);
+            if (required_started) {
+                ESP_LOGI(TAG, "Sensor buffers ready after %d ms (tof=%d)",
+                         wait_ms, g_tof_bottom_buf.count());
                 break;
             }
 
