@@ -1,164 +1,110 @@
 #!/usr/bin/env python3
 """
-visualize_interactive.py - Interactive Telemetry Visualization Tool
+visualize_interactive.py - Interactive Telemetry Dashboard
 
-Browser-based interactive visualization using Plotly.
-Supports zoom, pan, signal toggle, and configurable tile layout.
+Generates a self-contained HTML dashboard with signal selection,
+overlay support, and configurable layout. No server required.
 
-ブラウザベースのインタラクティブ可視化ツール（Plotly使用）。
-ズーム・パン・信号トグル・タイルレイアウト設定が可能。
+ブラウザ上で信号選択・重ね描き・レイアウト変更が可能な
+自己完結型 HTML ダッシュボードを生成。サーバー不要。
 
 Usage:
     python visualize_interactive.py <csv_file> [options]
+    sf log viz <csv_file> -i [options]
 
-    # Default layout (auto)
-    python visualize_interactive.py flight.csv
-
-    # Custom layout: 3 rows x 2 columns
-    python visualize_interactive.py flight.csv --layout 3x2
-
-    # Select specific signal groups
-    python visualize_interactive.py flight.csv --groups gyro attitude bias_gyro
-
-    # Save to HTML file
-    python visualize_interactive.py flight.csv -o dashboard.html
-
-Available signal groups:
-    gyro          Raw gyro [rad/s]
-    accel         Raw accel [m/s²]
-    gyro_corr     Bias-corrected gyro [rad/s]
-    attitude      Roll/Pitch/Yaw [deg]
-    position      Position NED [m]
-    velocity      Velocity NED [m/s]
-    bias_gyro     Gyro bias [rad/s]
-    bias_accel    Accel bias [m/s²]
-    control       Controller inputs
-    height        Baro altitude / ToF [m]
-    flow          Optical flow [counts]
+Features:
+    - Select signals from sidebar checkboxes
+    - Overlay multiple signals on the same plot
+    - Add/remove subplots dynamically
+    - Zoom, pan, hover on all axes
+    - Configurable grid layout
 """
 
 import argparse
 import csv
+import json
 import math
 import sys
-import webbrowser
 import tempfile
+import webbrowser
 from pathlib import Path
 
 import numpy as np
 
-try:
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-except ImportError:
-    print("Error: plotly is required. Install with: pip install plotly")
-    sys.exit(1)
-
 
 # =============================================================================
-# Signal group definitions
-# 信号グループ定義
+# Signal definitions with categories
 # =============================================================================
 
-SIGNAL_GROUPS = {
-    'gyro': {
-        'title': 'Raw Gyro [rad/s]',
-        'signals': [
-            ('gyro_x', 'X', 'red'),
-            ('gyro_y', 'Y', 'green'),
-            ('gyro_z', 'Z', 'blue'),
-        ],
-    },
-    'accel': {
-        'title': 'Raw Accel [m/s²]',
-        'signals': [
-            ('accel_x', 'X', 'red'),
-            ('accel_y', 'Y', 'green'),
-            ('accel_z', 'Z', 'blue'),
-        ],
-    },
-    'gyro_corr': {
-        'title': 'Corrected Gyro [rad/s]',
-        'signals': [
-            ('gyro_corrected_x', 'X', 'red'),
-            ('gyro_corrected_y', 'Y', 'green'),
-            ('gyro_corrected_z', 'Z', 'blue'),
-        ],
-    },
-    'attitude': {
-        'title': 'Attitude [deg]',
-        'signals': [],  # Computed from quaternion
-        'computed': True,
-    },
-    'position': {
-        'title': 'Position NED [m]',
-        'signals': [
-            ('pos_x', 'North', 'red'),
-            ('pos_y', 'East', 'green'),
-            ('pos_z', 'Down', 'blue'),
-        ],
-    },
-    'velocity': {
-        'title': 'Velocity NED [m/s]',
-        'signals': [
-            ('vel_x', 'North', 'red'),
-            ('vel_y', 'East', 'green'),
-            ('vel_z', 'Down', 'blue'),
-        ],
-    },
-    'bias_gyro': {
-        'title': 'Gyro Bias [rad/s]',
-        'signals': [
-            ('gyro_bias_x', 'X', 'red'),
-            ('gyro_bias_y', 'Y', 'green'),
-            ('gyro_bias_z', 'Z', 'blue'),
-        ],
-    },
-    'bias_accel': {
-        'title': 'Accel Bias [m/s²]',
-        'signals': [
-            ('accel_bias_x', 'X', 'red'),
-            ('accel_bias_y', 'Y', 'green'),
-            ('accel_bias_z', 'Z', 'blue'),
-        ],
-    },
-    'control': {
-        'title': 'Control Inputs',
-        'signals': [
-            ('ctrl_throttle', 'Throttle', 'orange'),
-            ('ctrl_roll', 'Roll', 'red'),
-            ('ctrl_pitch', 'Pitch', 'green'),
-            ('ctrl_yaw', 'Yaw', 'blue'),
-        ],
-    },
-    'height': {
-        'title': 'Height [m]',
-        'signals': [
-            ('baro_altitude', 'Baro', 'purple'),
-            ('tof_bottom', 'ToF Bottom', 'orange'),
-            ('tof_front', 'ToF Front', 'cyan'),
-        ],
-    },
-    'flow': {
-        'title': 'Optical Flow',
-        'signals': [
-            ('flow_x', 'X [counts]', 'red'),
-            ('flow_y', 'Y [counts]', 'green'),
-            ('flow_quality', 'Quality', 'blue'),
-        ],
-    },
+SIGNAL_CATEGORIES = {
+    'IMU - Gyro': [
+        ('gyro_x', 'Gyro X [rad/s]'),
+        ('gyro_y', 'Gyro Y [rad/s]'),
+        ('gyro_z', 'Gyro Z [rad/s]'),
+    ],
+    'IMU - Accel': [
+        ('accel_x', 'Accel X [m/s²]'),
+        ('accel_y', 'Accel Y [m/s²]'),
+        ('accel_z', 'Accel Z [m/s²]'),
+    ],
+    'IMU - Corrected Gyro': [
+        ('gyro_corrected_x', 'Gyro Corr X [rad/s]'),
+        ('gyro_corrected_y', 'Gyro Corr Y [rad/s]'),
+        ('gyro_corrected_z', 'Gyro Corr Z [rad/s]'),
+    ],
+    'ESKF - Attitude': [
+        ('roll_deg', 'Roll [deg]'),
+        ('pitch_deg', 'Pitch [deg]'),
+        ('yaw_deg', 'Yaw [deg]'),
+    ],
+    'ESKF - Position': [
+        ('pos_x', 'Pos North [m]'),
+        ('pos_y', 'Pos East [m]'),
+        ('pos_z', 'Pos Down [m]'),
+    ],
+    'ESKF - Velocity': [
+        ('vel_x', 'Vel North [m/s]'),
+        ('vel_y', 'Vel East [m/s]'),
+        ('vel_z', 'Vel Down [m/s]'),
+    ],
+    'ESKF - Gyro Bias': [
+        ('gyro_bias_x', 'Gyro Bias X [rad/s]'),
+        ('gyro_bias_y', 'Gyro Bias Y [rad/s]'),
+        ('gyro_bias_z', 'Gyro Bias Z [rad/s]'),
+    ],
+    'ESKF - Accel Bias': [
+        ('accel_bias_x', 'Accel Bias X [m/s²]'),
+        ('accel_bias_y', 'Accel Bias Y [m/s²]'),
+        ('accel_bias_z', 'Accel Bias Z [m/s²]'),
+    ],
+    'Control': [
+        ('ctrl_throttle', 'Throttle'),
+        ('ctrl_roll', 'Roll Cmd'),
+        ('ctrl_pitch', 'Pitch Cmd'),
+        ('ctrl_yaw', 'Yaw Cmd'),
+    ],
+    'Sensors - Height': [
+        ('baro_altitude', 'Baro Alt [m]'),
+        ('tof_bottom', 'ToF Bottom [m]'),
+        ('tof_front', 'ToF Front [m]'),
+    ],
+    'Sensors - Flow': [
+        ('flow_x', 'Flow X [counts]'),
+        ('flow_y', 'Flow Y [counts]'),
+        ('flow_quality', 'Flow Quality'),
+    ],
 }
 
-DEFAULT_GROUPS = [
-    'gyro', 'accel', 'gyro_corr', 'control',
-    'attitude', 'position', 'velocity',
-    'bias_gyro', 'bias_accel',
-    'height', 'flow',
+COLORS = [
+    '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
+    '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990',
+    '#dcbeff', '#9A6324', '#800000', '#aaffc3', '#808000',
+    '#000075', '#a9a9a9',
 ]
 
 
 def load_csv(filepath: str) -> dict:
-    """Load CSV and return dict of numpy arrays"""
+    """Load CSV and return dict of lists (JSON-serializable)"""
     with open(filepath, 'r') as f:
         reader = csv.DictReader(f)
         columns = reader.fieldnames
@@ -167,24 +113,25 @@ def load_csv(filepath: str) -> dict:
     data = {}
     for col in columns:
         try:
-            data[col] = np.array([float(r[col]) for r in rows])
+            vals = [float(r[col]) for r in rows]
+            data[col] = vals
         except (ValueError, KeyError):
             pass
 
     # Compute time in seconds
-    # 時間を秒で計算
     if 'timestamp_us' in data:
-        data['time_s'] = (data['timestamp_us'] - data['timestamp_us'][0]) / 1e6
+        t0 = data['timestamp_us'][0]
+        data['time_s'] = [(t - t0) / 1e6 for t in data['timestamp_us']]
     elif 'timestamp_ms' in data:
-        data['time_s'] = (data['timestamp_ms'] - data['timestamp_ms'][0]) / 1e3
+        t0 = data['timestamp_ms'][0]
+        data['time_s'] = [(t - t0) / 1e3 for t in data['timestamp_ms']]
 
     # Compute attitude from quaternion
-    # クォータニオンから姿勢を計算
     if all(k in data for k in ['quat_w', 'quat_x', 'quat_y', 'quat_z']):
         n = len(data['quat_w'])
-        data['roll_deg'] = np.zeros(n)
-        data['pitch_deg'] = np.zeros(n)
-        data['yaw_deg'] = np.zeros(n)
+        data['roll_deg'] = [0.0] * n
+        data['pitch_deg'] = [0.0] * n
+        data['yaw_deg'] = [0.0] * n
         for i in range(n):
             w, x, y, z = data['quat_w'][i], data['quat_x'][i], data['quat_y'][i], data['quat_z'][i]
             data['roll_deg'][i] = math.degrees(math.atan2(2*(w*x + y*z), 1 - 2*(x*x + y*y)))
@@ -194,202 +141,368 @@ def load_csv(filepath: str) -> dict:
     return data
 
 
-def create_figure(data: dict, groups: list, layout: tuple = None,
-                  title: str = "StampFly Telemetry") -> go.Figure:
-    """Create interactive Plotly figure
-    インタラクティブな Plotly 図を作成
-    """
-    t = data.get('time_s', np.arange(len(next(iter(data.values())))))
+def generate_html(data: dict, title: str) -> str:
+    """Generate self-contained HTML dashboard"""
 
-    # Filter to groups that have data
-    # データのあるグループのみフィルタ
-    valid_groups = []
-    for g in groups:
-        if g not in SIGNAL_GROUPS:
-            print(f"Warning: Unknown group '{g}', skipping")
-            continue
-        gdef = SIGNAL_GROUPS[g]
-        if g == 'attitude':
-            if 'roll_deg' in data:
-                valid_groups.append(g)
-        else:
-            if any(s[0] in data for s in gdef['signals']):
-                valid_groups.append(g)
+    # Filter categories to only include signals present in data
+    categories = {}
+    for cat, signals in SIGNAL_CATEGORIES.items():
+        available = [(key, label) for key, label in signals if key in data]
+        if available:
+            categories[cat] = available
 
-    n_plots = len(valid_groups)
-    if n_plots == 0:
-        print("Error: No valid signal groups with data")
-        return None
+    # Serialize data to JSON (only signals that exist + time)
+    all_keys = set()
+    for sigs in categories.values():
+        for key, _ in sigs:
+            all_keys.add(key)
+    all_keys.add('time_s')
 
-    # Determine layout
-    # レイアウト決定
-    if layout:
-        rows, cols = layout
-    else:
-        cols = 1
-        rows = n_plots
+    export_data = {k: data[k] for k in all_keys if k in data}
 
-    # Pad if needed
-    while rows * cols < n_plots:
-        rows += 1
+    data_json = json.dumps(export_data, separators=(',', ':'))
+    categories_json = json.dumps(categories, ensure_ascii=False)
+    colors_json = json.dumps(COLORS)
 
-    # Create subplots
-    subplot_titles = [SIGNAL_GROUPS[g]['title'] for g in valid_groups]
-    # Pad titles if layout has more cells than groups
-    while len(subplot_titles) < rows * cols:
-        subplot_titles.append("")
+    n_samples = len(data.get('time_s', []))
+    duration = data['time_s'][-1] if 'time_s' in data and n_samples > 0 else 0
+    rate = n_samples / duration if duration > 0 else 0
 
-    fig = make_subplots(
-        rows=rows, cols=cols,
-        subplot_titles=subplot_titles,
-        shared_xaxes=True,
-        vertical_spacing=0.03,
-    )
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{title}</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+* {{ margin: 0; padding: 0; box-sizing: border-box; }}
+body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; height: 100vh; background: #f5f5f5; }}
 
-    for idx, group_name in enumerate(valid_groups):
-        row = idx // cols + 1
-        col = idx % cols + 1
-        gdef = SIGNAL_GROUPS[group_name]
+/* Sidebar */
+#sidebar {{
+    width: 260px; min-width: 260px; background: #fff; border-right: 1px solid #ddd;
+    overflow-y: auto; padding: 12px; font-size: 13px;
+}}
+#sidebar h2 {{ font-size: 15px; margin-bottom: 8px; color: #333; }}
+.info {{ font-size: 11px; color: #888; margin-bottom: 12px; }}
+.cat-title {{
+    font-weight: 600; font-size: 12px; color: #555; margin: 10px 0 4px 0;
+    cursor: pointer; user-select: none;
+}}
+.cat-title:hover {{ color: #000; }}
+.signal-item {{
+    display: flex; align-items: center; padding: 2px 0 2px 12px;
+    cursor: pointer; border-radius: 3px;
+}}
+.signal-item:hover {{ background: #f0f0f0; }}
+.signal-item input {{ margin-right: 6px; cursor: pointer; }}
+.signal-item label {{ cursor: pointer; font-size: 12px; white-space: nowrap; }}
 
-        if group_name == 'attitude':
-            # Attitude is computed
-            for name, label, color in [
-                ('roll_deg', 'Roll', 'red'),
-                ('pitch_deg', 'Pitch', 'green'),
-                ('yaw_deg', 'Yaw', 'blue'),
-            ]:
-                if name in data:
-                    fig.add_trace(
-                        go.Scattergl(
-                            x=t, y=data[name],
-                            name=f'{label}',
-                            legendgroup=group_name,
-                            legendgrouptitle_text=gdef['title'],
-                            line=dict(color=color, width=1),
-                            visible=True,
-                        ),
-                        row=row, col=col,
-                    )
-        else:
-            for col_name, label, color in gdef['signals']:
-                if col_name in data:
-                    fig.add_trace(
-                        go.Scattergl(
-                            x=t, y=data[col_name],
-                            name=f'{label}',
-                            legendgroup=group_name,
-                            legendgrouptitle_text=gdef['title'],
-                            line=dict(color=color, width=1),
-                            visible=True,
-                        ),
-                        row=row, col=col,
-                    )
+/* Plot controls */
+#controls {{
+    padding: 10px 0; border-top: 1px solid #eee; margin-top: 10px;
+}}
+#controls label {{ font-size: 12px; color: #555; }}
+#controls select, #controls input {{ font-size: 12px; margin: 2px 0; }}
+button {{
+    padding: 6px 12px; font-size: 12px; cursor: pointer; border: 1px solid #ccc;
+    border-radius: 4px; background: #fff; margin: 2px;
+}}
+button:hover {{ background: #e8e8e8; }}
+button.primary {{ background: #4363d8; color: #fff; border-color: #4363d8; }}
+button.primary:hover {{ background: #3252b5; }}
+button.danger {{ color: #e6194b; border-color: #e6194b; }}
 
-        # Set y-axis title
-        fig.update_yaxes(title_text=gdef['title'], row=row, col=col)
+/* Main area */
+#main {{ flex: 1; display: flex; flex-direction: column; overflow: hidden; }}
+#toolbar {{
+    background: #fff; border-bottom: 1px solid #ddd; padding: 8px 16px;
+    display: flex; align-items: center; gap: 12px; font-size: 13px;
+}}
+#plot-area {{ flex: 1; overflow-y: auto; padding: 8px; }}
+.plot-container {{
+    background: #fff; border: 1px solid #ddd; border-radius: 6px;
+    margin-bottom: 8px; position: relative;
+}}
+.plot-header {{
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 10px; border-bottom: 1px solid #eee; font-size: 12px;
+    color: #555; background: #fafafa; border-radius: 6px 6px 0 0;
+}}
+.plot-header span {{ font-weight: 600; }}
+.plot-div {{ width: 100%; }}
+</style>
+</head>
+<body>
 
-    # Set x-axis title on bottom row
-    for c in range(1, cols + 1):
-        fig.update_xaxes(title_text="Time [s]", row=rows, col=c)
+<div id="sidebar">
+    <h2>StampFly Telemetry</h2>
+    <div class="info">{n_samples} samples, {duration:.1f}s, {rate:.0f} Hz</div>
 
-    # Layout settings
-    height = max(300, 250 * rows)
-    fig.update_layout(
-        title=title,
-        height=height,
-        legend=dict(
-            groupclick="togglegroup",  # Click group title to toggle all signals in group
-            tracegroupgap=10,
-        ),
-        hovermode='x unified',
-        template='plotly_white',
-    )
+    <div id="signal-list"></div>
 
-    # Enable rangeslider on bottom x-axis for easy time navigation
-    # 下部の x 軸にレンジスライダーを追加（時間ナビゲーション用）
-    fig.update_xaxes(rangeslider=dict(visible=True), row=rows, col=1)
+    <div id="controls">
+        <button class="primary" onclick="addPlot()">+ Add Plot</button>
+        <button onclick="addPreset('imu')">IMU Preset</button>
+        <button onclick="addPreset('eskf')">ESKF Preset</button>
+        <button onclick="addPreset('bias')">Bias Preset</button>
+        <button onclick="clearAll()">Clear All</button>
+        <div style="margin-top:8px">
+            <label>Target plot:</label>
+            <select id="target-plot" style="width:100%"></select>
+        </div>
+    </div>
+</div>
 
-    return fig
+<div id="main">
+    <div id="toolbar">
+        <span style="font-weight:600">{title}</span>
+        <span style="color:#888; font-size:12px">
+            Check signals → click "Add to Plot" or double-click signal.
+            Zoom: drag | Pan: shift+drag | Reset: double-click plot
+        </span>
+    </div>
+    <div id="plot-area"></div>
+</div>
+
+<script>
+const DATA = {data_json};
+const CATEGORIES = {categories_json};
+const COLORS = {colors_json};
+
+let plots = [];  // [{{ id, div, traces: [{{key, label}}] }}]
+let plotCounter = 0;
+let colorIndex = 0;
+
+function nextColor() {{
+    const c = COLORS[colorIndex % COLORS.length];
+    colorIndex++;
+    return c;
+}}
+
+// Build signal list sidebar
+function buildSidebar() {{
+    const container = document.getElementById('signal-list');
+    let html = '';
+    for (const [cat, signals] of Object.entries(CATEGORIES)) {{
+        html += `<div class="cat-title" onclick="toggleCat(this)">▸ ${{cat}}</div>`;
+        html += `<div class="cat-signals" style="display:none">`;
+        for (const [key, label] of signals) {{
+            html += `<div class="signal-item" ondblclick="quickAdd('${{key}}','${{label}}')">`;
+            html += `<input type="checkbox" id="cb_${{key}}" value="${{key}}" data-label="${{label}}">`;
+            html += `<label for="cb_${{key}}">${{label}}</label>`;
+            html += `</div>`;
+        }}
+        html += `<div style="padding:2px 12px"><button onclick="addCheckedFromCat(this)" style="font-size:11px">Add checked to plot</button></div>`;
+        html += `</div>`;
+    }}
+    container.innerHTML = html;
+}}
+
+function toggleCat(el) {{
+    const sigs = el.nextElementSibling;
+    if (sigs.style.display === 'none') {{
+        sigs.style.display = 'block';
+        el.textContent = el.textContent.replace('▸', '▾');
+    }} else {{
+        sigs.style.display = 'none';
+        el.textContent = el.textContent.replace('▾', '▸');
+    }}
+}}
+
+function addCheckedFromCat(btn) {{
+    const catDiv = btn.parentElement.parentElement;
+    const checkboxes = catDiv.querySelectorAll('input[type=checkbox]:checked');
+    if (checkboxes.length === 0) return;
+
+    let plot = getTargetPlot();
+    if (!plot) plot = addPlot();
+
+    checkboxes.forEach(cb => {{
+        addSignalToPlot(plot, cb.value, cb.dataset.label);
+        cb.checked = false;
+    }});
+}}
+
+function quickAdd(key, label) {{
+    let plot = getTargetPlot();
+    if (!plot) plot = addPlot();
+    addSignalToPlot(plot, key, label);
+}}
+
+function getTargetPlot() {{
+    const sel = document.getElementById('target-plot');
+    if (!sel.value) return null;
+    return plots.find(p => p.id === sel.value);
+}}
+
+function updateTargetSelect() {{
+    const sel = document.getElementById('target-plot');
+    const current = sel.value;
+    sel.innerHTML = '';
+    plots.forEach(p => {{
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.title;
+        sel.appendChild(opt);
+    }});
+    if (current && plots.find(p => p.id === current)) {{
+        sel.value = current;
+    }} else if (plots.length > 0) {{
+        sel.value = plots[plots.length - 1].id;
+    }}
+}}
+
+function addPlot() {{
+    plotCounter++;
+    const id = `plot_${{plotCounter}}`;
+    const title = `Plot ${{plotCounter}}`;
+
+    const area = document.getElementById('plot-area');
+    const container = document.createElement('div');
+    container.className = 'plot-container';
+    container.id = `container_${{id}}`;
+    container.innerHTML = `
+        <div class="plot-header">
+            <span id="title_${{id}}">${{title}}</span>
+            <button class="danger" onclick="removePlot('${{id}}')" style="font-size:11px;padding:2px 8px">✕ Remove</button>
+        </div>
+        <div id="${{id}}" class="plot-div"></div>
+    `;
+    area.appendChild(container);
+
+    const layout = {{
+        height: 280,
+        margin: {{ l: 60, r: 20, t: 10, b: 40 }},
+        xaxis: {{ title: 'Time [s]' }},
+        yaxis: {{ title: '' }},
+        hovermode: 'x unified',
+        template: 'plotly_white',
+        legend: {{ orientation: 'h', y: 1.12 }},
+    }};
+
+    Plotly.newPlot(id, [], layout, {{
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+    }});
+
+    const plot = {{ id, title, div: document.getElementById(id), traces: [] }};
+    plots.push(plot);
+    updateTargetSelect();
+    return plot;
+}}
+
+function removePlot(id) {{
+    const idx = plots.findIndex(p => p.id === id);
+    if (idx === -1) return;
+    plots.splice(idx, 1);
+    const container = document.getElementById(`container_${{id}}`);
+    if (container) container.remove();
+    updateTargetSelect();
+}}
+
+function addSignalToPlot(plot, key, label) {{
+    if (!DATA[key] || !DATA.time_s) return;
+    // Check if already added
+    if (plot.traces.find(t => t.key === key)) return;
+
+    const color = nextColor();
+    const trace = {{
+        x: DATA.time_s,
+        y: DATA[key],
+        name: label,
+        type: 'scattergl',
+        mode: 'lines',
+        line: {{ color: color, width: 1 }},
+    }};
+
+    Plotly.addTraces(plot.id, trace);
+    plot.traces.push({{ key, label }});
+
+    // Update title
+    const titleEl = document.getElementById(`title_${{plot.id}}`);
+    titleEl.textContent = plot.traces.map(t => t.label).join(', ');
+}}
+
+function addPreset(name) {{
+    if (name === 'imu') {{
+        const p1 = addPlot();
+        ['gyro_x', 'gyro_y', 'gyro_z'].forEach(k => addSignalToPlot(p1, k, k));
+        const p2 = addPlot();
+        ['accel_x', 'accel_y', 'accel_z'].forEach(k => addSignalToPlot(p2, k, k));
+        const p3 = addPlot();
+        ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z'].forEach(k => addSignalToPlot(p3, k, k));
+    }} else if (name === 'eskf') {{
+        const p1 = addPlot();
+        ['roll_deg', 'pitch_deg', 'yaw_deg'].forEach(k => addSignalToPlot(p1, k, k));
+        const p2 = addPlot();
+        ['pos_x', 'pos_y', 'pos_z'].forEach(k => addSignalToPlot(p2, k, k));
+        const p3 = addPlot();
+        ['vel_x', 'vel_y', 'vel_z'].forEach(k => addSignalToPlot(p3, k, k));
+    }} else if (name === 'bias') {{
+        const p1 = addPlot();
+        ['gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z'].forEach(k => addSignalToPlot(p1, k, k));
+        const p2 = addPlot();
+        ['accel_bias_x', 'accel_bias_y', 'accel_bias_z'].forEach(k => addSignalToPlot(p2, k, k));
+    }}
+}}
+
+function clearAll() {{
+    plots.forEach(p => {{
+        const container = document.getElementById(`container_${{p.id}}`);
+        if (container) container.remove();
+    }});
+    plots = [];
+    colorIndex = 0;
+    updateTargetSelect();
+}}
+
+// Initialize
+buildSidebar();
+</script>
+</body>
+</html>"""
+
+    return html
 
 
-def visualize(filepath: str, groups: list = None, layout: tuple = None,
-              output: str = None, title: str = None):
-    """Main visualization function"""
+def visualize(filepath: str, groups=None, layout=None, output=None, title=None):
+    """Main entry point"""
     print(f"Loading: {filepath}")
     data = load_csv(filepath)
 
-    n_samples = len(data.get('time_s', []))
-    duration = data['time_s'][-1] - data['time_s'][0] if 'time_s' in data and n_samples > 1 else 0
-    rate = n_samples / duration if duration > 0 else 0
-    print(f"Samples: {n_samples}, Duration: {duration:.1f}s, Rate: {rate:.0f} Hz")
-
-    if groups is None:
-        groups = DEFAULT_GROUPS
+    n = len(data.get('time_s', []))
+    dur = data['time_s'][-1] if 'time_s' in data and n > 0 else 0
+    rate = n / dur if dur > 0 else 0
+    print(f"Samples: {n}, Duration: {dur:.1f}s, Rate: {rate:.0f} Hz")
 
     if title is None:
-        title = f"StampFly Telemetry — {Path(filepath).name}"
+        title = f"StampFly — {Path(filepath).name}"
 
-    fig = create_figure(data, groups, layout, title)
-    if fig is None:
-        return
+    html = generate_html(data, title)
 
     if output:
-        fig.write_html(output)
+        with open(output, 'w') as f:
+            f.write(html)
         print(f"Saved: {output}")
     else:
-        # Save to temp file and open in browser
-        # 一時ファイルに保存してブラウザで開く
         tmp = tempfile.NamedTemporaryFile(suffix='.html', delete=False, prefix='stampfly_viz_')
-        fig.write_html(tmp.name)
+        tmp.write(html.encode('utf-8'))
         tmp.close()
         print(f"Opening in browser: {tmp.name}")
         webbrowser.open(f'file://{tmp.name}')
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Interactive telemetry visualization (Plotly)",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Signal groups:
-  gyro        Raw gyro [rad/s]
-  accel       Raw accel [m/s²]
-  gyro_corr   Bias-corrected gyro [rad/s]
-  attitude    Roll/Pitch/Yaw [deg]
-  position    Position NED [m]
-  velocity    Velocity NED [m/s]
-  bias_gyro   Gyro bias [rad/s]
-  bias_accel  Accel bias [m/s²]
-  control     Controller inputs
-  height      Baro/ToF altitude [m]
-  flow        Optical flow
-
-Examples:
-  %(prog)s flight.csv
-  %(prog)s flight.csv --layout 3x2
-  %(prog)s flight.csv --groups attitude bias_gyro bias_accel
-  %(prog)s flight.csv -o dashboard.html
-""")
+    parser = argparse.ArgumentParser(description="Interactive telemetry dashboard")
     parser.add_argument('file', help="CSV telemetry file")
-    parser.add_argument('--layout', '-l', default=None,
-                        help="Tile layout as ROWSxCOLS (e.g., 3x2). Default: Nx1")
-    parser.add_argument('--groups', '-g', nargs='+', default=None,
-                        help="Signal groups to display (default: all)")
-    parser.add_argument('--output', '-o', default=None,
-                        help="Save to HTML file instead of opening browser")
-
+    parser.add_argument('-o', '--output', help="Save HTML to file")
+    # These args are accepted for CLI compatibility but the browser UI handles selection
+    parser.add_argument('--layout', help="(ignored, use browser UI)")
+    parser.add_argument('--groups', nargs='+', help="(ignored, use browser UI)")
     args = parser.parse_args()
-
-    layout = None
-    if args.layout:
-        try:
-            parts = args.layout.lower().split('x')
-            layout = (int(parts[0]), int(parts[1]))
-        except (ValueError, IndexError):
-            print(f"Error: Invalid layout '{args.layout}'. Use format ROWSxCOLS (e.g., 3x2)")
-            return 1
-
-    visualize(args.file, args.groups, layout, args.output)
+    visualize(args.file, output=args.output)
     return 0
 
 
