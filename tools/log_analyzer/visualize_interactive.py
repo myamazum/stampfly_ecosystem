@@ -285,32 +285,31 @@ function syncXRange(sourceId, eventData) {{
     if (_syncBusy) return;
     if (!document.getElementById('sync-x').checked) return;
 
-    // Extract x range from relayout event
+    // Only respond to explicit x-axis range changes (zoom/pan/reset)
+    // Ignore other relayout events (e.g., hover spike lines, resize)
+    // 明示的な X 軸範囲変更（ズーム・パン・リセット）のみ応答
     let xr = null;
     let autorange = false;
     if ('xaxis.range[0]' in eventData && 'xaxis.range[1]' in eventData) {{
         xr = [eventData['xaxis.range[0]'], eventData['xaxis.range[1]']];
-    }} else if ('xaxis.range' in eventData) {{
-        xr = eventData['xaxis.range'];
     }} else if ('xaxis.autorange' in eventData) {{
         autorange = true;
     }} else {{
-        return;  // Not an x-axis change
+        return;  // Not a user-initiated x-axis change
     }}
 
     _syncBusy = true;
-    try {{
-        plots.forEach(p => {{
-            if (p.id === sourceId) return;
-            if (autorange) {{
-                Plotly.relayout(p.id, {{'xaxis.autorange': true}});
-            }} else {{
-                Plotly.relayout(p.id, {{'xaxis.range': xr}});
-            }}
-        }});
-    }} finally {{
-        _syncBusy = false;
-    }}
+    plots.forEach(p => {{
+        if (p.id === sourceId) return;
+        if (autorange) {{
+            Plotly.relayout(p.id, {{'xaxis.autorange': true}});
+        }} else {{
+            Plotly.relayout(p.id, {{'xaxis.range': xr}});
+        }}
+    }});
+    // Keep guard up until next event loop tick to block cascading events
+    // 連鎖イベントをブロックするため次のイベントループまでガードを維持
+    setTimeout(() => {{ _syncBusy = false; }}, 0);
 }}
 
 function nextColor() {{
