@@ -262,17 +262,29 @@ struct ExtendedSample {
     // ESKF状態フラグ
     uint8_t eskf_status;      // bit0: converged, bit1-7: reserved
 
-    uint8_t padding1[7];      // alignment to make ESKF section 60 bytes
+    uint8_t padding1[3];      // alignment
 
-    // --- Additional sensor data (20 bytes) ---
-    // Barometer altitude [m]
-    // 気圧高度
-    float baro_altitude;      // [m] MSL altitude
+    // Bias-corrected accel (what ESKF sees)
+    // バイアス補正済み加速度（ESKFが使用する値）
+    float accel_corrected_x;  // [m/s²]
+    float accel_corrected_y;  // [m/s²]
+    float accel_corrected_z;  // [m/s²]
+
+    // --- Additional sensor data ---
+    // Barometer
+    // 気圧センサー
+    float baro_altitude;      // [m] altitude (relative)
+    float baro_pressure;      // [hPa] raw pressure
 
     // ToF distance [m]
     // ToF距離
     float tof_bottom;         // [m] bottom sensor
     float tof_front;          // [m] front sensor
+
+    // ToF status
+    // ToFステータス
+    uint8_t tof_bottom_status; // 0=valid, 254=all invalid, 255=no target
+    uint8_t tof_front_status;  // same as above
 
     // Optical flow (raw sensor output)
     // 光学フロー（センサ生出力）
@@ -280,18 +292,23 @@ struct ExtendedSample {
     int16_t flow_y;           // [pixels/frame or sensor units]
     uint8_t flow_quality;     // [0-255] quality/confidence
 
-    uint8_t padding2[3];      // alignment to 136 bytes total
+    // Magnetometer (calibrated, body frame NED)
+    // 地磁気（キャリブレーション済み、機体座標系NED）
+    uint8_t padding2;         // alignment
+    float mag_x;              // [uT]
+    float mag_y;              // [uT]
+    float mag_z;              // [uT]
 };
 
-static_assert(sizeof(ExtendedSample) == 136, "ExtendedSample size mismatch");
+static_assert(sizeof(ExtendedSample) == 160, "ExtendedSample size mismatch");
 
 /**
- * @brief Extended batch packet (552 bytes)
+ * @brief Extended batch packet (648 bytes)
  *
  * 400Hz unified telemetry: 4 samples per frame at 100fps.
  * 400Hz統一テレメトリ: 100fps × 4サンプル/フレーム
  *
- * Bandwidth: 552 bytes × 100 fps = 55.2 KB/s ≈ 442 kbps
+ * Bandwidth: 648 bytes × 100 fps = 63.3 KB/s ≈ 518 kbps
  */
 #pragma pack(push, 1)
 struct TelemetryExtendedBatchPacket {
@@ -301,7 +318,7 @@ struct TelemetryExtendedBatchPacket {
     uint8_t  sample_count;    // Number of samples (4)
     uint8_t  reserved;
 
-    // Samples (136 bytes × 4 = 544 bytes)
+    // Samples (160 bytes × 4 = 640 bytes)
     ExtendedSample samples[4];
 
     // Footer (4 bytes)
@@ -310,7 +327,7 @@ struct TelemetryExtendedBatchPacket {
 };
 #pragma pack(pop)
 
-static_assert(sizeof(TelemetryExtendedBatchPacket) == 552, "TelemetryExtendedBatchPacket size mismatch");
+static_assert(sizeof(TelemetryExtendedBatchPacket) == 648, "TelemetryExtendedBatchPacket size mismatch");
 
 /**
  * @brief Sensor status flags (bitfield)

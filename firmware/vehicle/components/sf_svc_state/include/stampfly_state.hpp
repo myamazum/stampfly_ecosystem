@@ -112,6 +112,7 @@ public:
     void getMagData(Vec3& mag) const;
     void getBaroData(float& altitude, float& pressure) const;
     void getToFData(float& bottom, float& front) const;
+    void getToFStatus(uint8_t& bottom_status, uint8_t& front_status) const;
     void getFlowData(float& vx, float& vy) const;
     void getFlowRawData(int16_t& dx, int16_t& dy, uint8_t& squal) const;
     void getPowerData(float& voltage, float& current) const;

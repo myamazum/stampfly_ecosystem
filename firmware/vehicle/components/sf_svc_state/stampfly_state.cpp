@@ -183,6 +183,14 @@ void StampFlyState::getToFData(float& bottom, float& front) const
     xSemaphoreGive(mutex_);
 }
 
+void StampFlyState::getToFStatus(uint8_t& bottom_status, uint8_t& front_status) const
+{
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    bottom_status = tof_bottom_status_;
+    front_status = tof_front_status_;
+    xSemaphoreGive(mutex_);
+}
+
 void StampFlyState::getFlowData(float& vx, float& vy) const
 {
     xSemaphoreTake(mutex_, portMAX_DELAY);

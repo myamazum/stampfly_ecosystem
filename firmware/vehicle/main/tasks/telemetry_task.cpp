@@ -137,21 +137,38 @@ void TelemetryTask(void* pvParameters)
         // ESKF状態: bit0 = 初期化済み
         sample.eskf_status = state.isESKFInitialized() ? 0x01 : 0x00;
 
+        // Bias-corrected accel
+        // バイアス補正済み加速度
+        sample.accel_corrected_x = accel.x - eskf_state.accel_bias.x;
+        sample.accel_corrected_y = accel.y - eskf_state.accel_bias.y;
+        sample.accel_corrected_z = accel.z - eskf_state.accel_bias.z;
+
+        // Clear padding
+        sample.padding1[0] = 0;
+        sample.padding1[1] = 0;
+        sample.padding1[2] = 0;
+
         // === Additional sensor data ===
         // 追加センサデータ
 
-        // Barometer altitude [m]
-        // 気圧高度
+        // Barometer
+        // 気圧センサー
         float baro_alt, baro_press;
         state.getBaroData(baro_alt, baro_press);
         sample.baro_altitude = baro_alt;
+        sample.baro_pressure = baro_press;
 
-        // ToF distances [m]
-        // ToF距離
+        // ToF distances and status
+        // ToF距離とステータス
         float tof_bottom, tof_front;
         state.getToFData(tof_bottom, tof_front);
         sample.tof_bottom = tof_bottom;
         sample.tof_front = tof_front;
+
+        uint8_t tof_bottom_status, tof_front_status;
+        state.getToFStatus(tof_bottom_status, tof_front_status);
+        sample.tof_bottom_status = tof_bottom_status;
+        sample.tof_front_status = tof_front_status;
 
         // Optical flow raw data
         // 光学フロー生データ
@@ -162,17 +179,14 @@ void TelemetryTask(void* pvParameters)
         sample.flow_y = flow_dy;
         sample.flow_quality = flow_squal;
 
-        // Clear padding
-        sample.padding1[0] = 0;
-        sample.padding1[1] = 0;
-        sample.padding1[2] = 0;
-        sample.padding1[3] = 0;
-        sample.padding1[4] = 0;
-        sample.padding1[5] = 0;
-        sample.padding1[6] = 0;
-        sample.padding2[0] = 0;
-        sample.padding2[1] = 0;
-        sample.padding2[2] = 0;
+        // Magnetometer (calibrated, body frame NED)
+        // 地磁気（キャリブレーション済み、機体座標系NED）
+        sample.padding2 = 0;
+        stampfly::Vec3 mag_data;
+        state.getMagData(mag_data);
+        sample.mag_x = mag_data.x;
+        sample.mag_y = mag_data.y;
+        sample.mag_z = mag_data.z;
 
         // Advance read index (ring buffer wrap)
         // 読み取りインデックスを進める（リングバッファ循環）

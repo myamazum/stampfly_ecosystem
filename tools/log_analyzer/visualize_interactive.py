@@ -52,6 +52,11 @@ SIGNAL_CATEGORIES = {
         ('gyro_corrected_y', 'Gyro Corr Y [rad/s]'),
         ('gyro_corrected_z', 'Gyro Corr Z [rad/s]'),
     ],
+    'IMU - Corrected Accel': [
+        ('accel_corrected_x', 'Accel Corr X [m/s²]'),
+        ('accel_corrected_y', 'Accel Corr Y [m/s²]'),
+        ('accel_corrected_z', 'Accel Corr Z [m/s²]'),
+    ],
     'ESKF - Attitude': [
         ('roll_deg', 'Roll [deg]'),
         ('pitch_deg', 'Pitch [deg]'),
@@ -85,13 +90,21 @@ SIGNAL_CATEGORIES = {
     ],
     'Sensors - Height': [
         ('baro_altitude', 'Baro Alt [m]'),
+        ('baro_pressure', 'Baro Press [hPa]'),
         ('tof_bottom', 'ToF Bottom [m]'),
         ('tof_front', 'ToF Front [m]'),
+        ('tof_bottom_status', 'ToF Bot Status'),
+        ('tof_front_status', 'ToF Frt Status'),
     ],
     'Sensors - Flow': [
         ('flow_x', 'Flow X [counts]'),
         ('flow_y', 'Flow Y [counts]'),
         ('flow_quality', 'Flow Quality'),
+    ],
+    'Sensors - Mag': [
+        ('mag_x', 'Mag X [uT]'),
+        ('mag_y', 'Mag Y [uT]'),
+        ('mag_z', 'Mag Z [uT]'),
     ],
 }
 

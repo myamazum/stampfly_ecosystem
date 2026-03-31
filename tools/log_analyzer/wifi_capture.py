@@ -111,16 +111,16 @@ LEGACY_FFT_PACKET_FORMAT += 'B'    # padding
 LEGACY_FFT_PACKET_SIZE = 32
 
 # =============================================================================
-# Extended Batch Packet (552 bytes, header 0xBD) - 400Hz unified telemetry
+# Extended Batch Packet (648 bytes, header 0xBD) - 400Hz unified telemetry
 # =============================================================================
-# Contains 4 samples of 136 bytes each with ESKF estimates and sensor data
-EXTENDED_SAMPLE_SIZE = 136
+# Contains 4 samples of 160 bytes each with ESKF estimates and sensor data
+EXTENDED_SAMPLE_SIZE = 160
 EXTENDED_BATCH_SIZE = 4
 EXTENDED_BATCH_HEADER_SIZE = 4  # header, type, count, reserved
 EXTENDED_BATCH_FOOTER_SIZE = 4  # checksum + padding
-EXTENDED_BATCH_PACKET_SIZE = 552  # 4 + 136*4 + 4
+EXTENDED_BATCH_PACKET_SIZE = 648  # 4 + 160*4 + 4
 
-# ExtendedSample structure (136 bytes):
+# ExtendedSample structure (160 bytes):
 #   Core sensor data (56 bytes):
 #     uint32_t timestamp_us
 #     float gyro_x/y/z (raw)
@@ -155,15 +155,19 @@ EXTENDED_SAMPLE_FORMAT += 'fff'     # vel_x/y/z
 EXTENDED_SAMPLE_FORMAT += 'hhh'     # gyro_bias_x/y/z (int16)
 EXTENDED_SAMPLE_FORMAT += 'hhh'     # accel_bias_x/y/z (int16)
 EXTENDED_SAMPLE_FORMAT += 'B'       # eskf_status
-EXTENDED_SAMPLE_FORMAT += '7B'      # padding1
+EXTENDED_SAMPLE_FORMAT += '3B'      # padding1
+EXTENDED_SAMPLE_FORMAT += 'fff'     # accel_corrected_x/y/z
 EXTENDED_SAMPLE_FORMAT += 'f'       # baro_altitude
+EXTENDED_SAMPLE_FORMAT += 'f'       # baro_pressure
 EXTENDED_SAMPLE_FORMAT += 'ff'      # tof_bottom/front
+EXTENDED_SAMPLE_FORMAT += 'BB'      # tof_bottom_status/front_status
 EXTENDED_SAMPLE_FORMAT += 'hh'      # flow_x/y
 EXTENDED_SAMPLE_FORMAT += 'B'       # flow_quality
-EXTENDED_SAMPLE_FORMAT += '3B'      # padding2
+EXTENDED_SAMPLE_FORMAT += 'B'       # padding2
+EXTENDED_SAMPLE_FORMAT += 'fff'     # mag_x/y/z
 
 _EXTENDED_SAMPLE_CALCSIZE = struct.calcsize(EXTENDED_SAMPLE_FORMAT)
-assert _EXTENDED_SAMPLE_CALCSIZE == 136, f"Extended sample size mismatch: {_EXTENDED_SAMPLE_CALCSIZE}"
+assert _EXTENDED_SAMPLE_CALCSIZE == 160, f"Extended sample size mismatch: {_EXTENDED_SAMPLE_CALCSIZE}"
 
 # CSV columns for extended mode (full ESKF + sensors)
 EXTENDED_CSV_COLUMNS = [
@@ -177,8 +181,12 @@ EXTENDED_CSV_COLUMNS = [
     'vel_x', 'vel_y', 'vel_z',
     'gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z',
     'accel_bias_x', 'accel_bias_y', 'accel_bias_z',
-    'baro_altitude', 'tof_bottom', 'tof_front',
+    'accel_corrected_x', 'accel_corrected_y', 'accel_corrected_z',
+    'baro_altitude', 'baro_pressure',
+    'tof_bottom', 'tof_front',
+    'tof_bottom_status', 'tof_front_status',
     'flow_x', 'flow_y', 'flow_quality',
+    'mag_x', 'mag_y', 'mag_z',
 ]
 
 # CSV columns for FFT mode (with bias-corrected gyro + controller inputs)
@@ -298,23 +306,42 @@ def parse_extended_batch_packet(data: bytes) -> list:
         sample['accel_bias_z'] = values[idx + 2] / 10000.0
         idx += 3
 
-        # ESKF status (1 byte) + padding (7 bytes)
+        # ESKF status (1 byte) + padding (3 bytes)
         sample['eskf_status'] = values[idx]
-        idx += 8  # Skip eskf_status + 7 padding bytes
+        idx += 4  # Skip eskf_status + 3 padding bytes
 
-        # Baro altitude (1 float)
+        # Accel corrected (3 floats)
+        sample['accel_corrected_x'] = values[idx]
+        sample['accel_corrected_y'] = values[idx + 1]
+        sample['accel_corrected_z'] = values[idx + 2]
+        idx += 3
+
+        # Baro (2 floats: altitude, pressure)
         sample['baro_altitude'] = values[idx]
-        idx += 1
+        sample['baro_pressure'] = values[idx + 1]
+        idx += 2
 
-        # ToF (2 floats)
+        # ToF (2 floats + 2 uint8 status)
         sample['tof_bottom'] = values[idx]
         sample['tof_front'] = values[idx + 1]
+        idx += 2
+        sample['tof_bottom_status'] = values[idx]
+        sample['tof_front_status'] = values[idx + 1]
         idx += 2
 
         # Optical flow (2 int16 + 1 uint8)
         sample['flow_x'] = values[idx]
         sample['flow_y'] = values[idx + 1]
         sample['flow_quality'] = values[idx + 2]
+        idx += 3
+
+        # Padding (1 byte)
+        idx += 1
+
+        # Magnetometer (3 floats)
+        sample['mag_x'] = values[idx]
+        sample['mag_y'] = values[idx + 1]
+        sample['mag_z'] = values[idx + 2]
 
         samples.append(sample)
 
@@ -565,7 +592,7 @@ class TelemetryCapture:
                                 if self.mode is None:
                                     self.mode = mode
                                     mode_str = {
-                                        "extended": "Extended (552B, 4 samples with ESKF+sensors)",
+                                        "extended": "Extended (648B, 4 samples with ESKF+sensors)",
                                         "fft_batch": "FFT Batch (232B, 4 samples)",
                                         "normal": "Normal (116B)",
                                         "fft_legacy": "FFT Legacy (32B)"
@@ -635,7 +662,7 @@ class TelemetryCapture:
         frame_rate = self.frame_count / duration if duration > 0 else 0
 
         mode_str = {
-            "extended": "Extended (552B, 4 samples/frame with ESKF+sensors)",
+            "extended": "Extended (648B, 4 samples/frame with ESKF+sensors)",
             "fft_batch": "FFT Batch (232B, 4 samples/frame)",
             "normal": "Normal (116B)",
             "fft_legacy": "FFT Legacy (32B)"
