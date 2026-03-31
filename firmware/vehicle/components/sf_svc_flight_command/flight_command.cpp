@@ -14,16 +14,16 @@
 
 // Forward declarations for globals
 // グローバル変数の前方宣言
+#include "ring_buffer.hpp"
+#include "stampfly_math.hpp"
 namespace globals {
     extern stampfly::LandingHandler g_landing_handler;
     extern sf::SensorFusion g_fusion;
 
-    // ToF sensor buffer (for open-loop climb altitude check)
-    // ToFセンサーバッファ（開ループ上昇の高度チェック用）
-    constexpr int REF_BUFFER_SIZE = 100;
-    extern float g_tof_bottom_buffer[REF_BUFFER_SIZE];
-    extern int g_tof_bottom_buffer_index;
-    extern int g_tof_bottom_buffer_count;
+    // ToF sensor ring buffer (for open-loop climb altitude check)
+    // ToFセンサーリングバッファ（開ループ上昇の高度チェック用）
+    inline constexpr int TOF_BUFFER_SIZE = 16;
+    extern RingBuffer<float, TOF_BUFFER_SIZE> g_tof_bottom_buf;
 }
 
 static const char* TAG = "FlightCmd";
@@ -373,9 +373,8 @@ void FlightCommandService::updateJumpCommand(float dt, float current_altitude) {
     // Get raw ToF altitude (used throughout jump command)
     // ToF生値を取得（Jumpコマンド全体で使用）
     float tof_altitude = 0.0f;
-    if (globals::g_tof_bottom_buffer_count > 0) {
-        int tof_latest_idx = (globals::g_tof_bottom_buffer_index - 1 + globals::REF_BUFFER_SIZE) % globals::REF_BUFFER_SIZE;
-        tof_altitude = globals::g_tof_bottom_buffer[tof_latest_idx];
+    if (globals::g_tof_bottom_buf.count() > 0) {
+        tof_altitude = globals::g_tof_bottom_buf.latest();
     }
 
     switch (phase_) {

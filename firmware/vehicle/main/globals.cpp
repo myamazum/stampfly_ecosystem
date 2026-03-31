@@ -60,25 +60,14 @@ float g_baro_reference_altitude = 0.0f;
 bool g_baro_reference_set = false;
 
 // =============================================================================
-// Sensor Reference Buffers
+// Sensor Ring Buffers
 // =============================================================================
 
-// Accelerometer buffer (for roll/pitch initialization and ESKF)
-stampfly::math::Vector3 g_accel_buffer[REF_BUFFER_SIZE];
-int g_accel_buffer_index = 0;
-int g_accel_buffer_count = 0;
-
-// Gyroscope buffer (for ESKF)
-stampfly::math::Vector3 g_gyro_buffer[REF_BUFFER_SIZE];
-int g_gyro_buffer_index = 0;
-int g_gyro_buffer_count = 0;
-
-// Raw IMU buffers (pre-LPF, for telemetry, indexed by g_accel_buffer_index)
-stampfly::math::Vector3 g_accel_raw_buffer[REF_BUFFER_SIZE];
-stampfly::math::Vector3 g_gyro_raw_buffer[REF_BUFFER_SIZE];
-
-// IMU internal timestamp buffer
-uint32_t g_imu_timestamp_buffer[REF_BUFFER_SIZE] = {};
+// IMU group (400Hz)
+RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_accel_buf;
+RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_gyro_buf;
+RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_accel_raw_buf;
+RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_gyro_raw_buf;
 
 // Sensor last-read timestamps
 volatile uint32_t g_baro_last_timestamp_us = 0;
@@ -86,31 +75,16 @@ volatile uint32_t g_tof_last_timestamp_us = 0;
 volatile uint32_t g_mag_last_timestamp_us = 0;
 volatile uint32_t g_flow_last_timestamp_us = 0;
 
-// Magnetometer buffer (for yaw=0 reference and ESKF)
-stampfly::math::Vector3 g_mag_buffer[REF_BUFFER_SIZE];
-int g_mag_buffer_index = 0;
-int g_mag_buffer_count = 0;
+// Independent sensor buffers
+RingBuffer<stampfly::math::Vector3, MAG_BUFFER_SIZE> g_mag_buf;
 bool g_mag_ref_set = false;
 
-// Barometer buffer (for ESKF altitude)
-float g_baro_buffer[REF_BUFFER_SIZE];
-int g_baro_buffer_index = 0;
-int g_baro_buffer_count = 0;
+RingBuffer<float, BARO_BUFFER_SIZE> g_baro_buf;
 
-// ToF bottom buffer (for ESKF altitude)
-float g_tof_bottom_buffer[REF_BUFFER_SIZE];
-int g_tof_bottom_buffer_index = 0;
-int g_tof_bottom_buffer_count = 0;
+RingBuffer<float, TOF_BUFFER_SIZE> g_tof_bottom_buf;
+RingBuffer<float, TOF_BUFFER_SIZE> g_tof_front_buf;
 
-// ToF front buffer (for obstacle detection)
-float g_tof_front_buffer[REF_BUFFER_SIZE];
-int g_tof_front_buffer_index = 0;
-int g_tof_front_buffer_count = 0;
-
-// Optical flow buffer (for ESKF velocity)
-OptFlowData g_optflow_buffer[REF_BUFFER_SIZE];
-int g_optflow_buffer_index = 0;
-int g_optflow_buffer_count = 0;
+RingBuffer<OptFlowData, FLOW_BUFFER_SIZE> g_flow_buf;
 
 // =============================================================================
 // Calibration Data

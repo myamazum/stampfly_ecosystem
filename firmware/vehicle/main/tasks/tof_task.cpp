@@ -118,11 +118,7 @@ void ToFTask(void* pvParameters)
                             g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
 
                             // リングバッファに追加
-                            g_tof_bottom_buffer[g_tof_bottom_buffer_index] = distance_m;
-                            g_tof_bottom_buffer_index = (g_tof_bottom_buffer_index + 1) % REF_BUFFER_SIZE;
-                            if (g_tof_bottom_buffer_count < REF_BUFFER_SIZE) {
-                                g_tof_bottom_buffer_count++;
-                            }
+                            g_tof_bottom_buf.push(distance_m);
                             g_tof_bottom_data_ready = true;
 
                             // Fallback to simple altitude estimator (センサーフュージョン未使用時)
@@ -183,11 +179,7 @@ void ToFTask(void* pvParameters)
                         state.updateToF(stampfly::ToFPosition::FRONT, distance_m, status);
 
                         // リングバッファに追加（常時更新）
-                        g_tof_front_buffer[g_tof_front_buffer_index] = distance_m;
-                        g_tof_front_buffer_index = (g_tof_front_buffer_index + 1) % REF_BUFFER_SIZE;
-                        if (g_tof_front_buffer_count < REF_BUFFER_SIZE) {
-                            g_tof_front_buffer_count++;
-                        }
+                        g_tof_front_buf.push(distance_m);
                         g_tof_front_data_ready = true;
                     }
                     g_tof_front.clearInterruptAndStartMeasurement();

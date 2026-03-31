@@ -49,7 +49,7 @@ void TelemetryTask(void* pvParameters)
     // Wait for IMU to start populating the buffer
     // IMUがバッファにデータを入れ始めるのを待つ
     vTaskDelay(pdMS_TO_TICKS(100));
-    telemetry_read_index = g_accel_buffer_index;
+    telemetry_read_index = g_accel_buf.raw_index();
 
     while (true) {
         // Wait for IMU update (400Hz, synchronized with IMU task)
@@ -72,8 +72,8 @@ void TelemetryTask(void* pvParameters)
 
         // Read from ring buffer at current read index
         // リングバッファから現在の読み取りインデックスで読む
-        const auto& accel = g_accel_buffer[telemetry_read_index];
-        const auto& gyro = g_gyro_buffer[telemetry_read_index];
+        const auto& accel = g_accel_buf.raw_at(telemetry_read_index);
+        const auto& gyro = g_gyro_buf.raw_at(telemetry_read_index);
 
         // Raw gyro/accel (LPF only, no bias correction)
         // 生ジャイロ/加速度（LPFのみ、バイアス補正なし）
@@ -190,8 +190,8 @@ void TelemetryTask(void* pvParameters)
 
         // Raw IMU (pre-LPF)
         // LPF前のIMU生値
-        const auto& accel_raw = g_accel_raw_buffer[telemetry_read_index];
-        const auto& gyro_raw = g_gyro_raw_buffer[telemetry_read_index];
+        const auto& accel_raw = g_accel_raw_buf.raw_at(telemetry_read_index);
+        const auto& gyro_raw = g_gyro_raw_buf.raw_at(telemetry_read_index);
         sample.gyro_raw_x = gyro_raw.x;
         sample.gyro_raw_y = gyro_raw.y;
         sample.gyro_raw_z = gyro_raw.z;
@@ -204,7 +204,7 @@ void TelemetryTask(void* pvParameters)
         // Guard against ring buffer read-ahead: ensure monotonically increasing
         // リングバッファの読み越し防止: 単調増加を保証
         {
-            uint32_t imu_ts = g_imu_timestamp_buffer[telemetry_read_index];
+            uint32_t imu_ts = g_accel_raw_buf.raw_timestamp_at(telemetry_read_index);
             static uint32_t last_imu_ts = 0;
             if (imu_ts >= last_imu_ts) {
                 last_imu_ts = imu_ts;
@@ -221,7 +221,7 @@ void TelemetryTask(void* pvParameters)
 
         // Advance read index (ring buffer wrap)
         // 読み取りインデックスを進める（リングバッファ循環）
-        telemetry_read_index = (telemetry_read_index + 1) % REF_BUFFER_SIZE;
+        telemetry_read_index = (telemetry_read_index + 1) % IMU_BUFFER_SIZE;
 
         batch_index++;
 

@@ -44,11 +44,7 @@ void BaroTask(void* pvParameters)
                 // リングバッファに相対高度を追加（安定判定用）
                 float relative_alt = g_baro_reference_set ?
                     (baro.altitude_m - g_baro_reference_altitude) : 0.0f;
-                g_baro_buffer[g_baro_buffer_index] = relative_alt;
-                g_baro_buffer_index = (g_baro_buffer_index + 1) % REF_BUFFER_SIZE;
-                if (g_baro_buffer_count < REF_BUFFER_SIZE) {
-                    g_baro_buffer_count++;
-                }
+                g_baro_buf.push(relative_alt);
                 g_baro_data_ready = true;
 
                 // Fallback to simple altitude estimator (センサーフュージョン未使用時)

@@ -61,11 +61,7 @@ void OptFlowTask(void* pvParameters)
                     state.updateOpticalFlow(flow_body_x, flow_body_y, burst.squal);
 
                     // リングバッファに追加（常時更新）
-                    g_optflow_buffer[g_optflow_buffer_index] = {flow_body_x, flow_body_y, burst.squal};
-                    g_optflow_buffer_index = (g_optflow_buffer_index + 1) % REF_BUFFER_SIZE;
-                    if (g_optflow_buffer_count < REF_BUFFER_SIZE) {
-                        g_optflow_buffer_count++;
-                    }
+                    g_flow_buf.push(OptFlowData{flow_body_x, flow_body_y, burst.squal});
                     g_optflow_data_ready = true;
                     g_flow_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
                 } else {

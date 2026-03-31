@@ -42,6 +42,9 @@
 // Math
 #include "stampfly_math.hpp"
 
+// Ring buffer template
+#include "ring_buffer.hpp"
+
 namespace globals {
 
 // =============================================================================
@@ -97,29 +100,26 @@ extern float g_baro_reference_altitude;
 extern bool g_baro_reference_set;
 
 // =============================================================================
-// Sensor Reference Buffers (for attitude initialization)
+// Sensor Ring Buffers (sized per sensor rate)
+// センサーリングバッファ（各センサーのレートに応じたサイズ）
 // =============================================================================
 
-inline constexpr int REF_BUFFER_SIZE = 200;  // 500ms @ 400Hz (was 100 = 250ms)
+// Buffer sizes (each sized for ~0.5s at sensor rate)
+// バッファサイズ（各センサーレートで約0.5秒分）
+inline constexpr int IMU_BUFFER_SIZE  = 200;  // 400Hz × 0.5s
+inline constexpr int MAG_BUFFER_SIZE  = 16;   // 25Hz × 0.64s
+inline constexpr int BARO_BUFFER_SIZE = 32;   // 50Hz × 0.64s
+inline constexpr int TOF_BUFFER_SIZE  = 16;   // 30Hz × 0.53s
+inline constexpr int FLOW_BUFFER_SIZE = 64;   // 100Hz × 0.64s
 
-// Accelerometer buffer (LPF filtered, for ESKF)
-extern stampfly::math::Vector3 g_accel_buffer[REF_BUFFER_SIZE];
-extern int g_accel_buffer_index;
-extern int g_accel_buffer_count;
-
-// Gyroscope buffer (LPF filtered, for ESKF)
-extern stampfly::math::Vector3 g_gyro_buffer[REF_BUFFER_SIZE];
-extern int g_gyro_buffer_index;
-extern int g_gyro_buffer_count;
-
-// Raw IMU buffers (pre-LPF, for telemetry, indexed by g_accel_buffer_index)
-// LPF前のIMU生値バッファ（テレメトリ用、g_accel_buffer_indexと同じインデックス）
-extern stampfly::math::Vector3 g_accel_raw_buffer[REF_BUFFER_SIZE];
-extern stampfly::math::Vector3 g_gyro_raw_buffer[REF_BUFFER_SIZE];
-
-// IMU internal timestamp buffer (for telemetry jitter analysis)
-// IMU内部タイムスタンプバッファ（テレメトリジッター解析用）
-extern uint32_t g_imu_timestamp_buffer[REF_BUFFER_SIZE];
+// IMU group (same size, telemetry reads all with same index)
+// IMUグループ（同サイズ、テレメトリは同じインデックスで読み出す）
+extern RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_accel_buf;
+extern RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_gyro_buf;
+extern RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_accel_raw_buf;
+extern RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_gyro_raw_buf;
+// Note: IMU timestamp is stored via push(value, ts_us) in g_accel_raw_buf
+// 注: IMUタイムスタンプは g_accel_raw_buf の push(value, ts_us) で格納
 
 // Sensor last-read timestamps (volatile, set by each sensor task)
 // 各センサータスクが最終取得時刻を記録
@@ -128,36 +128,22 @@ extern volatile uint32_t g_tof_last_timestamp_us;
 extern volatile uint32_t g_mag_last_timestamp_us;
 extern volatile uint32_t g_flow_last_timestamp_us;
 
-// Magnetometer buffer (for yaw=0 reference and ESKF)
-extern stampfly::math::Vector3 g_mag_buffer[REF_BUFFER_SIZE];
-extern int g_mag_buffer_index;
-extern int g_mag_buffer_count;
+// Independent sensor buffers
+// 独立センサーバッファ
+extern RingBuffer<stampfly::math::Vector3, MAG_BUFFER_SIZE> g_mag_buf;
 extern bool g_mag_ref_set;
 
-// Barometer buffer (for ESKF altitude)
-extern float g_baro_buffer[REF_BUFFER_SIZE];
-extern int g_baro_buffer_index;
-extern int g_baro_buffer_count;
+extern RingBuffer<float, BARO_BUFFER_SIZE> g_baro_buf;
 
-// ToF bottom buffer (for ESKF altitude)
-extern float g_tof_bottom_buffer[REF_BUFFER_SIZE];
-extern int g_tof_bottom_buffer_index;
-extern int g_tof_bottom_buffer_count;
+extern RingBuffer<float, TOF_BUFFER_SIZE> g_tof_bottom_buf;
+extern RingBuffer<float, TOF_BUFFER_SIZE> g_tof_front_buf;
 
-// ToF front buffer (for obstacle detection)
-extern float g_tof_front_buffer[REF_BUFFER_SIZE];
-extern int g_tof_front_buffer_index;
-extern int g_tof_front_buffer_count;
-
-// Optical flow buffer (for ESKF velocity)
 struct OptFlowData {
     int16_t dx;
     int16_t dy;
     uint8_t squal;
 };
-extern OptFlowData g_optflow_buffer[REF_BUFFER_SIZE];
-extern int g_optflow_buffer_index;
-extern int g_optflow_buffer_count;
+extern RingBuffer<OptFlowData, FLOW_BUFFER_SIZE> g_flow_buf;
 
 // =============================================================================
 // Calibration Data

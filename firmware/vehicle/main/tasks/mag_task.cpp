@@ -65,12 +65,7 @@ void MagTask(void* pvParameters)
                     stampfly::math::Vector3 m(cal_mag_x, cal_mag_y, cal_mag_z);
 
                     // リングバッファに追加（常時更新）
-                    // 初期化時は平均計算、ESKF実行時は最新値を使用
-                    g_mag_buffer[g_mag_buffer_index] = m;
-                    g_mag_buffer_index = (g_mag_buffer_index + 1) % REF_BUFFER_SIZE;
-                    if (g_mag_buffer_count < REF_BUFFER_SIZE) {
-                        g_mag_buffer_count++;
-                    }
+                    g_mag_buf.push(m);
 
                     // 新しいデータがあることを示すフラグ（25Hz）
                     // ESKF updateはIMUTask内で行う（レースコンディション防止）

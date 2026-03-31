@@ -82,37 +82,25 @@ using namespace globals;
  */
 void initializeAttitudeFromBuffers()
 {
-    if (g_accel_buffer_count == 0) {
+    if (g_accel_buf.count() == 0) {
         ESP_LOGW(TAG, "No accel samples in buffer, cannot initialize attitude");
         return;
     }
-    if (g_mag_buffer_count == 0) {
+    if (g_mag_buf.count() == 0) {
         ESP_LOGW(TAG, "No mag samples in buffer, cannot initialize attitude");
         return;
     }
 
-    // 加速度バッファの平均を計算
-    stampfly::math::Vector3 accel_sum = stampfly::math::Vector3::zero();
-    int accel_count = std::min(g_accel_buffer_count, REF_BUFFER_SIZE);
-    for (int i = 0; i < accel_count; i++) {
-        accel_sum += g_accel_buffer[i];
-    }
-    stampfly::math::Vector3 accel_avg = accel_sum * (1.0f / accel_count);
-
-    // 地磁気バッファの平均を計算
-    stampfly::math::Vector3 mag_sum = stampfly::math::Vector3::zero();
-    int mag_count = std::min(g_mag_buffer_count, REF_BUFFER_SIZE);
-    for (int i = 0; i < mag_count; i++) {
-        mag_sum += g_mag_buffer[i];
-    }
-    stampfly::math::Vector3 mag_avg = mag_sum * (1.0f / mag_count);
+    // バッファ平均を計算
+    stampfly::math::Vector3 accel_avg = g_accel_buf.mean();
+    stampfly::math::Vector3 mag_avg = g_mag_buf.mean();
 
     // センサーフュージョンの姿勢を初期化
     if (g_fusion.isInitialized()) {
         g_fusion.initializeAttitude(accel_avg, mag_avg);
         g_mag_ref_set = true;
         ESP_LOGI(TAG, "Attitude initialized from buffers: accel=%d samples, mag=%d samples",
-                 accel_count, mag_count);
+                 g_accel_buf.count(), g_mag_buf.count());
     }
 }
 
@@ -122,25 +110,20 @@ void initializeAttitudeFromBuffers()
  */
 void setMagReferenceFromBuffer()
 {
-    if (g_mag_buffer_count == 0) {
+    if (g_mag_buf.count() == 0) {
         ESP_LOGW(TAG, "No mag samples in buffer, cannot set reference");
         return;
     }
 
     // バッファの平均を計算
-    stampfly::math::Vector3 sum = stampfly::math::Vector3::zero();
-    int count = std::min(g_mag_buffer_count, REF_BUFFER_SIZE);
-    for (int i = 0; i < count; i++) {
-        sum += g_mag_buffer[i];
-    }
-    stampfly::math::Vector3 avg = sum * (1.0f / count);
+    stampfly::math::Vector3 avg = g_mag_buf.mean();
 
     // センサーフュージョンに設定
     if (g_fusion.isInitialized()) {
         g_fusion.setMagReference(avg);
         g_mag_ref_set = true;
         ESP_LOGI(TAG, "Mag reference set from %d samples: (%.1f, %.1f, %.1f) uT",
-                 count, avg.x, avg.y, avg.z);
+                 g_mag_buf.count(), avg.x, avg.y, avg.z);
     }
 }
 
@@ -607,12 +590,12 @@ extern "C" void app_main(void)
         constexpr int MAX_SENSOR_INIT_WAIT_MS = 2000;  // 最大2秒待機
         while (wait_ms < MAX_SENSOR_INIT_WAIT_MS) {
             bool all_started =
-                g_accel_buffer_count > 0 &&
-                g_gyro_buffer_count > 0 &&
-                g_mag_buffer_count > 0 &&
-                g_baro_buffer_count > 0 &&
-                g_tof_bottom_buffer_count > 0 &&
-                g_optflow_buffer_count > 0;
+                g_accel_buf.count() > 0 &&
+                g_gyro_buf.count() > 0 &&
+                g_mag_buf.count() > 0 &&
+                g_baro_buf.count() > 0 &&
+                g_tof_bottom_buf.count() > 0 &&
+                g_flow_buf.count() > 0;
 
             if (all_started) {
                 ESP_LOGI(TAG, "All sensor buffers started filling after %d ms", wait_ms);
@@ -625,8 +608,8 @@ extern "C" void app_main(void)
 
         if (wait_ms >= MAX_SENSOR_INIT_WAIT_MS) {
             ESP_LOGW(TAG, "Sensor init timeout: accel=%d gyro=%d mag=%d baro=%d tof=%d flow=%d",
-                     g_accel_buffer_count, g_gyro_buffer_count, g_mag_buffer_count,
-                     g_baro_buffer_count, g_tof_bottom_buffer_count, g_optflow_buffer_count);
+                     g_accel_buf.count(), g_gyro_buf.count(), g_mag_buf.count(),
+                     g_baro_buf.count(), g_tof_bottom_buf.count(), g_flow_buf.count());
         }
     }
 
@@ -661,16 +644,18 @@ extern "C" void app_main(void)
     // デバッグログ用（1秒ごとにログ出力）
     int last_log_sec = 0;
 
-    // ヘルパー: Vector3の標準偏差ノルムを計算
-    auto calcVector3StdNorm = [](const auto& buffer, int count, int buffer_size) {
+    // ヘルパー: RingBuffer<Vector3,N> の標準偏差ノルムを計算
+    auto calcVector3StdNorm = [](const auto& buf) {
+        int n = buf.count();
+        if (n == 0) return 0.0f;
         stampfly::math::Vector3 sum = stampfly::math::Vector3::zero();
         stampfly::math::Vector3 sum_sq = stampfly::math::Vector3::zero();
-        int n = std::min(count, buffer_size);
         for (int i = 0; i < n; i++) {
-            sum += buffer[i];
-            sum_sq.x += buffer[i].x * buffer[i].x;
-            sum_sq.y += buffer[i].y * buffer[i].y;
-            sum_sq.z += buffer[i].z * buffer[i].z;
+            const auto& v = buf.get(i);
+            sum += v;
+            sum_sq.x += v.x * v.x;
+            sum_sq.y += v.y * v.y;
+            sum_sq.z += v.z * v.z;
         }
         float fn = static_cast<float>(n);
         stampfly::math::Vector3 avg = sum * (1.0f / fn);
@@ -680,13 +665,15 @@ extern "C" void app_main(void)
         return std::sqrt(var_x + var_y + var_z);
     };
 
-    // ヘルパー: スカラーの標準偏差を計算
-    auto calcScalarStd = [](const auto& buffer, int count, int buffer_size) {
+    // ヘルパー: RingBuffer<float,N> の標準偏差を計算
+    auto calcScalarStd = [](const auto& buf) {
+        int n = buf.count();
+        if (n == 0) return 0.0f;
         float sum = 0.0f, sum_sq = 0.0f;
-        int n = std::min(count, buffer_size);
         for (int i = 0; i < n; i++) {
-            sum += buffer[i];
-            sum_sq += buffer[i] * buffer[i];
+            float v = buf.get(i);
+            sum += v;
+            sum_sq += v * v;
         }
         float fn = static_cast<float>(n);
         float avg = sum / fn;
@@ -708,84 +695,79 @@ extern "C" void app_main(void)
         }
 
         // === 加速度 ===
-        if (!accel_passed && g_accel_buffer_count >= MIN_ACCEL_SAMPLES) {
-            float std_norm = calcVector3StdNorm(g_accel_buffer, g_accel_buffer_count, REF_BUFFER_SIZE);
+        if (!accel_passed && g_accel_buf.count() >= MIN_ACCEL_SAMPLES) {
+            float std_norm = calcVector3StdNorm(g_accel_buf);
             last_accel_std_norm = std_norm;
             if (std_norm < ACCEL_STD_THRESHOLD) {
                 accel_passed = true;
                 ESP_LOGI(TAG, "  Accel: PASSED (%.4f < %.3f)", std_norm, ACCEL_STD_THRESHOLD);
             } else {
                 // 不合格: バッファクリアして再サンプリング
-                g_accel_buffer_count = 0;
-                g_accel_buffer_index = 0;
+                g_accel_buf.reset();
                 if (do_log) ESP_LOGW(TAG, "  Accel: NG (%.4f > %.3f) -> retry", std_norm, ACCEL_STD_THRESHOLD);
             }
         } else if (do_log && !accel_passed) {
-            ESP_LOGI(TAG, "  Accel: waiting (%d/%d samples)", g_accel_buffer_count, MIN_ACCEL_SAMPLES);
+            ESP_LOGI(TAG, "  Accel: waiting (%d/%d samples)", g_accel_buf.count(), MIN_ACCEL_SAMPLES);
         }
 
         // === ジャイロ ===
-        if (!gyro_passed && g_gyro_buffer_count >= MIN_GYRO_SAMPLES) {
-            float std_norm = calcVector3StdNorm(g_gyro_buffer, g_gyro_buffer_count, REF_BUFFER_SIZE);
+        if (!gyro_passed && g_gyro_buf.count() >= MIN_GYRO_SAMPLES) {
+            float std_norm = calcVector3StdNorm(g_gyro_buf);
             last_gyro_std_norm = std_norm;
             if (std_norm < GYRO_STD_THRESHOLD) {
                 gyro_passed = true;
                 ESP_LOGI(TAG, "  Gyro:  PASSED (%.5f < %.3f)", std_norm, GYRO_STD_THRESHOLD);
             } else {
-                g_gyro_buffer_count = 0;
-                g_gyro_buffer_index = 0;
+                g_gyro_buf.reset();
                 if (do_log) ESP_LOGW(TAG, "  Gyro:  NG (%.5f > %.3f) -> retry", std_norm, GYRO_STD_THRESHOLD);
             }
         } else if (do_log && !gyro_passed) {
-            ESP_LOGI(TAG, "  Gyro:  waiting (%d/%d samples)", g_gyro_buffer_count, MIN_GYRO_SAMPLES);
+            ESP_LOGI(TAG, "  Gyro:  waiting (%d/%d samples)", g_gyro_buf.count(), MIN_GYRO_SAMPLES);
         }
 
         // === 地磁気 ===
-        if (!mag_passed && g_mag_buffer_count >= MIN_MAG_SAMPLES) {
-            float std_norm = calcVector3StdNorm(g_mag_buffer, g_mag_buffer_count, REF_BUFFER_SIZE);
+        if (!mag_passed && g_mag_buf.count() >= MIN_MAG_SAMPLES) {
+            float std_norm = calcVector3StdNorm(g_mag_buf);
             last_mag_std_norm = std_norm;
             if (std_norm < MAG_STD_THRESHOLD) {
                 mag_passed = true;
                 ESP_LOGI(TAG, "  Mag:   PASSED (%.3f < %.1f)", std_norm, MAG_STD_THRESHOLD);
             } else {
-                g_mag_buffer_count = 0;
-                g_mag_buffer_index = 0;
+                g_mag_buf.reset();
                 if (do_log) ESP_LOGW(TAG, "  Mag:   NG (%.3f > %.1f) -> retry", std_norm, MAG_STD_THRESHOLD);
             }
         } else if (do_log && !mag_passed) {
-            ESP_LOGI(TAG, "  Mag:   waiting (%d/%d samples)", g_mag_buffer_count, MIN_MAG_SAMPLES);
+            ESP_LOGI(TAG, "  Mag:   waiting (%d/%d samples)", g_mag_buf.count(), MIN_MAG_SAMPLES);
         }
 
         // === 気圧 ===
-        if (!baro_passed && g_baro_buffer_count >= MIN_BARO_SAMPLES) {
-            float std_val = calcScalarStd(g_baro_buffer, g_baro_buffer_count, REF_BUFFER_SIZE);
+        if (!baro_passed && g_baro_buf.count() >= MIN_BARO_SAMPLES) {
+            float std_val = calcScalarStd(g_baro_buf);
             last_baro_std = std_val;
             if (std_val < BARO_STD_THRESHOLD) {
                 baro_passed = true;
                 ESP_LOGI(TAG, "  Baro:  PASSED (%.4f < %.2f)", std_val, BARO_STD_THRESHOLD);
             } else {
-                g_baro_buffer_count = 0;
-                g_baro_buffer_index = 0;
+                g_baro_buf.reset();
                 if (do_log) ESP_LOGW(TAG, "  Baro:  NG (%.4f > %.2f) -> retry", std_val, BARO_STD_THRESHOLD);
             }
         } else if (do_log && !baro_passed) {
-            ESP_LOGI(TAG, "  Baro:  waiting (%d/%d samples)", g_baro_buffer_count, MIN_BARO_SAMPLES);
+            ESP_LOGI(TAG, "  Baro:  waiting (%d/%d samples)", g_baro_buf.count(), MIN_BARO_SAMPLES);
         }
 
         // === ToF ===
-        if (!tof_passed && g_tof_bottom_buffer_count >= MIN_TOF_SAMPLES) {
-            float std_val = calcScalarStd(g_tof_bottom_buffer, g_tof_bottom_buffer_count, REF_BUFFER_SIZE);
+        if (!tof_passed && g_tof_bottom_buf.count() >= MIN_TOF_SAMPLES) {
+            float std_val = calcScalarStd(g_tof_bottom_buf);
             last_tof_std = std_val;
             if (std_val < TOF_STD_THRESHOLD) {
                 tof_passed = true;
                 ESP_LOGI(TAG, "  ToF:   PASSED (%.4f < %.3f)", std_val, TOF_STD_THRESHOLD);
             } else {
-                g_tof_bottom_buffer_count = 0;
-                g_tof_bottom_buffer_index = 0;
+                g_tof_bottom_buf.reset();
                 if (do_log) ESP_LOGW(TAG, "  ToF:   NG (%.4f > %.3f) -> retry", std_val, TOF_STD_THRESHOLD);
             }
         } else if (do_log && !tof_passed) {
-            ESP_LOGI(TAG, "  ToF:   waiting (%d/%d samples)", g_tof_bottom_buffer_count, MIN_TOF_SAMPLES);
+            ESP_LOGI(TAG, "  ToF:   waiting (%d/%d samples)", g_tof_bottom_buf.count(), MIN_TOF_SAMPLES);
         }
 
         // 全センサー合格したら終了
@@ -827,26 +809,18 @@ extern "C" void app_main(void)
     // Phase 2 キャリブレーションはセンサー安定化前に実行されるため不正確な可能性がある。
     // Phase 3 安定化待ち中に蓄積されたリングバッファから再計算する。
     {
-        int count = std::min(g_gyro_buffer_count, REF_BUFFER_SIZE);
+        int count = g_gyro_buf.count();
         if (count > 0) {
-            stampfly::math::Vector3 gyro_sum = stampfly::math::Vector3::zero();
-            stampfly::math::Vector3 accel_sum = stampfly::math::Vector3::zero();
-            for (int i = 0; i < count; i++) {
-                gyro_sum += g_gyro_buffer[i];
-                accel_sum += g_accel_buffer[i];
-            }
-            float n = static_cast<float>(count);
             // Gyro bias = average of raw gyro (stationary → bias only)
             // ジャイロバイアス = 生ジャイロの平均（静止時 → バイアス成分のみ）
-            g_initial_gyro_bias = gyro_sum * (1.0f / n);
+            g_initial_gyro_bias = g_gyro_buf.mean();
             // Accel bias = deviation from gravity [0, 0, -g]
             // 加速度バイアス = 重力ベクトル [0, 0, -g] からの偏差
-            // Buffer values are already in m/s² (converted by imu_task)
-            // バッファの値は既に m/s² 単位（imu_task で変換済み）
+            stampfly::math::Vector3 accel_avg = g_accel_buf.mean();
             g_initial_accel_bias = stampfly::math::Vector3(
-                accel_sum.x / n,
-                accel_sum.y / n,
-                accel_sum.z / n - (-config::eskf::GRAVITY)
+                accel_avg.x,
+                accel_avg.y,
+                accel_avg.z - (-config::eskf::GRAVITY)
             );
             ESP_LOGI(TAG, "Bias recalculated from stable buffers (%d samples):", count);
             ESP_LOGI(TAG, "  Gyro: [%.5f, %.5f, %.5f] rad/s",

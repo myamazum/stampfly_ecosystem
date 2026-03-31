@@ -79,20 +79,17 @@ void IMUTask(void* pvParameters)
                 float gyro_body_y = gyro.x;     // Pitch rate [rad/s]
                 float gyro_body_z = -gyro.z;    // Yaw rate [rad/s]
 
-                // Store pre-LPF raw values for telemetry
-                // テレメトリ用にLPF前の生値を保存
-                // Use g_accel_buffer_index (same index as LPF buffer) so that
-                // telemetry_read_index reads matching timestamp + raw + LPF data.
-                // テレメトリの read_index と一致させるため LPF バッファと同じインデックスを使用
-                int raw_idx = g_accel_buffer_index;  // Before increment below
-                g_accel_raw_buffer[raw_idx] =
-                    stampfly::math::Vector3(accel_body_x, accel_body_y, accel_body_z);
-                g_gyro_raw_buffer[raw_idx] =
-                    stampfly::math::Vector3(gyro_body_x, gyro_body_y, gyro_body_z);
-                // IMU internal timestamp (actual control loop timing)
-                // IMU内部タイムスタンプ（実際の制御ループタイミング）
-                g_imu_timestamp_buffer[raw_idx] =
-                    static_cast<uint32_t>(esp_timer_get_time());
+                // Store pre-LPF raw values for telemetry (with timestamp)
+                // テレメトリ用にLPF前の生値を保存（タイムスタンプ付き）
+                // All IMU buffers share the same raw_index via push() ordering,
+                // so telemetry can read matching data at the same raw_index.
+                // 全IMUバッファは push() 順序で同じ raw_index を共有し、
+                // テレメトリは同じ raw_index で対応するデータを読める。
+                uint32_t imu_ts = static_cast<uint32_t>(esp_timer_get_time());
+                g_accel_raw_buf.push(
+                    stampfly::math::Vector3(accel_body_x, accel_body_y, accel_body_z), imu_ts);
+                g_gyro_raw_buf.push(
+                    stampfly::math::Vector3(gyro_body_x, gyro_body_y, gyro_body_z));
 
                 // Apply low-pass filters (機体座標系で)
                 float filtered_accel[3] = {
@@ -115,20 +112,9 @@ void IMUTask(void* pvParameters)
                 stampfly::math::Vector3 a(filtered_accel[0], filtered_accel[1], filtered_accel[2]);
                 stampfly::math::Vector3 g(filtered_gyro[0], filtered_gyro[1], filtered_gyro[2]);
 
-                // 加速度リングバッファに追加（常時更新）
-                // 初期化時は平均計算、ESKF実行時は最新値を使用
-                g_accel_buffer[g_accel_buffer_index] = a;
-                g_accel_buffer_index = (g_accel_buffer_index + 1) % REF_BUFFER_SIZE;
-                if (g_accel_buffer_count < REF_BUFFER_SIZE) {
-                    g_accel_buffer_count++;
-                }
-
-                // ジャイロも同様にバッファに追加
-                g_gyro_buffer[g_gyro_buffer_index] = g;
-                g_gyro_buffer_index = (g_gyro_buffer_index + 1) % REF_BUFFER_SIZE;
-                if (g_gyro_buffer_count < REF_BUFFER_SIZE) {
-                    g_gyro_buffer_count++;
-                }
+                // 加速度・ジャイロリングバッファに追加（常時更新）
+                g_accel_buf.push(a);
+                g_gyro_buf.push(g);
 
                 // Signal telemetry task for FFT mode (400Hz sync)
                 // FFTモードのテレメトリタスクに新しいIMUデータを通知
@@ -148,9 +134,8 @@ void IMUTask(void* pvParameters)
                                         state.getFlightState() == stampfly::FlightState::INIT);
 
                     float tof_bottom_now = 0.0f;
-                    if (g_tof_bottom_buffer_count > 0) {
-                        int tof_latest_idx = (g_tof_bottom_buffer_index - 1 + REF_BUFFER_SIZE) % REF_BUFFER_SIZE;
-                        tof_bottom_now = g_tof_bottom_buffer[tof_latest_idx];
+                    if (g_tof_bottom_buf.count() > 0) {
+                        tof_bottom_now = g_tof_bottom_buf.latest();
                     }
 
                     // Update landing handler with current sensor data
@@ -236,9 +221,8 @@ void IMUTask(void* pvParameters)
 
                         // 接地判定（ToF高度ベース、リングバッファから取得）
                         float tof_bottom_now = 0.0f;
-                        if (g_tof_bottom_buffer_count > 0) {
-                            int tof_latest_idx = (g_tof_bottom_buffer_index - 1 + REF_BUFFER_SIZE) % REF_BUFFER_SIZE;
-                            tof_bottom_now = g_tof_bottom_buffer[tof_latest_idx];
+                        if (g_tof_bottom_buf.count() > 0) {
+                            tof_bottom_now = g_tof_bottom_buf.latest();
                         }
                         static bool is_grounded = true;        // 起動時は接地状態
                         static bool has_taken_off = false;     // 一度でも離陸したか
@@ -273,10 +257,8 @@ void IMUTask(void* pvParameters)
                         // ヒステリシス: 閾値〜2倍の間は状態維持、カウンタもリセットしない
 
                         // バッファの最新値を取得
-                        int accel_latest_idx = (g_accel_buffer_index - 1 + REF_BUFFER_SIZE) % REF_BUFFER_SIZE;
-                        int gyro_latest_idx = (g_gyro_buffer_index - 1 + REF_BUFFER_SIZE) % REF_BUFFER_SIZE;
-                        const auto& accel_latest = g_accel_buffer[accel_latest_idx];
-                        const auto& gyro_latest = g_gyro_buffer[gyro_latest_idx];
+                        const auto& accel_latest = g_accel_buf.latest();
+                        const auto& gyro_latest = g_gyro_buf.latest();
 
                         // 接地中かどうかを判定してskip_positionフラグを設定
                         bool skip_position = is_grounded && eskf::ENABLE_LANDING_RESET;
@@ -322,13 +304,11 @@ void IMUTask(void* pvParameters)
                                 if (optflow_takeoff_skip_counter > 0) {
                                     optflow_takeoff_skip_counter--;
                                     // 共分散リセット直後は過剰補正防止のためスキップ
-                                } else if (g_optflow_buffer_count > 0 && g_tof_bottom_buffer_count > 0) {
+                                } else if (g_flow_buf.count() > 0 && g_tof_bottom_buf.count() > 0) {
                                     constexpr float dt = 0.01f;  // 100Hz
                                     // バッファの最新値を取得
-                                    int optflow_latest_idx = (g_optflow_buffer_index - 1 + REF_BUFFER_SIZE) % REF_BUFFER_SIZE;
-                                    int tof_latest_idx = (g_tof_bottom_buffer_index - 1 + REF_BUFFER_SIZE) % REF_BUFFER_SIZE;
-                                    const auto& flow = g_optflow_buffer[optflow_latest_idx];
-                                    float tof_bottom = g_tof_bottom_buffer[tof_latest_idx];
+                                    const auto& flow = g_flow_buf.latest();
+                                    float tof_bottom = g_tof_bottom_buf.latest();
                                     // squal/distance チェックは SensorFusion 内部で実行
                                     g_fusion.updateOpticalFlow(flow.dx, flow.dy, flow.squal, tof_bottom, dt,
                                                                gyro_latest.x, gyro_latest.y);
@@ -343,10 +323,9 @@ void IMUTask(void* pvParameters)
                         // TODO: 気圧センサの値が確認できたら有効化
                         if (g_baro_data_ready) {
                             g_baro_data_ready = false;
-                            if (g_baro_task_healthy && g_baro_buffer_count > 0) {
-                                // バッファの最新値を取得
-                                int baro_latest_idx = (g_baro_buffer_index - 1 + REF_BUFFER_SIZE) % REF_BUFFER_SIZE;
-                                // g_fusion.updateBarometer(g_baro_buffer[baro_latest_idx]);
+                            if (g_baro_task_healthy && g_baro_buf.count() > 0) {
+                                // TODO: 気圧センサの値が確認できたら有効化
+                                // g_fusion.updateBarometer(g_baro_buf.latest());
                             }
                         }
 
@@ -368,11 +347,9 @@ void IMUTask(void* pvParameters)
                                 if (tof_takeoff_skip_counter > 0) {
                                     tof_takeoff_skip_counter--;
                                     // 共分散リセット直後は過剰補正防止のためスキップ
-                                } else if (g_tof_bottom_buffer_count > 0) {
-                                    // バッファの最新値を取得
-                                    int tof_latest_idx = (g_tof_bottom_buffer_index - 1 + REF_BUFFER_SIZE) % REF_BUFFER_SIZE;
+                                } else if (g_tof_bottom_buf.count() > 0) {
                                     // 距離範囲チェックはSensorFusion内部で実行
-                                    g_fusion.updateToF(g_tof_bottom_buffer[tof_latest_idx]);
+                                    g_fusion.updateToF(g_tof_bottom_buf.latest());
                                 }
                             }
                         }
@@ -384,10 +361,8 @@ void IMUTask(void* pvParameters)
                         static uint32_t mag_update_count = 0;
                         if (g_mag_data_ready && g_mag_ref_set) {
                             g_mag_data_ready = false;
-                            if (g_mag_task_healthy && g_mag_buffer_count > 0) {
-                                // バッファの最新値を取得
-                                int latest_idx = (g_mag_buffer_index - 1 + REF_BUFFER_SIZE) % REF_BUFFER_SIZE;
-                                g_fusion.updateMagnetometer(g_mag_buffer[latest_idx]);
+                            if (g_mag_task_healthy && g_mag_buf.count() > 0) {
+                                g_fusion.updateMagnetometer(g_mag_buf.latest());
                                 mag_update_count++;
                             }
                         }
