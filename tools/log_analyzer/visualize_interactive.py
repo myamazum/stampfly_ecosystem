@@ -423,10 +423,6 @@ function addPlot() {{
     `;
     area.appendChild(container);
 
-    // Sync X axis on zoom/pan
-    // ズーム・パン時に X 軸を同期
-    plotDiv.on('plotly_relayout', function(ed) {{ syncXRange(id, ed); }});
-
     // Click anywhere on plot area to select as target
     // プロットエリアのクリックでターゲットに選択
     container.addEventListener('click', function(e) {{
@@ -472,6 +468,11 @@ function addPlot() {{
     // plotly_hover returns data values, not cursor position on axis.
     // Use mousemove + Plotly axis mapping to get the actual cursor y-coordinate.
     const plotDiv = document.getElementById(id);
+
+    // Sync X axis on zoom/pan
+    // ズーム・パン時に X 軸を同期
+    plotDiv.on('plotly_relayout', function(ed) {{ syncXRange(id, ed); }});
+
     plotDiv.addEventListener('mousemove', function(evt) {{
         const cursorEl = document.getElementById(`cursor_${{id}}`);
         if (!cursorEl) return;
