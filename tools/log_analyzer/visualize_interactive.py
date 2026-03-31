@@ -404,19 +404,34 @@ function addPlot() {{
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     }});
 
-    // Show cursor position (t, y) in plot header on hover
-    // ホバー時にプロットヘッダーにカーソル位置 (t, y) を表示
+    // Show cursor position (t, y_axis) in plot header using mouse events
+    // マウスイベントでカーソルの軸上の座標 (t, y) をヘッダーに表示
+    // plotly_hover returns data values, not cursor position on axis.
+    // Use mousemove + Plotly axis mapping to get the actual cursor y-coordinate.
     const plotDiv = document.getElementById(id);
-    plotDiv.on('plotly_hover', function(eventData) {{
-        const pt = eventData.points[0];
-        if (pt) {{
-            const cursorEl = document.getElementById(`cursor_${{id}}`);
-            if (cursorEl) {{
-                cursorEl.textContent = `t=${{pt.x.toFixed(3)}}s  y=${{pt.y.toFixed(5)}}`;
-            }}
+    plotDiv.addEventListener('mousemove', function(evt) {{
+        const cursorEl = document.getElementById(`cursor_${{id}}`);
+        if (!cursorEl) return;
+        const bb = plotDiv.getBoundingClientRect();
+        const layout = plotDiv._fullLayout;
+        if (!layout || !layout.xaxis || !layout.yaxis) return;
+        const xa = layout.xaxis;
+        const ya = layout.yaxis;
+        // Mouse position relative to plot area
+        const mouseX = evt.clientX - bb.left;
+        const mouseY = evt.clientY - bb.top;
+        // Check if inside plot area
+        if (mouseX < xa._offset || mouseX > xa._offset + xa._length ||
+            mouseY < ya._offset || mouseY > ya._offset + ya._length) {{
+            cursorEl.textContent = '';
+            return;
         }}
+        // Convert pixel to data coordinates
+        const tVal = xa.p2d(mouseX - xa._offset);
+        const yVal = ya.p2d(mouseY - ya._offset);
+        cursorEl.textContent = `t=${{tVal.toFixed(3)}}s  y=${{yVal.toFixed(5)}}`;
     }});
-    plotDiv.on('plotly_unhover', function() {{
+    plotDiv.addEventListener('mouseleave', function() {{
         const cursorEl = document.getElementById(`cursor_${{id}}`);
         if (cursorEl) cursorEl.textContent = '';
     }});
