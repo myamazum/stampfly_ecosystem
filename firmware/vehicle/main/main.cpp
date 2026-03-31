@@ -639,6 +639,12 @@ extern "C" void app_main(void)
     bool baro_passed  = !has_baro;
     bool tof_passed   = !has_tof;
 
+    // ToF: initialized but may not have valid data (e.g. no ground below)
+    // Wait up to TOF_DATA_WAIT_MS for first sample, then skip if none
+    // ToF: 初期化済みでも有効データが来ない場合がある（下方に地面がない等）
+    // TOF_DATA_WAIT_MS 待っても1サンプルも来なければスキップ
+    constexpr int TOF_DATA_WAIT_MS = 2000;
+
     ESP_LOGI(TAG, "  Checking: IMU=%d MAG=%d BARO=%d ToF=%d",
              has_imu, has_mag, has_baro, has_tof);
 
@@ -806,7 +812,12 @@ extern "C" void app_main(void)
         }
 
         // === ToF ===
-        if (!tof_passed && tof_st.n >= MIN_TOF_SAMPLES) {
+        // Skip if no data after TOF_DATA_WAIT_MS (sensor present but no valid target)
+        // TOF_DATA_WAIT_MS 経過してもデータなし → センサーは存在するが有効ターゲットなし
+        if (!tof_passed && tof_st.n == 0 && elapsed_ms >= TOF_DATA_WAIT_MS) {
+            tof_passed = true;
+            ESP_LOGW(TAG, "  ToF:   SKIPPED (no valid data after %d ms)", TOF_DATA_WAIT_MS);
+        } else if (!tof_passed && tof_st.n >= MIN_TOF_SAMPLES) {
             float std_val = tof_st.std_val();
             last_tof_std = std_val;
             if (std_val < TOF_STD_THRESHOLD) {
