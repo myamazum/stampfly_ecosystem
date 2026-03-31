@@ -250,6 +250,9 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
         <button onclick="addPreset('eskf')">ESKF Preset</button>
         <button onclick="addPreset('bias')">Bias Preset</button>
         <button onclick="clearAll()">Clear All</button>
+        <div style="margin-top:6px">
+            <label><input type="checkbox" id="sync-x" checked onchange="toggleSyncX()"> Sync time axis</label>
+        </div>
         <div style="margin-top:8px">
             <label>Target plot:</label>
             <select id="target-plot" style="width:100%" onchange="selectPlot(this.value)"></select>
@@ -356,6 +359,39 @@ function updateTargetSelect() {{
     }}
 }}
 
+let syncX = true;
+let syncing = false;  // Prevent recursive sync
+
+function toggleSyncX() {{
+    syncX = document.getElementById('sync-x').checked;
+}}
+
+function onXRangeChanged(sourceId, eventData) {{
+    if (!syncX || syncing) return;
+    // Extract x-axis range from relayout event
+    let xRange = null;
+    if (eventData['xaxis.range[0]'] !== undefined && eventData['xaxis.range[1]'] !== undefined) {{
+        xRange = [eventData['xaxis.range[0]'], eventData['xaxis.range[1]']];
+    }} else if (eventData['xaxis.range'] !== undefined) {{
+        xRange = eventData['xaxis.range'];
+    }} else if (eventData['xaxis.autorange']) {{
+        xRange = null;  // Auto-range (reset)
+    }} else {{
+        return;  // Not an x-axis change
+    }}
+
+    syncing = true;
+    plots.forEach(p => {{
+        if (p.id === sourceId) return;
+        if (xRange) {{
+            Plotly.relayout(p.id, {{ 'xaxis.range': xRange }});
+        }} else {{
+            Plotly.relayout(p.id, {{ 'xaxis.autorange': true }});
+        }}
+    }});
+    syncing = false;
+}}
+
 function selectPlot(id) {{
     // Set target plot and highlight
     // ターゲットプロットを設定してハイライト
@@ -386,6 +422,12 @@ function addPlot() {{
         <div id="${{id}}" class="plot-div"></div>
     `;
     area.appendChild(container);
+
+    // Sync X axis range across all plots
+    // X軸（時間）の範囲を全プロットで同期
+    plotDiv.on('plotly_relayout', function(eventData) {{
+        onXRangeChanged(id, eventData);
+    }});
 
     // Click anywhere on plot area to select as target
     // プロットエリアのクリックでターゲットに選択
