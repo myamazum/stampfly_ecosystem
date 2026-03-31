@@ -630,31 +630,37 @@ extern "C" void app_main(void)
     const bool has_imu  = g_imu.isInitialized();
     const bool has_mag  = g_mag.isInitialized() && g_mag_cal.isCalibrated();
     const bool has_baro = g_baro.isInitialized();
-    // ToF: initialized but may have no valid data (no ground below)
-    // Use buffer count after fill wait — if still 0, no valid target
+    // ToF: initialized but may have no valid data (no target in range)
+    // Use buffer count after fill wait — if still 0, no valid target, skip
     // ToF: 初期化済みでもデータなしの場合あり（充填待ち後のバッファで判定）
-    const bool has_tof  = g_tof_bottom.isInitialized() && g_tof_bottom_buf.count() > 0;
+    const bool has_tof_bottom = g_tof_bottom.isInitialized() && g_tof_bottom_buf.count() > 0;
+    const bool has_tof_front  = g_tof_front.isInitialized() && g_tof_front_buf.count() > 0;
 
     // 各センサーの合格フラグ（存在しない or データなしなら即合格）
-    bool accel_passed = !has_imu;
-    bool gyro_passed  = !has_imu;
-    bool mag_passed   = !has_mag;
-    bool baro_passed  = !has_baro;
-    bool tof_passed   = !has_tof;
+    bool accel_passed     = !has_imu;
+    bool gyro_passed      = !has_imu;
+    bool mag_passed       = !has_mag;
+    bool baro_passed      = !has_baro;
+    bool tof_bottom_passed = !has_tof_bottom;
+    bool tof_front_passed  = !has_tof_front;
 
-    if (g_tof_bottom.isInitialized() && !has_tof) {
-        ESP_LOGW(TAG, "  ToF: initialized but no valid data - skipping stabilization");
+    if (g_tof_bottom.isInitialized() && !has_tof_bottom) {
+        ESP_LOGW(TAG, "  ToF bottom: initialized but no valid data - skipping");
+    }
+    if (g_tof_front.isInitialized() && !has_tof_front) {
+        ESP_LOGW(TAG, "  ToF front: initialized but no valid data - skipping");
     }
 
-    ESP_LOGI(TAG, "  Checking: IMU=%d MAG=%d BARO=%d ToF=%d",
-             has_imu, has_mag, has_baro, has_tof);
+    ESP_LOGI(TAG, "  Checking: IMU=%d MAG=%d BARO=%d ToF_B=%d ToF_F=%d",
+             has_imu, has_mag, has_baro, has_tof_bottom, has_tof_front);
 
     // 各センサーの最終std値を保持
     float last_accel_std_norm = 0.0f;
     float last_gyro_std_norm = 0.0f;
     float last_mag_std_norm = 0.0f;
     float last_baro_std = 0.0f;
-    float last_tof_std = 0.0f;
+    float last_tof_bottom_std = 0.0f;
+    float last_tof_front_std = 0.0f;
 
     // デバッグログ用（1秒ごとにログ出力）
     int last_log_sec = 0;
@@ -724,12 +730,13 @@ extern "C" void app_main(void)
     };
 
     Vec3Stats accel_st, gyro_st, mag_st;
-    ScalarStats baro_st, tof_st;
-    accel_st.read_idx = g_accel_buf.raw_index();
-    gyro_st.read_idx  = g_gyro_buf.raw_index();
-    mag_st.read_idx   = g_mag_buf.raw_index();
-    baro_st.read_idx  = g_baro_buf.raw_index();
-    tof_st.read_idx   = g_tof_bottom_buf.raw_index();
+    ScalarStats baro_st, tof_bottom_st, tof_front_st;
+    accel_st.read_idx      = g_accel_buf.raw_index();
+    gyro_st.read_idx       = g_gyro_buf.raw_index();
+    mag_st.read_idx        = g_mag_buf.raw_index();
+    baro_st.read_idx       = g_baro_buf.raw_index();
+    tof_bottom_st.read_idx = g_tof_bottom_buf.raw_index();
+    tof_front_st.read_idx  = g_tof_front_buf.raw_index();
 
     while (elapsed_ms < MAX_WAIT_MS) {
         vTaskDelay(pdMS_TO_TICKS(CHECK_INTERVAL_MS));
@@ -750,7 +757,8 @@ extern "C" void app_main(void)
         if (!gyro_passed)  consumeVec3(gyro_st, g_gyro_buf);
         if (!mag_passed)   consumeVec3(mag_st, g_mag_buf);
         if (!baro_passed)  consumeScalar(baro_st, g_baro_buf);
-        if (!tof_passed)   consumeScalar(tof_st, g_tof_bottom_buf);
+        if (!tof_bottom_passed) consumeScalar(tof_bottom_st, g_tof_bottom_buf);
+        if (!tof_front_passed)  consumeScalar(tof_front_st, g_tof_front_buf);
 
         // === 加速度 ===
         if (!accel_passed && accel_st.n >= MIN_ACCEL_SAMPLES) {
@@ -812,23 +820,38 @@ extern "C" void app_main(void)
             ESP_LOGI(TAG, "  Baro:  waiting (%d/%d samples)", baro_st.n, MIN_BARO_SAMPLES);
         }
 
-        // === ToF ===
-        if (!tof_passed && tof_st.n >= MIN_TOF_SAMPLES) {
-            float std_val = tof_st.std_val();
-            last_tof_std = std_val;
+        // === ToF bottom ===
+        if (!tof_bottom_passed && tof_bottom_st.n >= MIN_TOF_SAMPLES) {
+            float std_val = tof_bottom_st.std_val();
+            last_tof_bottom_std = std_val;
             if (std_val < TOF_STD_THRESHOLD) {
-                tof_passed = true;
-                ESP_LOGI(TAG, "  ToF:   PASSED (%.4f < %.3f, n=%d)", std_val, TOF_STD_THRESHOLD, tof_st.n);
+                tof_bottom_passed = true;
+                ESP_LOGI(TAG, "  ToF_B: PASSED (%.4f < %.3f, n=%d)", std_val, TOF_STD_THRESHOLD, tof_bottom_st.n);
             } else {
-                if (do_log) ESP_LOGW(TAG, "  ToF:   NG (%.4f > %.3f, n=%d) -> retry", std_val, TOF_STD_THRESHOLD, tof_st.n);
-                tof_st.reset(g_tof_bottom_buf.raw_index());
+                if (do_log) ESP_LOGW(TAG, "  ToF_B: NG (%.4f > %.3f, n=%d) -> retry", std_val, TOF_STD_THRESHOLD, tof_bottom_st.n);
+                tof_bottom_st.reset(g_tof_bottom_buf.raw_index());
             }
-        } else if (do_log && !tof_passed) {
-            ESP_LOGI(TAG, "  ToF:   waiting (%d/%d samples)", tof_st.n, MIN_TOF_SAMPLES);
+        } else if (do_log && !tof_bottom_passed) {
+            ESP_LOGI(TAG, "  ToF_B: waiting (%d/%d samples)", tof_bottom_st.n, MIN_TOF_SAMPLES);
+        }
+
+        // === ToF front ===
+        if (!tof_front_passed && tof_front_st.n >= MIN_TOF_SAMPLES) {
+            float std_val = tof_front_st.std_val();
+            last_tof_front_std = std_val;
+            if (std_val < TOF_STD_THRESHOLD) {
+                tof_front_passed = true;
+                ESP_LOGI(TAG, "  ToF_F: PASSED (%.4f < %.3f, n=%d)", std_val, TOF_STD_THRESHOLD, tof_front_st.n);
+            } else {
+                if (do_log) ESP_LOGW(TAG, "  ToF_F: NG (%.4f > %.3f, n=%d) -> retry", std_val, TOF_STD_THRESHOLD, tof_front_st.n);
+                tof_front_st.reset(g_tof_front_buf.raw_index());
+            }
+        } else if (do_log && !tof_front_passed) {
+            ESP_LOGI(TAG, "  ToF_F: waiting (%d/%d samples)", tof_front_st.n, MIN_TOF_SAMPLES);
         }
 
         // 全センサー合格したら終了
-        if (accel_passed && gyro_passed && mag_passed && baro_passed && tof_passed) {
+        if (accel_passed && gyro_passed && mag_passed && baro_passed && tof_bottom_passed && tof_front_passed) {
             break;
         }
     }
@@ -836,25 +859,28 @@ extern "C" void app_main(void)
     int64_t end_time = esp_timer_get_time();
     float stabilization_time_ms = (end_time - start_time) / 1000.0f;
 
-    bool all_passed = accel_passed && gyro_passed && mag_passed && baro_passed && tof_passed;
+    bool all_passed = accel_passed && gyro_passed && mag_passed && baro_passed
+                      && tof_bottom_passed && tof_front_passed;
 
     if (all_passed) {
         ESP_LOGI(TAG, "========================================");
         ESP_LOGI(TAG, "ALL SENSORS STABILIZED after %.0f ms", stabilization_time_ms);
-        if (has_imu)  ESP_LOGI(TAG, "  Accel: %.4f < %.3f", last_accel_std_norm, ACCEL_STD_THRESHOLD);
-        if (has_imu)  ESP_LOGI(TAG, "  Gyro:  %.5f < %.3f", last_gyro_std_norm, GYRO_STD_THRESHOLD);
-        if (has_mag)  ESP_LOGI(TAG, "  Mag:   %.3f < %.1f", last_mag_std_norm, MAG_STD_THRESHOLD);
-        if (has_baro) ESP_LOGI(TAG, "  Baro:  %.4f < %.2f", last_baro_std, BARO_STD_THRESHOLD);
-        if (has_tof)  ESP_LOGI(TAG, "  ToF:   %.4f < %.3f", last_tof_std, TOF_STD_THRESHOLD);
+        if (has_imu)        ESP_LOGI(TAG, "  Accel: %.4f < %.3f", last_accel_std_norm, ACCEL_STD_THRESHOLD);
+        if (has_imu)        ESP_LOGI(TAG, "  Gyro:  %.5f < %.3f", last_gyro_std_norm, GYRO_STD_THRESHOLD);
+        if (has_mag)        ESP_LOGI(TAG, "  Mag:   %.3f < %.1f", last_mag_std_norm, MAG_STD_THRESHOLD);
+        if (has_baro)       ESP_LOGI(TAG, "  Baro:  %.4f < %.2f", last_baro_std, BARO_STD_THRESHOLD);
+        if (has_tof_bottom) ESP_LOGI(TAG, "  ToF_B: %.4f < %.3f", last_tof_bottom_std, TOF_STD_THRESHOLD);
+        if (has_tof_front)  ESP_LOGI(TAG, "  ToF_F: %.4f < %.3f", last_tof_front_std, TOF_STD_THRESHOLD);
         ESP_LOGI(TAG, "========================================");
     } else {
         ESP_LOGW(TAG, "Sensor stabilization timeout after %.0f ms", stabilization_time_ms);
         ESP_LOGW(TAG, "Final sensor status:");
-        if (has_imu)  ESP_LOGW(TAG, "  Accel: %s (%.4f, th=%.3f)", accel_passed ? "OK" : "NG", last_accel_std_norm, ACCEL_STD_THRESHOLD);
-        if (has_imu)  ESP_LOGW(TAG, "  Gyro:  %s (%.5f, th=%.3f)", gyro_passed ? "OK" : "NG", last_gyro_std_norm, GYRO_STD_THRESHOLD);
-        if (has_mag)  ESP_LOGW(TAG, "  Mag:   %s (%.3f, th=%.1f)", mag_passed ? "OK" : "NG", last_mag_std_norm, MAG_STD_THRESHOLD);
-        if (has_baro) ESP_LOGW(TAG, "  Baro:  %s (%.4f, th=%.2f)", baro_passed ? "OK" : "NG", last_baro_std, BARO_STD_THRESHOLD);
-        if (has_tof)  ESP_LOGW(TAG, "  ToF:   %s (%.4f, th=%.3f)", tof_passed ? "OK" : "NG", last_tof_std, TOF_STD_THRESHOLD);
+        if (has_imu)        ESP_LOGW(TAG, "  Accel: %s (%.4f, th=%.3f)", accel_passed ? "OK" : "NG", last_accel_std_norm, ACCEL_STD_THRESHOLD);
+        if (has_imu)        ESP_LOGW(TAG, "  Gyro:  %s (%.5f, th=%.3f)", gyro_passed ? "OK" : "NG", last_gyro_std_norm, GYRO_STD_THRESHOLD);
+        if (has_mag)        ESP_LOGW(TAG, "  Mag:   %s (%.3f, th=%.1f)", mag_passed ? "OK" : "NG", last_mag_std_norm, MAG_STD_THRESHOLD);
+        if (has_baro)       ESP_LOGW(TAG, "  Baro:  %s (%.4f, th=%.2f)", baro_passed ? "OK" : "NG", last_baro_std, BARO_STD_THRESHOLD);
+        if (has_tof_bottom) ESP_LOGW(TAG, "  ToF_B: %s (%.4f, th=%.3f)", tof_bottom_passed ? "OK" : "NG", last_tof_bottom_std, TOF_STD_THRESHOLD);
+        if (has_tof_front)  ESP_LOGW(TAG, "  ToF_F: %s (%.4f, th=%.3f)", tof_front_passed ? "OK" : "NG", last_tof_front_std, TOF_STD_THRESHOLD);
         ESP_LOGW(TAG, "Proceeding with initialization anyway...");
     }
 
