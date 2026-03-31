@@ -37,15 +37,25 @@ import numpy as np
 # =============================================================================
 
 SIGNAL_CATEGORIES = {
-    'IMU - Gyro': [
+    'IMU - Gyro (LPF)': [
         ('gyro_x', 'Gyro X [rad/s]'),
         ('gyro_y', 'Gyro Y [rad/s]'),
         ('gyro_z', 'Gyro Z [rad/s]'),
     ],
-    'IMU - Accel': [
+    'IMU - Accel (LPF)': [
         ('accel_x', 'Accel X [m/s²]'),
         ('accel_y', 'Accel Y [m/s²]'),
         ('accel_z', 'Accel Z [m/s²]'),
+    ],
+    'IMU - Gyro (Raw)': [
+        ('gyro_raw_x', 'Gyro Raw X [rad/s]'),
+        ('gyro_raw_y', 'Gyro Raw Y [rad/s]'),
+        ('gyro_raw_z', 'Gyro Raw Z [rad/s]'),
+    ],
+    'IMU - Accel (Raw)': [
+        ('accel_raw_x', 'Accel Raw X [m/s²]'),
+        ('accel_raw_y', 'Accel Raw Y [m/s²]'),
+        ('accel_raw_z', 'Accel Raw Z [m/s²]'),
     ],
     'IMU - Corrected Gyro': [
         ('gyro_corrected_x', 'Gyro Corr X [rad/s]'),

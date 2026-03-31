@@ -102,15 +102,21 @@ extern bool g_baro_reference_set;
 
 inline constexpr int REF_BUFFER_SIZE = 100;
 
-// Accelerometer buffer (for roll/pitch initialization and ESKF)
+// Accelerometer buffer (LPF filtered, for ESKF)
 extern stampfly::math::Vector3 g_accel_buffer[REF_BUFFER_SIZE];
 extern int g_accel_buffer_index;
 extern int g_accel_buffer_count;
 
-// Gyroscope buffer (for ESKF)
+// Gyroscope buffer (LPF filtered, for ESKF)
 extern stampfly::math::Vector3 g_gyro_buffer[REF_BUFFER_SIZE];
 extern int g_gyro_buffer_index;
 extern int g_gyro_buffer_count;
+
+// Raw IMU buffers (pre-LPF, for telemetry)
+// LPF前のIMU生値バッファ（テレメトリ用）
+extern stampfly::math::Vector3 g_accel_raw_buffer[REF_BUFFER_SIZE];
+extern stampfly::math::Vector3 g_gyro_raw_buffer[REF_BUFFER_SIZE];
+extern int g_imu_raw_buffer_index;
 
 // Magnetometer buffer (for yaw=0 reference and ESKF)
 extern stampfly::math::Vector3 g_mag_buffer[REF_BUFFER_SIZE];

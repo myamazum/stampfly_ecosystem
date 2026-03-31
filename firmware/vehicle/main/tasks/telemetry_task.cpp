@@ -188,6 +188,17 @@ void TelemetryTask(void* pvParameters)
         sample.mag_y = mag_data.y;
         sample.mag_z = mag_data.z;
 
+        // Raw IMU (pre-LPF)
+        // LPF前のIMU生値
+        const auto& accel_raw = g_accel_raw_buffer[telemetry_read_index];
+        const auto& gyro_raw = g_gyro_raw_buffer[telemetry_read_index];
+        sample.gyro_raw_x = gyro_raw.x;
+        sample.gyro_raw_y = gyro_raw.y;
+        sample.gyro_raw_z = gyro_raw.z;
+        sample.accel_raw_x = accel_raw.x;
+        sample.accel_raw_y = accel_raw.y;
+        sample.accel_raw_z = accel_raw.z;
+
         // Advance read index (ring buffer wrap)
         // 読み取りインデックスを進める（リングバッファ循環）
         telemetry_read_index = (telemetry_read_index + 1) % REF_BUFFER_SIZE;

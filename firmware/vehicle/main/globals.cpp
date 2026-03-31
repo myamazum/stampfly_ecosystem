@@ -73,6 +73,11 @@ stampfly::math::Vector3 g_gyro_buffer[REF_BUFFER_SIZE];
 int g_gyro_buffer_index = 0;
 int g_gyro_buffer_count = 0;
 
+// Raw IMU buffers (pre-LPF, for telemetry)
+stampfly::math::Vector3 g_accel_raw_buffer[REF_BUFFER_SIZE];
+stampfly::math::Vector3 g_gyro_raw_buffer[REF_BUFFER_SIZE];
+int g_imu_raw_buffer_index = 0;
+
 // Magnetometer buffer (for yaw=0 reference and ESKF)
 stampfly::math::Vector3 g_mag_buffer[REF_BUFFER_SIZE];
 int g_mag_buffer_index = 0;

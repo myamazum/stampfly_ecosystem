@@ -79,6 +79,14 @@ void IMUTask(void* pvParameters)
                 float gyro_body_y = gyro.x;     // Pitch rate [rad/s]
                 float gyro_body_z = -gyro.z;    // Yaw rate [rad/s]
 
+                // Store pre-LPF raw values for telemetry
+                // テレメトリ用にLPF前の生値を保存
+                g_accel_raw_buffer[g_imu_raw_buffer_index] =
+                    stampfly::math::Vector3(accel_body_x, accel_body_y, accel_body_z);
+                g_gyro_raw_buffer[g_imu_raw_buffer_index] =
+                    stampfly::math::Vector3(gyro_body_x, gyro_body_y, gyro_body_z);
+                g_imu_raw_buffer_index = (g_imu_raw_buffer_index + 1) % REF_BUFFER_SIZE;
+
                 // Apply low-pass filters (機体座標系で)
                 float filtered_accel[3] = {
                     g_accel_lpf[0].apply(accel_body_x),

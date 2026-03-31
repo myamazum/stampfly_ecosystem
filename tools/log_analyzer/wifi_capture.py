@@ -114,11 +114,11 @@ LEGACY_FFT_PACKET_SIZE = 32
 # Extended Batch Packet (648 bytes, header 0xBD) - 400Hz unified telemetry
 # =============================================================================
 # Contains 4 samples of 160 bytes each with ESKF estimates and sensor data
-EXTENDED_SAMPLE_SIZE = 160
+EXTENDED_SAMPLE_SIZE = 184
 EXTENDED_BATCH_SIZE = 4
 EXTENDED_BATCH_HEADER_SIZE = 4  # header, type, count, reserved
 EXTENDED_BATCH_FOOTER_SIZE = 4  # checksum + padding
-EXTENDED_BATCH_PACKET_SIZE = 648  # 4 + 160*4 + 4
+EXTENDED_BATCH_PACKET_SIZE = 744  # 4 + 184*4 + 4
 
 # ExtendedSample structure (160 bytes):
 #   Core sensor data (56 bytes):
@@ -165,9 +165,11 @@ EXTENDED_SAMPLE_FORMAT += 'hh'      # flow_x/y
 EXTENDED_SAMPLE_FORMAT += 'B'       # flow_quality
 EXTENDED_SAMPLE_FORMAT += 'B'       # padding2
 EXTENDED_SAMPLE_FORMAT += 'fff'     # mag_x/y/z
+EXTENDED_SAMPLE_FORMAT += 'fff'     # gyro_raw_x/y/z
+EXTENDED_SAMPLE_FORMAT += 'fff'     # accel_raw_x/y/z
 
 _EXTENDED_SAMPLE_CALCSIZE = struct.calcsize(EXTENDED_SAMPLE_FORMAT)
-assert _EXTENDED_SAMPLE_CALCSIZE == 160, f"Extended sample size mismatch: {_EXTENDED_SAMPLE_CALCSIZE}"
+assert _EXTENDED_SAMPLE_CALCSIZE == 184, f"Extended sample size mismatch: {_EXTENDED_SAMPLE_CALCSIZE}"
 
 # CSV columns for extended mode (full ESKF + sensors)
 EXTENDED_CSV_COLUMNS = [
@@ -187,6 +189,8 @@ EXTENDED_CSV_COLUMNS = [
     'tof_bottom_status', 'tof_front_status',
     'flow_x', 'flow_y', 'flow_quality',
     'mag_x', 'mag_y', 'mag_z',
+    'gyro_raw_x', 'gyro_raw_y', 'gyro_raw_z',
+    'accel_raw_x', 'accel_raw_y', 'accel_raw_z',
 ]
 
 # CSV columns for FFT mode (with bias-corrected gyro + controller inputs)
@@ -342,6 +346,16 @@ def parse_extended_batch_packet(data: bytes) -> list:
         sample['mag_x'] = values[idx]
         sample['mag_y'] = values[idx + 1]
         sample['mag_z'] = values[idx + 2]
+        idx += 3
+
+        # Raw IMU pre-LPF (6 floats)
+        sample['gyro_raw_x'] = values[idx]
+        sample['gyro_raw_y'] = values[idx + 1]
+        sample['gyro_raw_z'] = values[idx + 2]
+        idx += 3
+        sample['accel_raw_x'] = values[idx]
+        sample['accel_raw_y'] = values[idx + 1]
+        sample['accel_raw_z'] = values[idx + 2]
 
         samples.append(sample)
 
@@ -592,7 +606,7 @@ class TelemetryCapture:
                                 if self.mode is None:
                                     self.mode = mode
                                     mode_str = {
-                                        "extended": "Extended (648B, 4 samples with ESKF+sensors)",
+                                        "extended": "Extended (744B, 4 samples with ESKF+sensors+raw)",
                                         "fft_batch": "FFT Batch (232B, 4 samples)",
                                         "normal": "Normal (116B)",
                                         "fft_legacy": "FFT Legacy (32B)"
@@ -662,7 +676,7 @@ class TelemetryCapture:
         frame_rate = self.frame_count / duration if duration > 0 else 0
 
         mode_str = {
-            "extended": "Extended (648B, 4 samples/frame with ESKF+sensors)",
+            "extended": "Extended (744B, 4 samples/frame with ESKF+sensors+raw)",
             "fft_batch": "FFT Batch (232B, 4 samples/frame)",
             "normal": "Normal (116B)",
             "fft_legacy": "FFT Legacy (32B)"
