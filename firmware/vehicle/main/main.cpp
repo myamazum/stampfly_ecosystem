@@ -512,13 +512,23 @@ extern "C" void app_main(void)
     // =========================================================================
     // Phase 1: Peripheral & sensor initialization (White solid LED)
     // Phase 1: ペリフェラル・センサー初期化（白LED点灯）
+    //
+    // White LED = "Place on flat surface and keep still"
+    // 白LED = 「平らな場所に置いて静止してください」
+    // Initialization runs during the settle time, then waits for remainder.
+    // 初期化は静置時間中に実行し、残り時間を待つ。
     // =========================================================================
-    ESP_LOGI(TAG, "Phase 1: Initializing peripherals and sensors...");
+    constexpr int SETTLE_TIME_MS = 5000;  // Time for user to place aircraft
+    int64_t phase1_start = esp_timer_get_time();
+
+    ESP_LOGI(TAG, "Phase 1: Place on flat surface and keep still (%d s)...", SETTLE_TIME_MS / 1000);
     led_mgr.requestChannel(stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::BOOT,
                            stampfly::LEDPattern::SOLID, 0xFFFFFF);  // White solid
     led_mgr.update();  // Apply once (SOLID needs no periodic update)
     g_buzzer.startTone();
 
+    // Run initialization while the user places the aircraft
+    // ユーザーが機体を置く間に初期化を進める
     init::sensors();
 
     ESP_LOGI(TAG, "Initializing estimators...");
@@ -538,6 +548,16 @@ extern "C" void app_main(void)
 
     ESP_LOGI(TAG, "Initializing WiFi CLI...");
     init::wifi_cli();
+
+    // Wait for remaining settle time (initialization takes ~1s, so ~4s remains)
+    // 残りの静置時間を待つ（初期化に ~1s かかるので ~4s 残る）
+    int64_t elapsed_us = esp_timer_get_time() - phase1_start;
+    int remaining_ms = SETTLE_TIME_MS - static_cast<int>(elapsed_us / 1000);
+    if (remaining_ms > 0) {
+        ESP_LOGI(TAG, "Waiting %d ms for settle...", remaining_ms);
+        vTaskDelay(pdMS_TO_TICKS(remaining_ms));
+    }
+    ESP_LOGI(TAG, "Phase 1 complete (%.1f s)", (esp_timer_get_time() - phase1_start) / 1e6f);
 
     // Start all tasks
     ESP_LOGI(TAG, "Starting tasks...");
