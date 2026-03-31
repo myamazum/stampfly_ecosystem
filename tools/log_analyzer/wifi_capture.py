@@ -35,6 +35,7 @@ Examples:
 
 import argparse
 import asyncio
+import collections
 import csv
 import math
 import struct
@@ -565,11 +566,13 @@ class TelemetryCapture:
 
     def __init__(self, ip: str = '192.168.4.1', port: int = 80):
         self.uri = f'ws://{ip}:{port}/ws'
-        self.packets = []
+        self.raw_frames = collections.deque()  # Raw WebSocket frames (bytes, GC-invisible)
+        self.packets = []   # Parsed sample dicts (populated by _parse_all_frames)
         self.start_time = None
         self.errors = 0
-        self.mode = None  # Detected from first packet
+        self.mode = None  # Detected from first packet header
         self.frame_count = 0
+        self._parsed = False
 
     async def _wait_for_tcp(self, max_retries: int = 15, interval: float = 2.0):
         """Wait for TCP port to become reachable (handles macOS captive portal delay)"""
@@ -611,34 +614,49 @@ class TelemetryCapture:
                 self.start_time = time.time()
                 end_time = self.start_time + duration
 
+                # Samples per frame (estimated for progress display)
+                # フレームあたりのサンプル数（プログレス表示用推定値）
+                samples_per_frame = 1
+
                 while time.time() < end_time:
                     try:
                         data = await asyncio.wait_for(ws.recv(), timeout=1.0)
-                        if isinstance(data, bytes):
-                            samples, mode = parse_packet(data)
-                            if samples:
-                                self.packets.extend(samples)
-                                self.frame_count += 1
-                                # Detect mode from first packet
-                                if self.mode is None:
-                                    self.mode = mode
-                                    mode_str = {
-                                        "extended": "Extended (840B, 4 samples with ESKF+sensors+raw+timestamps)",
-                                        "fft_batch": "FFT Batch (232B, 4 samples)",
-                                        "normal": "Normal (116B)",
-                                        "fft_legacy": "FFT Legacy (32B)"
-                                    }.get(mode, mode)
-                                    print(f"Detected mode: {mode_str}")
-                            else:
-                                self.errors += 1
+                        if isinstance(data, bytes) and len(data) > 0:
+                            # Store raw frame only (no parsing during capture)
+                            # 生フレームのみ格納（キャプチャ中はパースしない）
+                            self.raw_frames.append(data)
+                            self.frame_count += 1
+
+                            # Detect mode from first frame header (no struct.unpack needed)
+                            # 最初のフレームのヘッダーバイトでモード検出
+                            if self.mode is None:
+                                header = data[0]
+                                if header == 0xBD and len(data) == EXTENDED_BATCH_PACKET_SIZE:
+                                    self.mode = "extended"
+                                    samples_per_frame = 4
+                                elif header == 0xBC and len(data) == FFT_BATCH_PACKET_SIZE:
+                                    self.mode = "fft_batch"
+                                    samples_per_frame = 4
+                                elif header == 0xAA and len(data) == NORMAL_PACKET_SIZE:
+                                    self.mode = "normal"
+                                elif header == 0xBB and len(data) == LEGACY_FFT_PACKET_SIZE:
+                                    self.mode = "fft_legacy"
+                                mode_str = {
+                                    "extended": "Extended (840B, 4 samples with ESKF+sensors+raw+timestamps)",
+                                    "fft_batch": "FFT Batch (232B, 4 samples)",
+                                    "normal": "Normal (116B)",
+                                    "fft_legacy": "FFT Legacy (32B)"
+                                }.get(self.mode, "Unknown")
+                                print(f"Detected mode: {mode_str}")
                     except asyncio.TimeoutError:
                         print("Timeout waiting for packet")
                         continue
 
-                    # Progress update
+                    # Progress update (estimated sample count from frame count)
                     if progress_callback:
                         elapsed = time.time() - self.start_time
-                        progress_callback(elapsed, duration, len(self.packets), self.frame_count)
+                        est_samples = self.frame_count * samples_per_frame
+                        progress_callback(elapsed, duration, est_samples, self.frame_count)
 
         except ConnectionRefusedError:
             print(f"Error: Connection refused to {self.uri}")
@@ -650,8 +668,26 @@ class TelemetryCapture:
 
         return True
 
+    def _parse_all_frames(self):
+        """Parse all raw frames into packet dicts (called after capture)
+        キャプチャ後に全生フレームをパケット dict に変換
+        """
+        if self._parsed:
+            return
+        self.packets = []
+        self.errors = 0
+        for raw in self.raw_frames:
+            samples, mode = parse_packet(raw)
+            if samples:
+                self.packets.extend(samples)
+            else:
+                self.errors += 1
+        self._parsed = True
+        self.raw_frames.clear()  # Free raw frame memory
+
     def save_csv(self, filename: str):
         """Save captured packets to CSV"""
+        self._parse_all_frames()
         if not self.packets:
             print("No packets to save")
             return False
@@ -675,6 +711,7 @@ class TelemetryCapture:
 
     def print_stats(self):
         """Print capture statistics"""
+        self._parse_all_frames()
         if not self.packets:
             print("No packets captured")
             return
@@ -747,6 +784,7 @@ class TelemetryCapture:
 
     def run_fft_analysis(self):
         """Run FFT analysis on captured data"""
+        self._parse_all_frames()
         if not HAS_NUMPY:
             print("FFT analysis requires numpy: pip install numpy")
             return
