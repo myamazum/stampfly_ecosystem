@@ -544,6 +544,14 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
         <div style="margin-top:6px">
             <label><input type="checkbox" id="sync-x" checked> Sync time axis</label>
         </div>
+        <div style="margin-top:6px">
+            <label>Draw mode:</label>
+            <select id="draw-mode" style="width:100%">
+                <option value="lines" selected>Lines</option>
+                <option value="markers">Points</option>
+                <option value="lines+markers">Lines + Points</option>
+            </select>
+        </div>
         <div style="margin-top:8px">
             <label>Target plot:</label>
             <select id="target-plot" style="width:100%" onchange="selectPlot(this.value)"></select>
@@ -822,14 +830,16 @@ function addSignalToPlot(plot, key, label) {{
         yData = DATA[mapping.data];
     }}
 
+    const drawMode = document.getElementById('draw-mode').value;
     const color = nextColor();
     const trace = {{
         x: xData,
         y: yData,
         name: label,
         type: 'scattergl',
-        mode: 'lines',
+        mode: drawMode,
         line: {{ color: color, width: 1 }},
+        marker: {{ color: color, size: 3 }},
         hovertemplate: `${{label}}: %{{y:.5f}}<extra></extra>`,
     }};
 
