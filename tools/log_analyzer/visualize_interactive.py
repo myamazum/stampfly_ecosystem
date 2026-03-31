@@ -106,6 +106,18 @@ SIGNAL_CATEGORIES = {
         ('mag_y', 'Mag Y [uT]'),
         ('mag_z', 'Mag Z [uT]'),
     ],
+    'Computed - Gyro Integrated': [
+        ('gyro_int_roll', 'Gyro Int Roll [deg]'),
+        ('gyro_int_pitch', 'Gyro Int Pitch [deg]'),
+        ('gyro_int_yaw', 'Gyro Int Yaw [deg]'),
+    ],
+    'Computed - Accel Attitude': [
+        ('accel_roll', 'Accel Roll [deg]'),
+        ('accel_pitch', 'Accel Pitch [deg]'),
+    ],
+    'Computed - Mag Heading': [
+        ('mag_yaw', 'Mag Yaw [deg]'),
+    ],
 }
 
 COLORS = [
@@ -139,7 +151,8 @@ def load_csv(filepath: str) -> dict:
         t0 = data['timestamp_ms'][0]
         data['time_s'] = [(t - t0) / 1e3 for t in data['timestamp_ms']]
 
-    # Compute attitude from quaternion
+    # Compute attitude from quaternion (ESKF output)
+    # クォータニオンから姿勢角を計算（ESKF出力）
     if all(k in data for k in ['quat_w', 'quat_x', 'quat_y', 'quat_z']):
         n = len(data['quat_w'])
         data['roll_deg'] = [0.0] * n
@@ -150,6 +163,71 @@ def load_csv(filepath: str) -> dict:
             data['roll_deg'][i] = math.degrees(math.atan2(2*(w*x + y*z), 1 - 2*(x*x + y*y)))
             data['pitch_deg'][i] = math.degrees(math.asin(max(-1, min(1, 2*(w*y - z*x)))))
             data['yaw_deg'][i] = math.degrees(math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z)))
+
+    # =====================================================================
+    # Computed sensor-only attitude estimates (for comparison with ESKF)
+    # センサー単独の姿勢推定（ESKF出力との比較用）
+    # =====================================================================
+
+    n = len(data.get('time_s', []))
+
+    # 1. Gyro integration: cumulative integration of angular rate → angle
+    #    ジャイロ積分: 角速度を積分して角度を算出
+    if all(k in data for k in ['gyro_x', 'gyro_y', 'gyro_z', 'time_s']) and n > 1:
+        data['gyro_int_roll'] = [0.0] * n
+        data['gyro_int_pitch'] = [0.0] * n
+        data['gyro_int_yaw'] = [0.0] * n
+        roll, pitch, yaw = 0.0, 0.0, 0.0
+        for i in range(1, n):
+            dt = data['time_s'][i] - data['time_s'][i - 1]
+            if dt <= 0 or dt > 0.1:
+                dt = 0.0025  # fallback to 400Hz
+            roll += data['gyro_x'][i] * dt
+            pitch += data['gyro_y'][i] * dt
+            yaw += data['gyro_z'][i] * dt
+            data['gyro_int_roll'][i] = math.degrees(roll)
+            data['gyro_int_pitch'][i] = math.degrees(pitch)
+            data['gyro_int_yaw'][i] = math.degrees(yaw)
+
+    # 2. Accel-based attitude: roll/pitch from gravity direction
+    #    加速度ベースの姿勢: 重力方向からロール・ピッチを算出
+    #    NED body frame: static accel ≈ [0, 0, -g]
+    #    roll = atan2(-ay, -az), pitch = atan2(ax, sqrt(ay² + az²))
+    if all(k in data for k in ['accel_x', 'accel_y', 'accel_z']) and n > 0:
+        data['accel_roll'] = [0.0] * n
+        data['accel_pitch'] = [0.0] * n
+        for i in range(n):
+            ax = data['accel_x'][i]
+            ay = data['accel_y'][i]
+            az = data['accel_z'][i]
+            data['accel_roll'][i] = math.degrees(math.atan2(-ay, -az))
+            data['accel_pitch'][i] = math.degrees(
+                math.atan2(ax, math.sqrt(ay * ay + az * az)))
+
+    # 3. Mag-based heading: yaw from magnetometer (tilt-compensated)
+    #    地磁気ベースのヨー角: 傾き補正済み地磁気方位
+    if all(k in data for k in ['mag_x', 'mag_y', 'mag_z']) and n > 0:
+        data['mag_yaw'] = [0.0] * n
+        for i in range(n):
+            mx = data['mag_x'][i]
+            my = data['mag_y'][i]
+            # Tilt compensation using accel-derived roll/pitch if available
+            # 加速度由来のロール・ピッチで傾き補正
+            if 'accel_roll' in data and 'accel_pitch' in data:
+                roll_r = math.radians(data['accel_roll'][i])
+                pitch_r = math.radians(data['accel_pitch'][i])
+                mz = data['mag_z'][i]
+                # Rotate mag into horizontal plane
+                # 地磁気を水平面に回転
+                cos_r, sin_r = math.cos(roll_r), math.sin(roll_r)
+                cos_p, sin_p = math.cos(pitch_r), math.sin(pitch_r)
+                mx_h = mx * cos_p + my * sin_r * sin_p + mz * cos_r * sin_p
+                my_h = my * cos_r - mz * sin_r
+                data['mag_yaw'][i] = math.degrees(math.atan2(-my_h, mx_h))
+            else:
+                # No tilt compensation (2D heading)
+                # 傾き補正なし（2D方位）
+                data['mag_yaw'][i] = math.degrees(math.atan2(-my, mx))
 
     return data
 
