@@ -542,26 +542,39 @@ function addSignalToPlot(plot, key, label) {{
 }}
 
 function addPreset(name) {{
-    if (name === 'imu') {{
-        const p1 = addPlot();
-        ['gyro_x', 'gyro_y', 'gyro_z'].forEach(k => addSignalToPlot(p1, k, k));
-        const p2 = addPlot();
-        ['accel_x', 'accel_y', 'accel_z'].forEach(k => addSignalToPlot(p2, k, k));
-        const p3 = addPlot();
-        ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z'].forEach(k => addSignalToPlot(p3, k, k));
-    }} else if (name === 'eskf') {{
-        const p1 = addPlot();
-        ['roll_deg', 'pitch_deg', 'yaw_deg'].forEach(k => addSignalToPlot(p1, k, k));
-        const p2 = addPlot();
-        ['pos_x', 'pos_y', 'pos_z'].forEach(k => addSignalToPlot(p2, k, k));
-        const p3 = addPlot();
-        ['vel_x', 'vel_y', 'vel_z'].forEach(k => addSignalToPlot(p3, k, k));
-    }} else if (name === 'bias') {{
-        const p1 = addPlot();
-        ['gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z'].forEach(k => addSignalToPlot(p1, k, k));
-        const p2 = addPlot();
-        ['accel_bias_x', 'accel_bias_y', 'accel_bias_z'].forEach(k => addSignalToPlot(p2, k, k));
-    }}
+    // Temporarily disable sync during batch plot creation
+    // バッチ作成中は同期を一時無効化
+    const wasSyncing = syncX;
+    syncing = true;
+
+    const presets = {{
+        'imu': [
+            [['gyro_x', 'Gyro X'], ['gyro_y', 'Gyro Y'], ['gyro_z', 'Gyro Z']],
+            [['accel_x', 'Accel X'], ['accel_y', 'Accel Y'], ['accel_z', 'Accel Z']],
+            [['gyro_corrected_x', 'Gyro Corr X'], ['gyro_corrected_y', 'Gyro Corr Y'], ['gyro_corrected_z', 'Gyro Corr Z']],
+        ],
+        'eskf': [
+            [['roll_deg', 'Roll [deg]'], ['pitch_deg', 'Pitch [deg]'], ['yaw_deg', 'Yaw [deg]']],
+            [['pos_x', 'Pos N'], ['pos_y', 'Pos E'], ['pos_z', 'Pos D']],
+            [['vel_x', 'Vel N'], ['vel_y', 'Vel E'], ['vel_z', 'Vel D']],
+        ],
+        'bias': [
+            [['gyro_bias_x', 'Gyro Bias X'], ['gyro_bias_y', 'Gyro Bias Y'], ['gyro_bias_z', 'Gyro Bias Z']],
+            [['accel_bias_x', 'Accel Bias X'], ['accel_bias_y', 'Accel Bias Y'], ['accel_bias_z', 'Accel Bias Z']],
+        ],
+    }};
+
+    const groups = presets[name];
+    if (!groups) return;
+
+    groups.forEach(signals => {{
+        const p = addPlot();
+        signals.forEach(([key, label]) => {{
+            addSignalToPlot(p, key, label);
+        }});
+    }});
+
+    syncing = false;
 }}
 
 function clearAll() {{
