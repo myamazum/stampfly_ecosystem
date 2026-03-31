@@ -620,14 +620,23 @@ class TelemetryCapture:
             log_uri = self.uri.rstrip('/') + "?mode=log"
             async with websockets.connect(log_uri, ping_interval=None) as ws:
                 print(f"Connected in exclusive log mode! Capturing for {duration}s...")
-                self.start_time = time.time()
-                end_time = self.start_time + duration
 
                 # Samples per frame (estimated for progress display)
                 # フレームあたりのサンプル数（プログレス表示用推定値）
                 samples_per_frame = 1
 
-                while time.time() < end_time:
+                # Start timer from first received frame, not connection time.
+                # This ensures the requested duration of actual data is captured,
+                # regardless of connection establishment delay.
+                # 接続時刻ではなく最初のフレーム受信時刻から計測開始。
+                # 接続確立の遅延に関係なく、指定秒数分のデータを確実に取得。
+                first_frame_time = None
+
+                while True:
+                    # Check end condition: duration elapsed since first frame
+                    if first_frame_time is not None and time.time() - first_frame_time >= duration:
+                        break
+
                     try:
                         data = await asyncio.wait_for(ws.recv(), timeout=1.0)
                         if isinstance(data, bytes) and len(data) > 0:
@@ -635,6 +644,11 @@ class TelemetryCapture:
                             # 生フレームのみ格納（キャプチャ中はパースしない）
                             self.raw_frames.append(data)
                             self.frame_count += 1
+
+                            # Start timer on first frame
+                            if first_frame_time is None:
+                                first_frame_time = time.time()
+                                self.start_time = first_frame_time
 
                             # Detect mode from first frame header (no struct.unpack needed)
                             # 最初のフレームのヘッダーバイトでモード検出
@@ -662,8 +676,8 @@ class TelemetryCapture:
                         continue
 
                     # Progress update (estimated sample count from frame count)
-                    if progress_callback:
-                        elapsed = time.time() - self.start_time
+                    if progress_callback and first_frame_time is not None:
+                        elapsed = time.time() - first_frame_time
                         est_samples = self.frame_count * samples_per_frame
                         progress_callback(elapsed, duration, est_samples, self.frame_count)
 
