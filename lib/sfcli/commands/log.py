@@ -245,6 +245,21 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Hide additional sensor panels (baro, tof, flow)",
     )
+    viz_parser.add_argument(
+        "-i", "--interactive",
+        action="store_true",
+        help="Interactive mode (Plotly, opens in browser)",
+    )
+    viz_parser.add_argument(
+        "--layout",
+        metavar="RxC",
+        help="Tile layout as ROWSxCOLS for interactive mode (e.g., 3x2)",
+    )
+    viz_parser.add_argument(
+        "--groups",
+        nargs="+",
+        help="Signal groups for interactive mode (e.g., attitude bias_gyro)",
+    )
     viz_parser.set_defaults(func=run_viz)
 
     parser.set_defaults(func=run_help)
@@ -548,6 +563,38 @@ def run_viz(args: argparse.Namespace) -> int:
         return 1
 
     console.info(f"Visualizing: {path.name}")
+
+    # Interactive mode (Plotly)
+    if getattr(args, 'interactive', False):
+        try:
+            sys.path.insert(0, str(paths.root() / "tools" / "log_analyzer"))
+            import visualize_interactive
+
+            layout = None
+            if args.layout:
+                try:
+                    parts = args.layout.lower().split('x')
+                    layout = (int(parts[0]), int(parts[1]))
+                except (ValueError, IndexError):
+                    console.error(f"Invalid layout '{args.layout}'. Use ROWSxCOLS (e.g., 3x2)")
+                    return 1
+
+            visualize_interactive.visualize(
+                str(path),
+                groups=args.groups,
+                layout=layout,
+                output=args.save,
+            )
+            return 0
+        except ImportError as e:
+            console.error(f"Failed to import interactive visualizer: {e}")
+            console.print("  Required: pip install plotly")
+            return 1
+        except Exception as e:
+            console.error(f"Interactive visualization failed: {e}")
+            return 1
+        finally:
+            sys.path.pop(0)
 
     try:
         # Import visualization module
