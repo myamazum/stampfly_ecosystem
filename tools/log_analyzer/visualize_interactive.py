@@ -250,6 +250,9 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
         <button onclick="addPreset('eskf')">ESKF Preset</button>
         <button onclick="addPreset('bias')">Bias Preset</button>
         <button onclick="clearAll()">Clear All</button>
+        <div style="margin-top:6px">
+            <label><input type="checkbox" id="sync-x" checked> Sync time axis</label>
+        </div>
         <div style="margin-top:8px">
             <label>Target plot:</label>
             <select id="target-plot" style="width:100%" onchange="selectPlot(this.value)"></select>
@@ -276,6 +279,39 @@ const COLORS = {colors_json};
 let plots = [];  // [{{ id, div, traces: [{{key, label}}] }}]
 let plotCounter = 0;
 let colorIndex = 0;
+let _syncBusy = false;  // Guard against recursive relayout sync
+
+function syncXRange(sourceId, eventData) {{
+    if (_syncBusy) return;
+    if (!document.getElementById('sync-x').checked) return;
+
+    // Extract x range from relayout event
+    let xr = null;
+    let autorange = false;
+    if ('xaxis.range[0]' in eventData && 'xaxis.range[1]' in eventData) {{
+        xr = [eventData['xaxis.range[0]'], eventData['xaxis.range[1]']];
+    }} else if ('xaxis.range' in eventData) {{
+        xr = eventData['xaxis.range'];
+    }} else if ('xaxis.autorange' in eventData) {{
+        autorange = true;
+    }} else {{
+        return;  // Not an x-axis change
+    }}
+
+    _syncBusy = true;
+    try {{
+        plots.forEach(p => {{
+            if (p.id === sourceId) return;
+            if (autorange) {{
+                Plotly.relayout(p.id, {{'xaxis.autorange': true}});
+            }} else {{
+                Plotly.relayout(p.id, {{'xaxis.range': xr}});
+            }}
+        }});
+    }} finally {{
+        _syncBusy = false;
+    }}
+}}
 
 function nextColor() {{
     const c = COLORS[colorIndex % COLORS.length];
@@ -386,6 +422,10 @@ function addPlot() {{
         <div id="${{id}}" class="plot-div"></div>
     `;
     area.appendChild(container);
+
+    // Sync X axis on zoom/pan
+    // ズーム・パン時に X 軸を同期
+    plotDiv.on('plotly_relayout', function(ed) {{ syncXRange(id, ed); }});
 
     // Click anywhere on plot area to select as target
     // プロットエリアのクリックでターゲットに選択
