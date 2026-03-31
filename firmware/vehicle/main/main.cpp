@@ -631,20 +631,21 @@ extern "C" void app_main(void)
     const bool has_imu  = g_imu.isInitialized();
     const bool has_mag  = g_mag.isInitialized() && g_mag_cal.isCalibrated();
     const bool has_baro = g_baro.isInitialized();
-    const bool has_tof  = g_tof_bottom.isInitialized();
+    // ToF: initialized but may have no valid data (no ground below)
+    // Use buffer count after fill wait — if still 0, no valid target
+    // ToF: 初期化済みでもデータなしの場合あり（充填待ち後のバッファで判定）
+    const bool has_tof  = g_tof_bottom.isInitialized() && g_tof_bottom_buf.count() > 0;
 
-    // 各センサーの合格フラグ（存在しなければ即合格）
+    // 各センサーの合格フラグ（存在しない or データなしなら即合格）
     bool accel_passed = !has_imu;
     bool gyro_passed  = !has_imu;
     bool mag_passed   = !has_mag;
     bool baro_passed  = !has_baro;
     bool tof_passed   = !has_tof;
 
-    // ToF: initialized but may not have valid data (e.g. no ground below)
-    // Wait up to TOF_DATA_WAIT_MS for first sample, then skip if none
-    // ToF: 初期化済みでも有効データが来ない場合がある（下方に地面がない等）
-    // TOF_DATA_WAIT_MS 待っても1サンプルも来なければスキップ
-    constexpr int TOF_DATA_WAIT_MS = 2000;
+    if (g_tof_bottom.isInitialized() && !has_tof) {
+        ESP_LOGW(TAG, "  ToF: initialized but no valid data - skipping stabilization");
+    }
 
     ESP_LOGI(TAG, "  Checking: IMU=%d MAG=%d BARO=%d ToF=%d",
              has_imu, has_mag, has_baro, has_tof);
@@ -813,12 +814,7 @@ extern "C" void app_main(void)
         }
 
         // === ToF ===
-        // Skip if no data after TOF_DATA_WAIT_MS (sensor present but no valid target)
-        // TOF_DATA_WAIT_MS 経過してもデータなし → センサーは存在するが有効ターゲットなし
-        if (!tof_passed && tof_st.n == 0 && elapsed_ms >= TOF_DATA_WAIT_MS) {
-            tof_passed = true;
-            ESP_LOGW(TAG, "  ToF:   SKIPPED (no valid data after %d ms)", TOF_DATA_WAIT_MS);
-        } else if (!tof_passed && tof_st.n >= MIN_TOF_SAMPLES) {
+        if (!tof_passed && tof_st.n >= MIN_TOF_SAMPLES) {
             float std_val = tof_st.std_val();
             last_tof_std = std_val;
             if (std_val < TOF_STD_THRESHOLD) {
