@@ -73,10 +73,9 @@ stampfly::math::Vector3 g_gyro_buffer[REF_BUFFER_SIZE];
 int g_gyro_buffer_index = 0;
 int g_gyro_buffer_count = 0;
 
-// Raw IMU buffers (pre-LPF, for telemetry)
+// Raw IMU buffers (pre-LPF, for telemetry, indexed by g_accel_buffer_index)
 stampfly::math::Vector3 g_accel_raw_buffer[REF_BUFFER_SIZE];
 stampfly::math::Vector3 g_gyro_raw_buffer[REF_BUFFER_SIZE];
-int g_imu_raw_buffer_index = 0;
 
 // IMU internal timestamp buffer
 uint32_t g_imu_timestamp_buffer[REF_BUFFER_SIZE] = {};

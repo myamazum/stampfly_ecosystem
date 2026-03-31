@@ -112,11 +112,10 @@ extern stampfly::math::Vector3 g_gyro_buffer[REF_BUFFER_SIZE];
 extern int g_gyro_buffer_index;
 extern int g_gyro_buffer_count;
 
-// Raw IMU buffers (pre-LPF, for telemetry)
-// LPF前のIMU生値バッファ（テレメトリ用）
+// Raw IMU buffers (pre-LPF, for telemetry, indexed by g_accel_buffer_index)
+// LPF前のIMU生値バッファ（テレメトリ用、g_accel_buffer_indexと同じインデックス）
 extern stampfly::math::Vector3 g_accel_raw_buffer[REF_BUFFER_SIZE];
 extern stampfly::math::Vector3 g_gyro_raw_buffer[REF_BUFFER_SIZE];
-extern int g_imu_raw_buffer_index;
 
 // IMU internal timestamp buffer (for telemetry jitter analysis)
 // IMU内部タイムスタンプバッファ（テレメトリジッター解析用）
