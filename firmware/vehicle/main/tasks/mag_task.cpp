@@ -28,6 +28,7 @@ void MagTask(void* pvParameters)
             if (g_mag.read(mag) == ESP_OK) {
                 g_health.mag.recordSuccess();
                 g_mag_task_healthy = g_health.mag.isHealthy();
+                g_mag_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
                 // ============================================================
                 // BMM150座標系 → 機体座標系(NED) 変換
                 // 実測により確認:

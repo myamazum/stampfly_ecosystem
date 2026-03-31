@@ -307,17 +307,26 @@ struct ExtendedSample {
     float accel_raw_x;        // [m/s²]
     float accel_raw_y;        // [m/s²]
     float accel_raw_z;        // [m/s²]
+
+    // Internal timestamps [μs since boot]
+    // 内部タイムスタンプ（起動からのマイクロ秒）
+    uint32_t imu_timestamp_us;   // IMU loop internal clock (control loop jitter)
+    uint32_t baro_timestamp_us;  // Last baro read
+    uint32_t tof_timestamp_us;   // Last ToF read
+    uint32_t mag_timestamp_us;   // Last mag read
+    uint32_t flow_timestamp_us;  // Last flow read
+    uint32_t padding3;           // alignment to 4-byte boundary
 };
 
-static_assert(sizeof(ExtendedSample) == 184, "ExtendedSample size mismatch");
+static_assert(sizeof(ExtendedSample) == 208, "ExtendedSample size mismatch");
 
 /**
- * @brief Extended batch packet (744 bytes)
+ * @brief Extended batch packet (840 bytes)
  *
  * 400Hz unified telemetry: 4 samples per frame at 100fps.
  * 400Hz統一テレメトリ: 100fps × 4サンプル/フレーム
  *
- * Bandwidth: 744 bytes × 100 fps = 72.7 KB/s ≈ 595 kbps
+ * Bandwidth: 840 bytes × 100 fps = 82.0 KB/s ≈ 672 kbps
  */
 #pragma pack(push, 1)
 struct TelemetryExtendedBatchPacket {
@@ -327,7 +336,7 @@ struct TelemetryExtendedBatchPacket {
     uint8_t  sample_count;    // Number of samples (4)
     uint8_t  reserved;
 
-    // Samples (184 bytes × 4 = 736 bytes)
+    // Samples (208 bytes × 4 = 832 bytes)
     ExtendedSample samples[4];
 
     // Footer (4 bytes)
@@ -336,7 +345,7 @@ struct TelemetryExtendedBatchPacket {
 };
 #pragma pack(pop)
 
-static_assert(sizeof(TelemetryExtendedBatchPacket) == 744, "TelemetryExtendedBatchPacket size mismatch");
+static_assert(sizeof(TelemetryExtendedBatchPacket) == 840, "TelemetryExtendedBatchPacket size mismatch");
 
 /**
  * @brief Sensor status flags (bitfield)

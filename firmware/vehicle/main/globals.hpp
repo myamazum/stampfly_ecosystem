@@ -118,6 +118,17 @@ extern stampfly::math::Vector3 g_accel_raw_buffer[REF_BUFFER_SIZE];
 extern stampfly::math::Vector3 g_gyro_raw_buffer[REF_BUFFER_SIZE];
 extern int g_imu_raw_buffer_index;
 
+// IMU internal timestamp buffer (for telemetry jitter analysis)
+// IMU内部タイムスタンプバッファ（テレメトリジッター解析用）
+extern uint32_t g_imu_timestamp_buffer[REF_BUFFER_SIZE];
+
+// Sensor last-read timestamps (volatile, set by each sensor task)
+// 各センサータスクが最終取得時刻を記録
+extern volatile uint32_t g_baro_last_timestamp_us;
+extern volatile uint32_t g_tof_last_timestamp_us;
+extern volatile uint32_t g_mag_last_timestamp_us;
+extern volatile uint32_t g_flow_last_timestamp_us;
+
 // Magnetometer buffer (for yaw=0 reference and ESKF)
 extern stampfly::math::Vector3 g_mag_buffer[REF_BUFFER_SIZE];
 extern int g_mag_buffer_index;

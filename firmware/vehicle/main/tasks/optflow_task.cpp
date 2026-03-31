@@ -67,6 +67,7 @@ void OptFlowTask(void* pvParameters)
                         g_optflow_buffer_count++;
                     }
                     g_optflow_data_ready = true;
+                    g_flow_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
                 } else {
                     g_health.optflow.recordFailure();
                     g_optflow_task_healthy = g_health.optflow.isHealthy();

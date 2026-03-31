@@ -115,6 +115,7 @@ void ToFTask(void* pvParameters)
                             jump_candidate_sum = 0.0f;
                             g_health.tof.recordSuccess();
                             g_tof_task_healthy = g_health.tof.isHealthy();
+                            g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
 
                             // リングバッファに追加
                             g_tof_bottom_buffer[g_tof_bottom_buffer_index] = distance_m;

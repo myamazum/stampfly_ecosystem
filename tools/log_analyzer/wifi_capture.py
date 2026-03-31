@@ -114,11 +114,11 @@ LEGACY_FFT_PACKET_SIZE = 32
 # Extended Batch Packet (648 bytes, header 0xBD) - 400Hz unified telemetry
 # =============================================================================
 # Contains 4 samples of 160 bytes each with ESKF estimates and sensor data
-EXTENDED_SAMPLE_SIZE = 184
+EXTENDED_SAMPLE_SIZE = 208
 EXTENDED_BATCH_SIZE = 4
 EXTENDED_BATCH_HEADER_SIZE = 4  # header, type, count, reserved
 EXTENDED_BATCH_FOOTER_SIZE = 4  # checksum + padding
-EXTENDED_BATCH_PACKET_SIZE = 744  # 4 + 184*4 + 4
+EXTENDED_BATCH_PACKET_SIZE = 840  # 4 + 208*4 + 4
 
 # ExtendedSample structure (160 bytes):
 #   Core sensor data (56 bytes):
@@ -167,9 +167,15 @@ EXTENDED_SAMPLE_FORMAT += 'B'       # padding2
 EXTENDED_SAMPLE_FORMAT += 'fff'     # mag_x/y/z
 EXTENDED_SAMPLE_FORMAT += 'fff'     # gyro_raw_x/y/z
 EXTENDED_SAMPLE_FORMAT += 'fff'     # accel_raw_x/y/z
+EXTENDED_SAMPLE_FORMAT += 'I'       # imu_timestamp_us
+EXTENDED_SAMPLE_FORMAT += 'I'       # baro_timestamp_us
+EXTENDED_SAMPLE_FORMAT += 'I'       # tof_timestamp_us
+EXTENDED_SAMPLE_FORMAT += 'I'       # mag_timestamp_us
+EXTENDED_SAMPLE_FORMAT += 'I'       # flow_timestamp_us
+EXTENDED_SAMPLE_FORMAT += 'I'       # padding3
 
 _EXTENDED_SAMPLE_CALCSIZE = struct.calcsize(EXTENDED_SAMPLE_FORMAT)
-assert _EXTENDED_SAMPLE_CALCSIZE == 184, f"Extended sample size mismatch: {_EXTENDED_SAMPLE_CALCSIZE}"
+assert _EXTENDED_SAMPLE_CALCSIZE == 208, f"Extended sample size mismatch: {_EXTENDED_SAMPLE_CALCSIZE}"
 
 # CSV columns for extended mode (full ESKF + sensors)
 EXTENDED_CSV_COLUMNS = [
@@ -191,6 +197,8 @@ EXTENDED_CSV_COLUMNS = [
     'mag_x', 'mag_y', 'mag_z',
     'gyro_raw_x', 'gyro_raw_y', 'gyro_raw_z',
     'accel_raw_x', 'accel_raw_y', 'accel_raw_z',
+    'imu_timestamp_us', 'baro_timestamp_us', 'tof_timestamp_us',
+    'mag_timestamp_us', 'flow_timestamp_us',
 ]
 
 # CSV columns for FFT mode (with bias-corrected gyro + controller inputs)
@@ -356,6 +364,15 @@ def parse_extended_batch_packet(data: bytes) -> list:
         sample['accel_raw_x'] = values[idx]
         sample['accel_raw_y'] = values[idx + 1]
         sample['accel_raw_z'] = values[idx + 2]
+        idx += 3
+
+        # Internal timestamps (5 uint32 + 1 padding)
+        sample['imu_timestamp_us'] = values[idx]
+        sample['baro_timestamp_us'] = values[idx + 1]
+        sample['tof_timestamp_us'] = values[idx + 2]
+        sample['mag_timestamp_us'] = values[idx + 3]
+        sample['flow_timestamp_us'] = values[idx + 4]
+        # idx + 5 = padding3
 
         samples.append(sample)
 
@@ -606,7 +623,7 @@ class TelemetryCapture:
                                 if self.mode is None:
                                     self.mode = mode
                                     mode_str = {
-                                        "extended": "Extended (744B, 4 samples with ESKF+sensors+raw)",
+                                        "extended": "Extended (840B, 4 samples with ESKF+sensors+raw+timestamps)",
                                         "fft_batch": "FFT Batch (232B, 4 samples)",
                                         "normal": "Normal (116B)",
                                         "fft_legacy": "FFT Legacy (32B)"

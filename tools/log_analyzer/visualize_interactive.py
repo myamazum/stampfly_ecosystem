@@ -116,6 +116,17 @@ SIGNAL_CATEGORIES = {
         ('mag_y', 'Mag Y [uT]'),
         ('mag_z', 'Mag Z [uT]'),
     ],
+    'Timing - Internal Timestamps': [
+        ('imu_timestamp_us', 'IMU Timestamp [μs]'),
+        ('baro_timestamp_us', 'Baro Timestamp [μs]'),
+        ('tof_timestamp_us', 'ToF Timestamp [μs]'),
+        ('mag_timestamp_us', 'Mag Timestamp [μs]'),
+        ('flow_timestamp_us', 'Flow Timestamp [μs]'),
+    ],
+    'Timing - IMU Interval': [
+        ('imu_interval_us', 'IMU Interval [μs] (should be ~2500)'),
+        ('telemetry_interval_us', 'Telemetry Interval [μs]'),
+    ],
     'Computed - Gyro Int (raw)': [
         ('gyro_int_roll', 'Gyro Int Roll [deg]'),
         ('gyro_int_pitch', 'Gyro Int Pitch [deg]'),
@@ -189,6 +200,21 @@ def load_csv(filepath: str) -> dict:
     # =====================================================================
 
     n = len(data.get('time_s', []))
+
+    # Compute IMU interval (jitter analysis)
+    # IMU インターバル計算（ジッター解析）
+    if 'imu_timestamp_us' in data and n > 1:
+        data['imu_interval_us'] = [0.0] + [
+            data['imu_timestamp_us'][i] - data['imu_timestamp_us'][i - 1]
+            for i in range(1, n)
+        ]
+
+    # Compute telemetry interval
+    if 'timestamp_us' in data and n > 1:
+        data['telemetry_interval_us'] = [0.0] + [
+            data['timestamp_us'][i] - data['timestamp_us'][i - 1]
+            for i in range(1, n)
+        ]
 
     # 1a. Gyro integration (raw): cumulative integration of raw angular rate
     #     ジャイロ積分（生値）: 生の角速度を積分して角度を算出

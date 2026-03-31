@@ -199,6 +199,15 @@ void TelemetryTask(void* pvParameters)
         sample.accel_raw_y = accel_raw.y;
         sample.accel_raw_z = accel_raw.z;
 
+        // Internal timestamps
+        // 内部タイムスタンプ
+        sample.imu_timestamp_us = g_imu_timestamp_buffer[telemetry_read_index];
+        sample.baro_timestamp_us = g_baro_last_timestamp_us;
+        sample.tof_timestamp_us = g_tof_last_timestamp_us;
+        sample.mag_timestamp_us = g_mag_last_timestamp_us;
+        sample.flow_timestamp_us = g_flow_last_timestamp_us;
+        sample.padding3 = 0;
+
         // Advance read index (ring buffer wrap)
         // 読み取りインデックスを進める（リングバッファ循環）
         telemetry_read_index = (telemetry_read_index + 1) % REF_BUFFER_SIZE;

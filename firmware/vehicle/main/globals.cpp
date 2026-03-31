@@ -78,6 +78,15 @@ stampfly::math::Vector3 g_accel_raw_buffer[REF_BUFFER_SIZE];
 stampfly::math::Vector3 g_gyro_raw_buffer[REF_BUFFER_SIZE];
 int g_imu_raw_buffer_index = 0;
 
+// IMU internal timestamp buffer
+uint32_t g_imu_timestamp_buffer[REF_BUFFER_SIZE] = {};
+
+// Sensor last-read timestamps
+volatile uint32_t g_baro_last_timestamp_us = 0;
+volatile uint32_t g_tof_last_timestamp_us = 0;
+volatile uint32_t g_mag_last_timestamp_us = 0;
+volatile uint32_t g_flow_last_timestamp_us = 0;
+
 // Magnetometer buffer (for yaw=0 reference and ESKF)
 stampfly::math::Vector3 g_mag_buffer[REF_BUFFER_SIZE];
 int g_mag_buffer_index = 0;

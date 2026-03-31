@@ -79,12 +79,16 @@ void IMUTask(void* pvParameters)
                 float gyro_body_y = gyro.x;     // Pitch rate [rad/s]
                 float gyro_body_z = -gyro.z;    // Yaw rate [rad/s]
 
-                // Store pre-LPF raw values for telemetry
-                // テレメトリ用にLPF前の生値を保存
+                // Store pre-LPF raw values and timestamp for telemetry
+                // テレメトリ用にLPF前の生値とタイムスタンプを保存
                 g_accel_raw_buffer[g_imu_raw_buffer_index] =
                     stampfly::math::Vector3(accel_body_x, accel_body_y, accel_body_z);
                 g_gyro_raw_buffer[g_imu_raw_buffer_index] =
                     stampfly::math::Vector3(gyro_body_x, gyro_body_y, gyro_body_z);
+                // IMU internal timestamp (actual control loop timing)
+                // IMU内部タイムスタンプ（実際の制御ループタイミング）
+                g_imu_timestamp_buffer[g_imu_raw_buffer_index] =
+                    static_cast<uint32_t>(esp_timer_get_time());
                 g_imu_raw_buffer_index = (g_imu_raw_buffer_index + 1) % REF_BUFFER_SIZE;
 
                 // Apply low-pass filters (機体座標系で)
