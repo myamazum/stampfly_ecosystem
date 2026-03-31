@@ -201,7 +201,18 @@ void TelemetryTask(void* pvParameters)
 
         // Internal timestamps
         // 内部タイムスタンプ
-        sample.imu_timestamp_us = g_imu_timestamp_buffer[telemetry_read_index];
+        // Guard against ring buffer read-ahead: ensure monotonically increasing
+        // リングバッファの読み越し防止: 単調増加を保証
+        {
+            uint32_t imu_ts = g_imu_timestamp_buffer[telemetry_read_index];
+            static uint32_t last_imu_ts = 0;
+            if (imu_ts >= last_imu_ts) {
+                last_imu_ts = imu_ts;
+            } else {
+                imu_ts = last_imu_ts;  // Use previous if non-monotonic
+            }
+            sample.imu_timestamp_us = imu_ts;
+        }
         sample.baro_timestamp_us = g_baro_last_timestamp_us;
         sample.tof_timestamp_us = g_tof_last_timestamp_us;
         sample.mag_timestamp_us = g_mag_last_timestamp_us;
