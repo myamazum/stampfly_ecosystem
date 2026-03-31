@@ -365,6 +365,7 @@ function addPlot() {{
     container.innerHTML = `
         <div class="plot-header">
             <span id="title_${{id}}">${{title}}</span>
+            <span id="cursor_${{id}}" style="font-family:monospace;font-size:11px;color:#888;margin-left:auto;margin-right:12px"></span>
             <button class="danger" onclick="removePlot('${{id}}')" style="font-size:11px;padding:2px 8px">✕ Remove</button>
         </div>
         <div id="${{id}}" class="plot-div"></div>
@@ -374,8 +375,24 @@ function addPlot() {{
     const layout = {{
         height: 280,
         margin: {{ l: 60, r: 20, t: 10, b: 40 }},
-        xaxis: {{ title: 'Time [s]' }},
-        yaxis: {{ title: '' }},
+        xaxis: {{
+            title: 'Time [s]',
+            showspikes: true,
+            spikemode: 'across',
+            spikesnap: 'cursor',
+            spikethickness: 1,
+            spikecolor: '#999',
+            spikedash: 'dot',
+        }},
+        yaxis: {{
+            title: '',
+            showspikes: true,
+            spikemode: 'across',
+            spikesnap: 'cursor',
+            spikethickness: 1,
+            spikecolor: '#999',
+            spikedash: 'dot',
+        }},
         hovermode: 'x unified',
         template: 'plotly_white',
         legend: {{ orientation: 'h', y: 1.12 }},
@@ -387,7 +404,24 @@ function addPlot() {{
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     }});
 
-    const plot = {{ id, title, div: document.getElementById(id), traces: [] }};
+    // Show cursor position (t, y) in plot header on hover
+    // ホバー時にプロットヘッダーにカーソル位置 (t, y) を表示
+    const plotDiv = document.getElementById(id);
+    plotDiv.on('plotly_hover', function(eventData) {{
+        const pt = eventData.points[0];
+        if (pt) {{
+            const cursorEl = document.getElementById(`cursor_${{id}}`);
+            if (cursorEl) {{
+                cursorEl.textContent = `t=${{pt.x.toFixed(3)}}s  y=${{pt.y.toFixed(5)}}`;
+            }}
+        }}
+    }});
+    plotDiv.on('plotly_unhover', function() {{
+        const cursorEl = document.getElementById(`cursor_${{id}}`);
+        if (cursorEl) cursorEl.textContent = '';
+    }});
+
+    const plot = {{ id, title, div: plotDiv, traces: [] }};
     plots.push(plot);
     updateTargetSelect();
     return plot;
@@ -415,6 +449,7 @@ function addSignalToPlot(plot, key, label) {{
         type: 'scattergl',
         mode: 'lines',
         line: {{ color: color, width: 1 }},
+        hovertemplate: `${{label}}: %{{y:.5f}}<extra></extra>`,
     }};
 
     Plotly.addTraces(plot.id, trace);
