@@ -74,8 +74,26 @@ void TelemetryTask(void* pvParameters)
             batch_index = 0;
         }
 
-        // Detect ring buffer overrun: read_index lapped by writer
-        // リングバッファオーバーラン検出: read_index がライターに追い越された
+        // Proactive catch-up: if reader falls behind by more than MAX_LAG, skip ahead
+        // プロアクティブ追いつき: MAX_LAG以上遅れたらスキップして大きな欠損を防ぐ
+        // Without this, delay accumulates until full buffer overrun (~500ms loss).
+        // With this, worst-case loss is limited to MAX_LAG samples.
+        {
+            constexpr int MAX_LAG = 40;  // 40 samples = 100ms @ 400Hz
+            int head = g_accel_buf.raw_index();
+            int lag = (head - telemetry_read_index + IMU_BUFFER_SIZE) % IMU_BUFFER_SIZE;
+            if (lag > MAX_LAG) {
+                int new_idx = (head - 4 + IMU_BUFFER_SIZE) % IMU_BUFFER_SIZE;
+                ESP_LOGW(TAG, "Telemetry lag %d > %d, skip %d→%d",
+                         lag, MAX_LAG, telemetry_read_index, new_idx);
+                telemetry_read_index = new_idx;
+                batch_has_gap = true;
+                batch_index = 0;
+            }
+        }
+
+        // Detect ring buffer overrun: read_index lapped by writer (fallback safety)
+        // リングバッファオーバーラン検出: read_index がライターに追い越された（安全フォールバック）
         if (g_accel_buf.is_overrun(telemetry_read_index)) {
             overrun_count++;
             batch_has_gap = true;

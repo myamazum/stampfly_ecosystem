@@ -24,12 +24,50 @@ import argparse
 import csv
 import json
 import math
+import os
 import sys
 import tempfile
+import urllib.request
 import webbrowser
 from pathlib import Path
 
 import numpy as np
+
+
+# =============================================================================
+# Plotly.js local cache management
+# Plotly.js ローカルキャッシュ管理
+# =============================================================================
+
+PLOTLY_CDN_URL = 'https://cdn.plot.ly/plotly-2.35.2.min.js'
+PLOTLY_CACHE_DIR = Path(__file__).parent / 'vendor'
+PLOTLY_CACHE_FILE = PLOTLY_CACHE_DIR / 'plotly.min.js'
+
+
+def get_plotly_js() -> str:
+    """Load Plotly.js from local cache, downloading if needed.
+    ローカルキャッシュから Plotly.js を読み込み、なければダウンロード。
+
+    Returns the full JavaScript source code as a string.
+    """
+    # Try local cache first
+    # まずローカルキャッシュを試す
+    if PLOTLY_CACHE_FILE.exists():
+        return PLOTLY_CACHE_FILE.read_text(encoding='utf-8')
+
+    # Download and cache
+    # ダウンロードしてキャッシュ
+    print(f"Downloading Plotly.js from CDN (first time only)...")
+    try:
+        PLOTLY_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        urllib.request.urlretrieve(PLOTLY_CDN_URL, str(PLOTLY_CACHE_FILE))
+        print(f"Cached: {PLOTLY_CACHE_FILE} ({PLOTLY_CACHE_FILE.stat().st_size // 1024} KB)")
+        return PLOTLY_CACHE_FILE.read_text(encoding='utf-8')
+    except Exception as e:
+        print(f"ERROR: Failed to download Plotly.js: {e}", file=sys.stderr)
+        print(f"Please download manually:", file=sys.stderr)
+        print(f"  curl -L {PLOTLY_CDN_URL} -o {PLOTLY_CACHE_FILE}", file=sys.stderr)
+        sys.exit(1)
 
 
 # =============================================================================
@@ -374,7 +412,7 @@ def load_csv(filepath: str) -> dict:
     return data
 
 
-def generate_html(data: dict, title: str) -> str:
+def generate_html(data: dict, title: str, plotly_js: str = '') -> str:
     """Generate self-contained HTML dashboard"""
 
     # Filter categories to only include signals present in data
@@ -469,7 +507,7 @@ def generate_html(data: dict, title: str) -> str:
 <head>
 <meta charset="UTF-8">
 <title>{title}</title>
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>{plotly_js}</script>
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; height: 100vh; background: #f5f5f5; }}
@@ -931,7 +969,8 @@ def visualize(filepath: str, groups=None, layout=None, output=None, title=None):
     if title is None:
         title = f"StampFly — {Path(filepath).name}"
 
-    html = generate_html(data, title)
+    plotly_js = get_plotly_js()
+    html = generate_html(data, title, plotly_js)
 
     if output:
         with open(output, 'w') as f:
