@@ -509,20 +509,10 @@ extern "C" void app_main(void)
     auto& led_mgr = stampfly::LEDManager::getInstance();
 
     // =========================================================================
-    // Phase 1: Place on ground (White breathing) - 3 seconds
+    // Phase 1: Boot notification (brief buzzer, no countdown)
     // =========================================================================
-    ESP_LOGI(TAG, "Phase 1: Place aircraft on ground (3 seconds)...");
+    ESP_LOGI(TAG, "Phase 1: Boot notification...");
     g_buzzer.startTone();
-    led_mgr.requestChannel(stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::BOOT,
-                           stampfly::LEDPattern::BREATHE, 0xFFFFFF);  // White
-    for (int i = 3; i > 0; i--) {
-        ESP_LOGI(TAG, "  %d...", i);
-        // LED更新を手動で行う（LEDタスクはまだ起動していない）
-        for (int j = 0; j < 30; j++) {
-            led_mgr.update();
-            vTaskDelay(pdMS_TO_TICKS(33));  // ~30Hz
-        }
-    }
 
     // =========================================================================
     // Phase 2: Sensor initialization (Blue breathing)
@@ -579,26 +569,33 @@ extern "C" void app_main(void)
     startTasks();
 
     // =========================================================================
-    // センサータスク初期読み取り待ち
+    // センサータスク初期読み取り待ち（存在するセンサーのみ）
     // =========================================================================
-    // センサータスクは vTaskDelayUntil() で最初の読み取り前に10-33ms待機する
-    // Phase 3でバッファが空または0初期化値で埋まるのを防ぐため、
-    // 全センサーバッファに最低1サンプル入るまで待機
     ESP_LOGI(TAG, "Waiting for sensor tasks to start filling buffers...");
     {
+        // Detect which sensors are present
+        // 存在するセンサーを検出
+        const bool has_imu  = g_imu.isInitialized();
+        const bool has_mag  = g_mag.isInitialized();
+        const bool has_baro = g_baro.isInitialized();
+        const bool has_tof  = g_tof_bottom.isInitialized();
+        const bool has_flow = (g_optflow != nullptr);
+
+        ESP_LOGI(TAG, "  Sensors: IMU=%d MAG=%d BARO=%d ToF=%d FLOW=%d",
+                 has_imu, has_mag, has_baro, has_tof, has_flow);
+
         int wait_ms = 0;
-        constexpr int MAX_SENSOR_INIT_WAIT_MS = 2000;  // 最大2秒待機
+        constexpr int MAX_SENSOR_INIT_WAIT_MS = 2000;
         while (wait_ms < MAX_SENSOR_INIT_WAIT_MS) {
             bool all_started =
-                g_accel_buf.count() > 0 &&
-                g_gyro_buf.count() > 0 &&
-                g_mag_buf.count() > 0 &&
-                g_baro_buf.count() > 0 &&
-                g_tof_bottom_buf.count() > 0 &&
-                g_flow_buf.count() > 0;
+                (!has_imu  || (g_accel_buf.count() > 0 && g_gyro_buf.count() > 0)) &&
+                (!has_mag  || g_mag_buf.count() > 0) &&
+                (!has_baro || g_baro_buf.count() > 0) &&
+                (!has_tof  || g_tof_bottom_buf.count() > 0) &&
+                (!has_flow || g_flow_buf.count() > 0);
 
             if (all_started) {
-                ESP_LOGI(TAG, "All sensor buffers started filling after %d ms", wait_ms);
+                ESP_LOGI(TAG, "All present sensor buffers started filling after %d ms", wait_ms);
                 break;
             }
 
@@ -627,12 +624,23 @@ extern "C" void app_main(void)
     int elapsed_ms = 0;
     int64_t start_time = esp_timer_get_time();
 
-    // 各センサーの合格フラグ（一度合格したらチェック終了）
-    bool accel_passed = false;
-    bool gyro_passed = false;
-    bool mag_passed = false;
-    bool baro_passed = false;
-    bool tof_passed = false;
+    // Adaptive: skip stabilization for sensors that are not present
+    // 適応的: 存在しないセンサーは安定化チェックをスキップ
+    // (Optical flow has no stabilization check — only IMU/MAG/BARO/ToF)
+    const bool has_imu  = g_imu.isInitialized();
+    const bool has_mag  = g_mag.isInitialized() && g_mag_cal.isCalibrated();
+    const bool has_baro = g_baro.isInitialized();
+    const bool has_tof  = g_tof_bottom.isInitialized();
+
+    // 各センサーの合格フラグ（存在しなければ即合格）
+    bool accel_passed = !has_imu;
+    bool gyro_passed  = !has_imu;
+    bool mag_passed   = !has_mag;
+    bool baro_passed  = !has_baro;
+    bool tof_passed   = !has_tof;
+
+    ESP_LOGI(TAG, "  Checking: IMU=%d MAG=%d BARO=%d ToF=%d",
+             has_imu, has_mag, has_baro, has_tof);
 
     // 各センサーの最終std値を保持
     float last_accel_std_norm = 0.0f;
@@ -826,20 +834,20 @@ extern "C" void app_main(void)
     if (all_passed) {
         ESP_LOGI(TAG, "========================================");
         ESP_LOGI(TAG, "ALL SENSORS STABILIZED after %.0f ms", stabilization_time_ms);
-        ESP_LOGI(TAG, "  Accel: %.4f < %.3f", last_accel_std_norm, ACCEL_STD_THRESHOLD);
-        ESP_LOGI(TAG, "  Gyro:  %.5f < %.3f", last_gyro_std_norm, GYRO_STD_THRESHOLD);
-        ESP_LOGI(TAG, "  Mag:   %.3f < %.1f", last_mag_std_norm, MAG_STD_THRESHOLD);
-        ESP_LOGI(TAG, "  Baro:  %.4f < %.2f", last_baro_std, BARO_STD_THRESHOLD);
-        ESP_LOGI(TAG, "  ToF:   %.4f < %.3f", last_tof_std, TOF_STD_THRESHOLD);
+        if (has_imu)  ESP_LOGI(TAG, "  Accel: %.4f < %.3f", last_accel_std_norm, ACCEL_STD_THRESHOLD);
+        if (has_imu)  ESP_LOGI(TAG, "  Gyro:  %.5f < %.3f", last_gyro_std_norm, GYRO_STD_THRESHOLD);
+        if (has_mag)  ESP_LOGI(TAG, "  Mag:   %.3f < %.1f", last_mag_std_norm, MAG_STD_THRESHOLD);
+        if (has_baro) ESP_LOGI(TAG, "  Baro:  %.4f < %.2f", last_baro_std, BARO_STD_THRESHOLD);
+        if (has_tof)  ESP_LOGI(TAG, "  ToF:   %.4f < %.3f", last_tof_std, TOF_STD_THRESHOLD);
         ESP_LOGI(TAG, "========================================");
     } else {
         ESP_LOGW(TAG, "Sensor stabilization timeout after %.0f ms", stabilization_time_ms);
         ESP_LOGW(TAG, "Final sensor status:");
-        ESP_LOGW(TAG, "  Accel: %s (%.4f, th=%.3f)", accel_passed ? "OK" : "NG", last_accel_std_norm, ACCEL_STD_THRESHOLD);
-        ESP_LOGW(TAG, "  Gyro:  %s (%.5f, th=%.3f)", gyro_passed ? "OK" : "NG", last_gyro_std_norm, GYRO_STD_THRESHOLD);
-        ESP_LOGW(TAG, "  Mag:   %s (%.3f, th=%.1f)", mag_passed ? "OK" : "NG", last_mag_std_norm, MAG_STD_THRESHOLD);
-        ESP_LOGW(TAG, "  Baro:  %s (%.4f, th=%.2f)", baro_passed ? "OK" : "NG", last_baro_std, BARO_STD_THRESHOLD);
-        ESP_LOGW(TAG, "  ToF:   %s (%.4f, th=%.3f)", tof_passed ? "OK" : "NG", last_tof_std, TOF_STD_THRESHOLD);
+        if (has_imu)  ESP_LOGW(TAG, "  Accel: %s (%.4f, th=%.3f)", accel_passed ? "OK" : "NG", last_accel_std_norm, ACCEL_STD_THRESHOLD);
+        if (has_imu)  ESP_LOGW(TAG, "  Gyro:  %s (%.5f, th=%.3f)", gyro_passed ? "OK" : "NG", last_gyro_std_norm, GYRO_STD_THRESHOLD);
+        if (has_mag)  ESP_LOGW(TAG, "  Mag:   %s (%.3f, th=%.1f)", mag_passed ? "OK" : "NG", last_mag_std_norm, MAG_STD_THRESHOLD);
+        if (has_baro) ESP_LOGW(TAG, "  Baro:  %s (%.4f, th=%.2f)", baro_passed ? "OK" : "NG", last_baro_std, BARO_STD_THRESHOLD);
+        if (has_tof)  ESP_LOGW(TAG, "  ToF:   %s (%.4f, th=%.3f)", tof_passed ? "OK" : "NG", last_tof_std, TOF_STD_THRESHOLD);
         ESP_LOGW(TAG, "Proceeding with initialization anyway...");
     }
 
