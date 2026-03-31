@@ -615,11 +615,10 @@ class TelemetryCapture:
             return False
 
         try:
-            async with websockets.connect(
-                self.uri,
-                ping_interval=None,
-                subprotocols=["sf-log"],
-            ) as ws:
+            # Connect with ?mode=log query parameter to trigger exclusive mode
+            # クエリパラメータ ?mode=log で専用ログモードを起動
+            log_uri = self.uri.rstrip('/') + "?mode=log"
+            async with websockets.connect(log_uri, ping_interval=None) as ws:
                 print(f"Connected in exclusive log mode! Capturing for {duration}s...")
                 self.start_time = time.time()
                 end_time = self.start_time + duration

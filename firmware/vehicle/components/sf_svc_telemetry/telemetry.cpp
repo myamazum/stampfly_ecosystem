@@ -208,20 +208,21 @@ esp_err_t Telemetry::ws_handler(httpd_req_t* req)
 
     // Handle WebSocket handshake (HTTP GET request)
     if (req->method == HTTP_GET) {
-        // Check for log client subprotocol: "Sec-WebSocket-Protocol: sf-log"
-        // ログクライアント識別: サブプロトコル "sf-log" をチェック
+        // Detect log client via query parameter: /ws?mode=log
+        // クエリパラメータでログクライアントを識別: /ws?mode=log
+        // (Subprotocol headers are not reliably available in ESP-IDF httpd
+        //  during WebSocket upgrade, so we use query params instead)
         bool is_log_client = false;
-        char proto_buf[32] = {};
-        if (httpd_req_get_hdr_value_str(req, "Sec-WebSocket-Protocol",
-                                         proto_buf, sizeof(proto_buf)) == ESP_OK) {
-            is_log_client = (strncmp(proto_buf, "sf-log", 6) == 0);
+        char query_buf[32] = {};
+        if (httpd_req_get_url_query_str(req, query_buf, sizeof(query_buf)) == ESP_OK) {
+            char mode_val[8] = {};
+            if (httpd_query_key_value(query_buf, "mode", mode_val, sizeof(mode_val)) == ESP_OK) {
+                is_log_client = (strcmp(mode_val, "log") == 0);
+            }
         }
 
         if (is_log_client) {
             ESP_LOGI(TAG, "Log client handshake (fd=%d) — entering exclusive mode", fd);
-            // Respond with matching subprotocol to complete handshake
-            // サブプロトコルを返してハンドシェイクを完了
-            httpd_resp_set_hdr(req, "Sec-WebSocket-Protocol", "sf-log");
             // Disconnect existing non-log clients for exclusive access
             // 専用アクセスのため既存の非ログクライアントを切断
             s_instance->disconnectNonLogClients();
@@ -324,26 +325,21 @@ void Telemetry::removeClient(int fd)
 
 void Telemetry::disconnectNonLogClients()
 {
-    // Called BEFORE addClient for the new log client, so mutex is not held yet
-    // 新ログクライアントの addClient 前に呼ばれるため、mutex はまだ保持していない
+    // Called BEFORE addClient for the new log client, so mutex is not held yet.
+    // 新ログクライアントの addClient 前に呼ばれるため、mutex はまだ保持していない。
     xSemaphoreTake(client_mutex_, portMAX_DELAY);
+
+    // Collect fds to close (close outside mutex to avoid deadlock with close_handler)
+    // クローズ対象の fd を収集（close_handler とのデッドロック防止のため mutex 外でクローズ）
+    int fds_to_close[MAX_CLIENTS];
+    int close_count = 0;
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
         int fd = client_fds_[i];
         if (fd == -1 || client_is_log_[i]) continue;
 
         ESP_LOGI(TAG, "Disconnecting non-log client fd=%d for exclusive log mode", fd);
-
-        // Send WebSocket close frame to notify the browser
-        // ブラウザに通知するため WebSocket close フレームを送信
-        httpd_ws_frame_t close_pkt = {};
-        close_pkt.type = HTTPD_WS_TYPE_CLOSE;
-        close_pkt.final = true;
-        httpd_ws_send_frame_async(server_, fd, &close_pkt);
-
-        // Trigger httpd to close the socket (which calls close_handler → removeClient)
-        // httpd にソケットクローズを依頼（close_handler → removeClient が呼ばれる）
-        httpd_sess_trigger_close(server_, fd);
+        fds_to_close[close_count++] = fd;
 
         client_fds_[i] = -1;
         client_is_log_[i] = false;
@@ -351,6 +347,25 @@ void Telemetry::disconnectNonLogClients()
     }
 
     xSemaphoreGive(client_mutex_);
+
+    // Close sockets outside mutex — close() triggers close_handler callback,
+    // which calls removeClient(), but we already cleared the slot above.
+    // mutex 外でソケットをクローズ — close() は close_handler → removeClient() を
+    // トリガするが、スロットは上で既にクリア済み。
+    for (int i = 0; i < close_count; i++) {
+        // Send WS close frame first (best-effort, may fail if TCP buffer full)
+        // 先に WS close フレームを送信（ベストエフォート、TCP バッファ満杯時は失敗可能）
+        httpd_ws_frame_t close_pkt = {};
+        close_pkt.type = HTTPD_WS_TYPE_CLOSE;
+        close_pkt.final = true;
+        httpd_ws_send_frame_async(server_, fds_to_close[i], &close_pkt);
+
+        // Force-close the TCP socket — this is the reliable disconnect path.
+        // TCP ソケットを強制クローズ — これが確実な切断経路。
+        // httpd_sess_trigger_close schedules close for next server tick,
+        // but direct close() ensures immediate disconnection.
+        close(fds_to_close[i]);
+    }
 }
 
 int Telemetry::broadcast(const void* data, size_t len)
