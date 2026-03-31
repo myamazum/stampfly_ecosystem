@@ -696,8 +696,16 @@ function applyDrawMode() {{
     plots.forEach(p => {{
         const nTraces = p.traces.length;
         if (nTraces === 0) return;
+        // Save current X range before restyle
+        const plotDiv = document.getElementById(p.id);
+        const layout = plotDiv._fullLayout;
+        const xRange = layout && layout.xaxis ? [layout.xaxis.range[0], layout.xaxis.range[1]] : null;
         const update = {{ mode: Array(nTraces).fill(mode) }};
         Plotly.restyle(p.id, update);
+        // Restore X range after restyle
+        if (xRange) {{
+            Plotly.relayout(p.id, {{'xaxis.range': xRange}});
+        }}
     }});
 }}
 
