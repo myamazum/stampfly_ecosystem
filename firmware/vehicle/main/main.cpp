@@ -354,8 +354,8 @@ static void startTasks()
     ESP_LOGI(TAG, "Starting FreeRTOS tasks...");
 
     // Peripheral tasks (Core 0)
-    // Note: LEDTask is started earlier (before Phase 2) for boot animation
-    // 注: LEDTask はブートアニメーションのため Phase 2 前に起動済み
+    xTaskCreatePinnedToCore(LEDTask, "LEDTask", STACK_SIZE_LED, nullptr,
+                            PRIORITY_LED_TASK, &g_led_task_handle, 0);
 
     xTaskCreatePinnedToCore(ButtonTask, "ButtonTask", STACK_SIZE_BUTTON, nullptr,
                             PRIORITY_BUTTON_TASK, &g_button_task_handle, 0);
@@ -506,10 +506,7 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "Initializing actuators...");
     init::actuators();
 
-    // LEDManagerを取得し、LEDTaskを先行起動（アニメーション駆動用）
     auto& led_mgr = stampfly::LEDManager::getInstance();
-    xTaskCreatePinnedToCore(LEDTask, "LEDTask", config::STACK_SIZE_LED, nullptr,
-                            config::PRIORITY_LED_TASK, &g_led_task_handle, 0);
 
     // =========================================================================
     // Phase 1: Boot notification (brief buzzer, no countdown)
@@ -518,12 +515,14 @@ extern "C" void app_main(void)
     g_buzzer.startTone();
 
     // =========================================================================
-    // Phase 2: Sensor initialization (Blue breathing)
+    // Phase 2: Sensor initialization (Blue solid)
     // =========================================================================
-    // LEDTask が既に動いているのでアニメーションは自動更新される
+    // LEDTask is not running yet — use SOLID (no animation update needed)
+    // LEDTask 未起動のため SOLID を使用（アニメーション更新不要）
     ESP_LOGI(TAG, "Phase 2: Initializing sensors...");
     led_mgr.requestChannel(stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::BOOT,
-                           stampfly::LEDPattern::BREATHE, 0x0000FF);  // Blue
+                           stampfly::LEDPattern::SOLID, 0x0000FF);  // Blue solid
+    led_mgr.update();  // Apply once (SOLID needs no periodic update)
 
     init::sensors();
 
