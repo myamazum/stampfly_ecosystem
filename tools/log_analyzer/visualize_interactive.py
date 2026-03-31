@@ -546,7 +546,7 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
         </div>
         <div style="margin-top:6px">
             <label>Draw mode:</label>
-            <select id="draw-mode" style="width:100%">
+            <select id="draw-mode" style="width:100%" onchange="applyDrawMode()">
                 <option value="lines" selected>Lines</option>
                 <option value="markers">Points</option>
                 <option value="lines+markers">Lines + Points</option>
@@ -689,6 +689,16 @@ function updateTargetSelect() {{
     }} else if (plots.length > 0) {{
         sel.value = plots[plots.length - 1].id;
     }}
+}}
+
+function applyDrawMode() {{
+    const mode = document.getElementById('draw-mode').value;
+    plots.forEach(p => {{
+        const nTraces = p.traces.length;
+        if (nTraces === 0) return;
+        const update = {{ mode: Array(nTraces).fill(mode) }};
+        Plotly.restyle(p.id, update);
+    }});
 }}
 
 function selectPlot(id) {{
