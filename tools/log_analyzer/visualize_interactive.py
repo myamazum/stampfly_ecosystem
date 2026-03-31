@@ -266,15 +266,19 @@ def load_csv(filepath: str) -> dict:
             for i in range(1, n)
         ]
 
+    # Choose best time axis for gyro integration
+    # ジャイロ積分に使う時間軸を選択（IMU内部時計が利用可能ならそちらを使用）
+    gyro_time = data.get('_time_imu', data.get('time_s'))
+
     # 1a. Gyro integration (raw): cumulative integration of raw angular rate
     #     ジャイロ積分（生値）: 生の角速度を積分して角度を算出
-    if all(k in data for k in ['gyro_x', 'gyro_y', 'gyro_z', 'time_s']) and n > 1:
+    if gyro_time and all(k in data for k in ['gyro_x', 'gyro_y', 'gyro_z']) and n > 1:
         data['gyro_int_roll'] = [0.0] * n
         data['gyro_int_pitch'] = [0.0] * n
         data['gyro_int_yaw'] = [0.0] * n
         roll, pitch, yaw = 0.0, 0.0, 0.0
         for i in range(1, n):
-            dt = data['time_s'][i] - data['time_s'][i - 1]
+            dt = gyro_time[i] - gyro_time[i - 1]
             if dt <= 0 or dt > 0.1:
                 dt = 0.0025  # fallback to 400Hz
             roll += data['gyro_x'][i] * dt
@@ -286,13 +290,13 @@ def load_csv(filepath: str) -> dict:
 
     # 1b. Gyro integration (corrected): cumulative integration of bias-corrected gyro
     #     ジャイロ積分（補正値）: バイアス補正済み角速度を積分して角度を算出
-    if all(k in data for k in ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z', 'time_s']) and n > 1:
+    if gyro_time and all(k in data for k in ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z']) and n > 1:
         data['gyro_corr_int_roll'] = [0.0] * n
         data['gyro_corr_int_pitch'] = [0.0] * n
         data['gyro_corr_int_yaw'] = [0.0] * n
         roll, pitch, yaw = 0.0, 0.0, 0.0
         for i in range(1, n):
-            dt = data['time_s'][i] - data['time_s'][i - 1]
+            dt = gyro_time[i] - gyro_time[i - 1]
             if dt <= 0 or dt > 0.1:
                 dt = 0.0025
             roll += data['gyro_corrected_x'][i] * dt
