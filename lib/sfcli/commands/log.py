@@ -398,7 +398,7 @@ def run_wifi(args: argparse.Namespace) -> int:
     output = args.output
     if not output and not args.no_save:
         timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
-        output = str(get_log_dir() / f"stampfly_udp_{timestamp}.csv")
+        output = str(get_log_dir() / f"stampfly_udp_{timestamp}.jsonl")
 
     port = getattr(args, 'port', 8890)
     console.info(f"Capturing UDP telemetry from {args.ip}:{port}")
@@ -419,7 +419,7 @@ def run_wifi(args: argparse.Namespace) -> int:
         capture.print_stats()
 
         if not args.no_save and output:
-            capture.save_csv(output)
+            capture.save_jsonl(output)
 
         return 0
 

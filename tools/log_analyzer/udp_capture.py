@@ -356,41 +356,97 @@ class UDPTelemetryCapture:
         print(f"  {'TOTAL':<12} {sum(self.packet_count.values()):>8} {total_samples:>8}")
         print()
 
-    def save_csv(self, filepath: str):
-        """Save captured data to a single merged CSV file.
-        Merges all sensor streams by timestamp with NaN fill for missing values.
-        全センサストリームをタイムスタンプで統合し、欠損値は空文字で埋める。
+    def save_jsonl(self, filepath: str):
+        """Save captured data as JSONLines (1 line = 1 sensor sample).
+        JSONLines形式で保存（1行 = 1センササンプル）。
+
+        Each line is a self-describing JSON object with sensor type as 'id'.
+        各行はセンサ種別を 'id' フィールドに持つ自己記述的 JSON オブジェクト。
+
+        Example:
+          {"id":"imu","ts":75834074,"gyro":[0.01,0.02,-0.003],"accel":[0.12,-0.08,-9.81],...}
+          {"id":"posvel","ts":75834074,"pos":[1.2,0.5,-0.03],"vel":[0.01,-0.02,0.001]}
+          {"id":"flow","ts":75836000,"dx":31,"dy":23,"quality":35}
         """
-        # Collect all unique columns (preserving order)
-        all_columns = ['timestamp_us']
-        for pkt_id in sorted(SAMPLE_INFO.keys()):
-            if pkt_id in self.samples:
-                for col in CSV_COLUMNS[pkt_id]:
-                    if col != 'timestamp_us' and col not in all_columns:
-                        all_columns.append(col)
+        import json
 
-        # Collect all samples with their timestamps
-        all_rows = []
+        # Sensor ID to human-readable name and field structure
+        # センサIDから人間が読める名前とフィールド構造へのマッピング
+        JSONL_FORMAT = {
+            PKT_IMU_ESKF: lambda s: {
+                'id': 'imu',
+                'ts': s['timestamp_us'],
+                'gyro': [s['gyro_x'], s['gyro_y'], s['gyro_z']],
+                'accel': [s['accel_x'], s['accel_y'], s['accel_z']],
+                'gyro_raw': [s['gyro_raw_x'], s['gyro_raw_y'], s['gyro_raw_z']],
+                'accel_raw': [s['accel_raw_x'], s['accel_raw_y'], s['accel_raw_z']],
+                'quat': [s['quat_w'], s['quat_x'], s['quat_y'], s['quat_z']],
+                'gyro_bias': [s['gyro_bias_x'], s['gyro_bias_y'], s['gyro_bias_z']],
+                'accel_bias': [s['accel_bias_x'], s['accel_bias_y'], s['accel_bias_z']],
+            },
+            PKT_POS_VEL: lambda s: {
+                'id': 'posvel',
+                'ts': s['timestamp_us'],
+                'pos': [s['pos_x'], s['pos_y'], s['pos_z']],
+                'vel': [s['vel_x'], s['vel_y'], s['vel_z']],
+            },
+            PKT_CONTROL: lambda s: {
+                'id': 'ctrl',
+                'ts': s['timestamp_us'],
+                'throttle': s['ctrl_throttle'],
+                'roll': s['ctrl_roll'],
+                'pitch': s['ctrl_pitch'],
+                'yaw': s['ctrl_yaw'],
+            },
+            PKT_FLOW: lambda s: {
+                'id': 'flow',
+                'ts': s['timestamp_us'],
+                'dx': s['flow_x'],
+                'dy': s['flow_y'],
+                'quality': s['flow_quality'],
+            },
+            PKT_TOF: lambda s: {
+                'id': 'tof',
+                'ts': s['timestamp_us'],
+                'bottom': s['tof_bottom'],
+                'front': s['tof_front'],
+                'status_bottom': s['tof_bottom_status'],
+                'status_front': s['tof_front_status'],
+            },
+            PKT_BARO: lambda s: {
+                'id': 'baro',
+                'ts': s['timestamp_us'],
+                'altitude': s['baro_altitude'],
+                'pressure': s['baro_pressure'],
+            },
+            PKT_MAG: lambda s: {
+                'id': 'mag',
+                'ts': s['timestamp_us'],
+                'x': s['mag_x'],
+                'y': s['mag_y'],
+                'z': s['mag_z'],
+            },
+        }
+
+        # Collect all samples with their packet ID, sort by timestamp
+        # 全サンプルをパケットID付きで収集し、タイムスタンプ順にソート
+        all_entries = []
         for pkt_id, samples in self.samples.items():
+            fmt_fn = JSONL_FORMAT.get(pkt_id)
+            if not fmt_fn:
+                continue
             for sample in samples:
-                row = {'timestamp_us': sample['timestamp_us']}
-                for key, val in sample.items():
-                    if key != 'timestamp_us':
-                        row[key] = val
-                all_rows.append(row)
+                all_entries.append((sample['timestamp_us'], pkt_id, sample))
 
-        # Sort by timestamp
-        all_rows.sort(key=lambda r: r['timestamp_us'])
+        all_entries.sort(key=lambda e: e[0])
 
-        # Write CSV
-        with open(filepath, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=all_columns, extrasaction='ignore')
-            writer.writeheader()
-            for row in all_rows:
-                writer.writerow(row)
+        # Write JSONLines
+        with open(filepath, 'w') as f:
+            for ts, pkt_id, sample in all_entries:
+                obj = JSONL_FORMAT[pkt_id](sample)
+                f.write(json.dumps(obj, separators=(',', ':')) + '\n')
 
-        n = len(all_rows)
-        print(f"  Saved: {filepath} ({n} rows, {len(all_columns)} columns)")
+        print(f"  Saved: {filepath} ({len(all_entries)} lines)")
 
 
 # =============================================================================
@@ -427,7 +483,7 @@ def main():
     output = args.output
     if not output and not args.no_save:
         timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
-        output = f"stampfly_udp_{timestamp}.csv"
+        output = f"stampfly_udp_{timestamp}.jsonl"
 
     print(f"Capturing UDP telemetry from {args.ip}:{args.port}")
     print(f"  Duration: {args.duration}s")
@@ -446,7 +502,7 @@ def main():
     capture.print_stats()
 
     if not args.no_save and output:
-        capture.save_csv(output)
+        capture.save_jsonl(output)
 
     return 0
 
