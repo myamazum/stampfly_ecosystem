@@ -118,8 +118,8 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     # --- wifi ---
     wifi_parser = log_subparsers.add_parser(
         "wifi",
-        help="Capture telemetry via WiFi WebSocket",
-        description="Capture high-rate telemetry from StampFly via WiFi WebSocket.",
+        help="Capture telemetry via WiFi UDP",
+        description="Capture full-rate telemetry from StampFly via WiFi UDP.",
     )
     wifi_parser.add_argument(
         "-o", "--output",
@@ -139,13 +139,8 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     wifi_parser.add_argument(
         "--port",
         type=int,
-        default=80,
-        help="WebSocket port (default: 80)",
-    )
-    wifi_parser.add_argument(
-        "--fft",
-        action="store_true",
-        help="Run FFT analysis after capture",
+        default=8890,
+        help="UDP telemetry port (default: 8890)",
     )
     wifi_parser.add_argument(
         "--no-save",
@@ -387,14 +382,14 @@ def run_capture(args: argparse.Namespace) -> int:
 
 
 def run_wifi(args: argparse.Namespace) -> int:
-    """Capture telemetry via WiFi WebSocket"""
-    # Import the wifi capture module
+    """Capture telemetry via WiFi (UDP full-rate or legacy WebSocket)"""
+    # Import the UDP capture module (primary)
+    # UDP キャプチャモジュールをインポート（主要）
     try:
         sys.path.insert(0, str(paths.root() / "tools" / "log_analyzer"))
-        import wifi_capture
+        import udp_capture
     except ImportError as e:
-        console.error(f"Failed to import wifi_capture module: {e}")
-        console.print("  Make sure 'websockets' is installed: pip install websockets")
+        console.error(f"Failed to import udp_capture module: {e}")
         return 1
     finally:
         sys.path.pop(0)
@@ -403,40 +398,33 @@ def run_wifi(args: argparse.Namespace) -> int:
     output = args.output
     if not output and not args.no_save:
         timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
-        output = str(get_log_dir() / f"stampfly_wifi_{timestamp}.csv")
+        output = str(get_log_dir() / f"stampfly_udp_{timestamp}.csv")
 
-    console.info(f"Capturing WiFi telemetry from {args.ip}:{args.port}")
+    port = getattr(args, 'port', 8890)
+    console.info(f"Capturing UDP telemetry from {args.ip}:{port}")
     console.print(f"  Duration: {args.duration}s")
     if output:
         console.print(f"  Output: {output}")
     console.print()
 
     try:
-        # Create capture instance
-        capture = wifi_capture.TelemetryCapture(args.ip, args.port)
-
-        # Run async capture
-        success = asyncio.run(capture.capture(args.duration, wifi_capture.progress_bar))
+        capture = udp_capture.UDPTelemetryCapture(args.ip, port)
+        success = capture.capture(args.duration, udp_capture.progress_bar)
         print()  # Newline after progress bar
 
         if not success:
+            console.error("No data received. Check WiFi connection and StampFly power.")
             return 1
 
-        # Print stats
         capture.print_stats()
 
-        # Save to file
         if not args.no_save and output:
             capture.save_csv(output)
-
-        # Run FFT if requested
-        if args.fft:
-            capture.run_fft_analysis()
 
         return 0
 
     except Exception as e:
-        console.error(f"WiFi capture failed: {e}")
+        console.error(f"UDP capture failed: {e}")
         return 1
 
 
