@@ -342,15 +342,32 @@ class UDPTelemetryCapture:
         print()
 
         pkt_names = {v[0]: k for k, v in SAMPLE_INFO.items()}
-        print(f"  {'Type':<12} {'Packets':>8} {'Samples':>8} {'Rate':>8} {'Gaps':>6}")
-        print(f"  {'-'*12} {'-'*8} {'-'*8} {'-'*8} {'-'*6}")
+        print(f"  {'Type':<12} {'Packets':>8} {'Samples':>8} {'RxRate':>8} {'SrcRate':>8} {'Gaps':>6}")
+        print(f"  {'-'*12} {'-'*8} {'-'*8} {'-'*8} {'-'*8} {'-'*6}")
 
         for pkt_id, (name, _, _) in sorted(SAMPLE_INFO.items()):
             pkts = self.packet_count.get(pkt_id, 0)
             samps = self.sample_count.get(pkt_id, 0)
-            rate = samps / duration if duration > 0 else 0
+            rx_rate = samps / duration if duration > 0 else 0
             gaps = self.seq_gaps.get(pkt_id, 0)
-            print(f"  {name:<12} {pkts:>8} {samps:>8} {rate:>7.1f}Hz {gaps:>6}")
+
+            # Compute source rate from timestamps (median interval)
+            # タイムスタンプから送信元レートを計算（中央値インターバル）
+            src_rate_str = '   ---'
+            samples = self.samples.get(pkt_id, [])
+            if len(samples) >= 2:
+                timestamps = [s['timestamp_us'] for s in samples]
+                intervals = [timestamps[i+1] - timestamps[i]
+                             for i in range(len(timestamps)-1)
+                             if timestamps[i+1] > timestamps[i]]
+                if intervals:
+                    intervals.sort()
+                    median_us = intervals[len(intervals) // 2]
+                    if median_us > 0:
+                        src_rate = 1e6 / median_us
+                        src_rate_str = f'{src_rate:7.1f}'
+
+            print(f"  {name:<12} {pkts:>8} {samps:>8} {rx_rate:>7.1f}Hz {src_rate_str}Hz {gaps:>6}")
 
         print(f"  {'─'*12} {'─'*8} {'─'*8} {'─'*8} {'─'*6}")
         print(f"  {'TOTAL':<12} {sum(self.packet_count.values()):>8} {total_samples:>8}")
