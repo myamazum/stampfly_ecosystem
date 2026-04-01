@@ -292,10 +292,13 @@ def load_jsonl(filepath: str) -> dict:
     # 出力データ辞書を構築
     data = {}
 
-    # Find global t0 for time_s computation
-    # time_s 計算用のグローバル t0 を見つける
-    all_first_ts = [ts[0] for ts in sensor_times.values() if ts]
-    t0 = min(all_first_ts) if all_first_ts else 0
+    # Use IMU's first timestamp as t0 (highest rate, most reliable)
+    # IMU の最初のタイムスタンプを t0 として使用（最高レート、最も信頼性が高い）
+    if 'imu' in sensor_times and sensor_times['imu']:
+        t0 = sensor_times['imu'][0]
+    else:
+        all_first_ts = [ts[0] for ts in sensor_times.values() if ts]
+        t0 = min(all_first_ts) if all_first_ts else 0
 
     # Create per-sensor time axes and assign data
     # センサ別時間軸を作成しデータを割り当て
