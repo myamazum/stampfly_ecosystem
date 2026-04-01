@@ -116,6 +116,10 @@ void IMUTask(void* pvParameters)
                 g_accel_buf.push(a);
                 g_gyro_buf.push(g);
 
+                // Update sensor diagnostics
+                // センサ診断情報を更新
+                state.updateSensorDiag("imu", g_imu_task_healthy, imu_ts);
+
                 // Signal telemetry task for FFT mode (400Hz sync)
                 // FFTモードのテレメトリタスクに新しいIMUデータを通知
                 // IMPORTANT: Must be AFTER buffer writes so telemetry reads fresh data

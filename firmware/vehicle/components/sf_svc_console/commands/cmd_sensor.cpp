@@ -88,7 +88,7 @@ static int cmd_sensor(int argc, char** argv)
         console.print("  %-5s  %s  %8s  %7s  %s\r\n",
                        "-----", "--", "--------", "-------", "------");
 
-        const char* names[] = {"flow", "tof", "baro", "mag"};
+        const char* names[] = {"imu", "flow", "tof", "baro", "mag"};
         for (const char* name : names) {
             auto diag = state.getSensorDiag(name);
             float rate_hz = diag.period_us > 0 ? 1e6f / diag.period_us : 0;
