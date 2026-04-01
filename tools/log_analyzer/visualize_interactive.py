@@ -589,52 +589,39 @@ def generate_html(data: dict, title: str, plotly_js: str = '') -> str:
 
     # Mapping: signal name → sensor time axis key
     # 信号名 → センサ時間軸キー のマッピング
-    signal_sensor_map = {
-        # IMU signals → _time_imu
-        'gyro_x': 'imu', 'gyro_y': 'imu', 'gyro_z': 'imu',
-        'accel_x': 'imu', 'accel_y': 'imu', 'accel_z': 'imu',
-        'gyro_raw_x': 'imu', 'gyro_raw_y': 'imu', 'gyro_raw_z': 'imu',
-        'accel_raw_x': 'imu', 'accel_raw_y': 'imu', 'accel_raw_z': 'imu',
-        'quat_w': 'imu', 'quat_x': 'imu', 'quat_y': 'imu', 'quat_z': 'imu',
-        'gyro_bias_x': 'imu', 'gyro_bias_y': 'imu', 'gyro_bias_z': 'imu',
-        'accel_bias_x': 'imu', 'accel_bias_y': 'imu', 'accel_bias_z': 'imu',
-        # Computed from IMU quaternion
-        'roll_deg': 'imu', 'pitch_deg': 'imu', 'yaw_deg': 'imu',
-        # Corrected (from IMU loop in old CSV format)
-        'gyro_corrected_x': 'imu', 'gyro_corrected_y': 'imu', 'gyro_corrected_z': 'imu',
-        'accel_corrected_x': 'imu', 'accel_corrected_y': 'imu', 'accel_corrected_z': 'imu',
-        # Computed from IMU
-        'gyro_int_roll': 'imu', 'gyro_int_pitch': 'imu', 'gyro_int_yaw': 'imu',
-        'gyro_corr_int_roll': 'imu', 'gyro_corr_int_pitch': 'imu', 'gyro_corr_int_yaw': 'imu',
-        'accel_roll': 'imu', 'accel_pitch': 'imu',
-        'accel_corr_roll': 'imu', 'accel_corr_pitch': 'imu',
-        # Timing
-        'imu_interval_us': 'imu', 'telemetry_interval_us': 'imu', 'telemetry_delay_us': 'imu',
-        # Position/Velocity → _time_posvel (JSONLines) or _time_imu (old CSV)
-        'pos_x': 'posvel', 'pos_y': 'posvel', 'pos_z': 'posvel',
-        'vel_x': 'posvel', 'vel_y': 'posvel', 'vel_z': 'posvel',
-        # Control → _time_ctrl
-        'ctrl_throttle': 'ctrl', 'ctrl_roll': 'ctrl', 'ctrl_pitch': 'ctrl', 'ctrl_yaw': 'ctrl',
-        # Sensors
-        'flow_x': 'flow', 'flow_y': 'flow', 'flow_quality': 'flow',
-        'tof_bottom': 'tof', 'tof_front': 'tof', 'tof_bottom_status': 'tof', 'tof_front_status': 'tof',
-        'baro_altitude': 'baro', 'baro_pressure': 'baro',
-        'mag_x': 'mag', 'mag_y': 'mag', 'mag_z': 'mag', 'mag_yaw': 'mag',
-    }
+    # Auto-build signal→sensor mapping from data lengths
+    # データ長からシグナル→センサのマッピングを自動構築
+    # Any signal whose length matches a _time_* axis gets mapped to it.
+    # 長さが _time_* 軸と一致する信号は自動的にマッピングされる。
+    sensor_time_axes = {}  # {'imu': ('_time_imu', 3928), ...}
+    for k, v in data.items():
+        if k.startswith('_time_'):
+            sensor_name = k[6:]  # '_time_imu' → 'imu'
+            sensor_time_axes[sensor_name] = (k, len(v))
 
-    for sig, sensor in signal_sensor_map.items():
-        if sig not in data:
+    for sig, sig_data in data.items():
+        if sig.startswith('_time_') or sig == 'time_s':
             continue
-        time_key = f'_time_{sensor}'
-        # Check for sensor-specific time axis
-        if time_key in data and len(data[time_key]) == len(data[sig]):
-            signal_time_map[sig] = {'time': time_key, 'data': sig}
+        sig_len = len(sig_data)
+
+        # Find a _time_* axis with matching length
+        # 長さが一致する _time_* 軸を探す
+        matched = False
+        for sensor_name, (time_key, time_len) in sensor_time_axes.items():
+            if sig_len == time_len:
+                signal_time_map[sig] = {'time': time_key, 'data': sig}
+                matched = True
+                break
+
         # Fallback: check for dedup version (old CSV format)
-        elif f'{sig}_dedup' in data and time_key in data:
-            signal_time_map[sig] = {'time': time_key, 'data': f'{sig}_dedup'}
-        # Fallback: use _time_imu if available and lengths match
-        elif '_time_imu' in data and len(data.get('_time_imu', [])) == len(data[sig]):
-            signal_time_map[sig] = {'time': '_time_imu', 'data': sig}
+        # フォールバック: dedup バージョンを確認（旧CSVフォーマット）
+        if not matched:
+            dedup_key = f'{sig}_dedup'
+            if dedup_key in data:
+                for sensor_name, (time_key, time_len) in sensor_time_axes.items():
+                    if len(data[dedup_key]) == time_len:
+                        signal_time_map[sig] = {'time': time_key, 'data': dedup_key}
+                        break
 
     data_json = json.dumps(export_data, separators=(',', ':'))
     categories_json = json.dumps(categories, ensure_ascii=False)
