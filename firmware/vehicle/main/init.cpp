@@ -38,6 +38,7 @@
 #include "console.hpp"
 #include "logger.hpp"
 #include "telemetry.hpp"
+#include "udp_telemetry.hpp"
 #include "control_arbiter.hpp"
 #include "udp_server.hpp"
 #include "wifi_cli.hpp"
@@ -668,6 +669,19 @@ esp_err_t telemetry()
     }
 
     ESP_LOGI(TAG, "Telemetry initialized - Connect to WiFi 'StampFly', open http://192.168.4.1");
+
+    // Initialize UDP telemetry log server
+    // UDP テレメトリログサーバーを初期化
+    auto& udp_log = stampfly::udp_telem::UDPLogServer::getInstance();
+    ret = udp_log.init();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "UDP telemetry log server init failed: %s", esp_err_to_name(ret));
+        // Non-fatal: WebSocket telemetry still works
+    } else {
+        ESP_LOGI(TAG, "UDP telemetry log server ready on port %d",
+                 stampfly::udp_telem::UDP_LOG_PORT);
+    }
+
     return ESP_OK;
 }
 
