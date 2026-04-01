@@ -46,29 +46,36 @@ void OptFlowTask(void* pvParameters)
         g_optflow_checkpoint = 1;  // readMotionBurst前
 
         if (g_optflow != nullptr) {
+            // Always update timestamp on every poll attempt
+            // ポーリング試行ごとにタイムスタンプを更新
+            g_flow_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
+
             try {
                 auto burst = g_optflow->readMotionBurst();
                 g_optflow_checkpoint = 2;  // readMotionBurst成功
-                // Check quality
+
+                // PMW3901座標系 → 中間座標系 変換
+                int16_t flow_body_x = -burst.delta_y;
+                int16_t flow_body_y =  burst.delta_x;
+
+                // Record with actual quality (valid or not — let consumer decide)
+                // 実際の品質値で記録（有効/無効はデータ利用側が判断）
+                state.updateOpticalFlow(flow_body_x, flow_body_y, burst.squal);
+                g_flow_buf.push(OptFlowData{flow_body_x, flow_body_y, burst.squal});
+                g_optflow_data_ready = true;
+
                 if (stampfly::OutlierDetector::isFlowValid(burst.squal)) {
                     g_health.optflow.recordSuccess();
-                    g_optflow_task_healthy = g_health.optflow.isHealthy();
-
-                    // PMW3901座標系 → 中間座標系 変換
-                    int16_t flow_body_x = -burst.delta_y;
-                    int16_t flow_body_y =  burst.delta_x;
-
-                    state.updateOpticalFlow(flow_body_x, flow_body_y, burst.squal);
-
-                    // リングバッファに追加（常時更新）
-                    g_flow_buf.push(OptFlowData{flow_body_x, flow_body_y, burst.squal});
-                    g_optflow_data_ready = true;
-                    g_flow_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
                 } else {
                     g_health.optflow.recordFailure();
-                    g_optflow_task_healthy = g_health.optflow.isHealthy();
                 }
+                g_optflow_task_healthy = g_health.optflow.isHealthy();
             } catch (const stampfly::PMW3901Exception& e) {
+                // Read failed — record with quality=0 to indicate error
+                // 読み取り失敗 — quality=0 でエラーを示す
+                state.updateOpticalFlow(0, 0, 0);
+                g_flow_buf.push(OptFlowData{0, 0, 0});
+                g_optflow_data_ready = true;
                 g_health.optflow.recordFailure();
                 g_optflow_task_healthy = g_health.optflow.isHealthy();
             }

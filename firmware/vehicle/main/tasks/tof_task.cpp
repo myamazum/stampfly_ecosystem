@@ -49,16 +49,21 @@ void ToFTask(void* pvParameters)
             bool data_ready = false;
             g_tof_bottom.isDataReady(data_ready);
 
+            // Always update timestamp on every poll (data_ready or not)
+            // ポーリングごとにタイムスタンプを更新（data_ready に関わらず）
+            g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
+
             if (data_ready) {
                 uint16_t distance_mm;
                 uint8_t status;
                 esp_err_t ret = g_tof_bottom.getDistance(distance_mm, status);
                 if (ret == ESP_OK) {
                     bottom_errors = 0;  // Reset on success
-                    // Timestamp on every successful read (regardless of validity)
-                    // for telemetry visibility. Validity is indicated by status.
-                    // 読み取り成功ごとにタイムスタンプ更新（有効性は status で判断）
-                    g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
+
+                    // Always push to buffer and set data_ready so telemetry
+                    // records every measurement attempt with its status.
+                    // 全ての測定試行をバッファに記録（status で有効/無効を判断）
+                    g_tof_bottom_data_ready = true;
 
                     // Only update if completely valid measurement (status == 0)
                     // status 0 = valid, 1-7 = various errors, 14 = unknown
@@ -120,9 +125,8 @@ void ToFTask(void* pvParameters)
                             g_health.tof.recordSuccess();
                             g_tof_task_healthy = g_health.tof.isHealthy();
 
-                            // リングバッファに追加
+                            // リングバッファに追加（ESKFフュージョン用）
                             g_tof_bottom_buf.push(distance_m);
-                            g_tof_bottom_data_ready = true;
 
                             // Fallback to simple altitude estimator (センサーフュージョン未使用時)
                             if (!g_fusion.isInitialized() && g_altitude_est.isInitialized() && g_attitude_est.isInitialized()) {

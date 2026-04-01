@@ -24,11 +24,14 @@ void BaroTask(void* pvParameters)
 
     while (true) {
         if (g_baro.isInitialized()) {
+            // Always update timestamp on every poll attempt
+            // ポーリング試行ごとにタイムスタンプを更新
+            g_baro_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
+
             stampfly::BaroData baro;
             if (g_baro.read(baro) == ESP_OK) {
                 g_health.baro.recordSuccess();
                 g_baro_task_healthy = g_health.baro.isHealthy();
-                g_baro_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
 
                 // Use altitude from read() directly (already calculated)
                 state.updateBaro(baro.pressure_pa, baro.temperature_c, baro.altitude_m);

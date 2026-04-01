@@ -24,11 +24,14 @@ void MagTask(void* pvParameters)
 
     while (true) {
         if (g_mag.isInitialized()) {
+            // Always update timestamp on every poll attempt
+            // ポーリング試行ごとにタイムスタンプを更新
+            g_mag_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
+
             stampfly::MagData mag;
             if (g_mag.read(mag) == ESP_OK) {
                 g_health.mag.recordSuccess();
                 g_mag_task_healthy = g_health.mag.isHealthy();
-                g_mag_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
                 // ============================================================
                 // BMM150座標系 → 機体座標系(NED) 変換
                 // 実測により確認:
