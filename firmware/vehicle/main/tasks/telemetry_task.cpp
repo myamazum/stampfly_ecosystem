@@ -45,7 +45,7 @@ struct SendItem {
 };
 
 static QueueHandle_t s_send_queue = nullptr;
-static constexpr int SEND_QUEUE_SIZE = 16;
+static constexpr int SEND_QUEUE_SIZE = 32;
 
 // UDP batch accumulators
 // UDP バッチ蓄積器
@@ -365,7 +365,7 @@ void TelemetryTask(void* pvParameters)
     // Create send task
     // 送信タスク作成
     xTaskCreatePinnedToCore(TelemetrySendTask, "TelemSend", 4096,
-                            nullptr, 10, nullptr, 0);
+                            nullptr, 12, nullptr, 0);
 
     // Local state (small — only counters and indices)
     // ローカル状態（小さい — カウンタとインデックスのみ）
