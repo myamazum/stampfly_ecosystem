@@ -332,23 +332,12 @@ def load_jsonl(filepath: str) -> dict:
     # Add all signal data
     data.update(sensor_data)
 
-    # Mask invalid sensor data with NaN for clean visualization
-    # 無効センサデータを NaN でマスクして見やすく表示
-    if 'flow_quality' in data and 'flow_x' in data:
-        for i, q in enumerate(data['flow_quality']):
-            if q == 0:
-                data['flow_x'][i] = float('nan')
-                data['flow_y'][i] = float('nan')
-
-    if 'tof_bottom_status' in data and 'tof_bottom' in data:
-        for i, s in enumerate(data['tof_bottom_status']):
-            if s != 0:
-                data['tof_bottom'][i] = float('nan')
-
-    if 'tof_front_status' in data and 'tof_front' in data:
-        for i, s in enumerate(data['tof_front_status']):
-            if s != 0:
-                data['tof_front'][i] = float('nan')
+    # NOTE: Invalid sensor data is NOT masked here.
+    # Raw data + quality/status are passed to HTML so JavaScript can
+    # toggle invalid data visibility via checkbox at display time.
+    # 注意: 無効センサデータはここではマスクしない。
+    # 生データ + quality/status を HTML に渡し、JavaScript のチェックボックスで
+    # 表示時に無効データの表示/非表示を切り替える。
 
     # Compute corrected IMU (gyro - bias, accel - bias)
     # バイアス補正済み IMU を計算（gyro - bias, accel - bias）
@@ -774,6 +763,9 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
         <div style="margin-top:6px">
             <label><input type="checkbox" id="sync-x" checked> Sync time axis</label>
         </div>
+        <div style="margin-top:4px">
+            <label><input type="checkbox" id="hide-invalid" checked onchange="toggleInvalid()"> Hide invalid data</label>
+        </div>
         <div style="margin-top:6px">
             <label>Draw mode:</label>
             <select id="draw-mode" style="width:100%" onchange="applyDrawMode()">
@@ -809,6 +801,29 @@ const COLORS = {colors_json};
 
 let plots = [];  // [{{ id, div, traces: [{{key, label}}] }}]
 let plotCounter = 0;
+
+// Invalid data masking rules: signal → {{statusKey, validFn}}
+// 無効データマスクルール: 信号名 → {{状態キー, 有効判定関数}}
+const INVALID_RULES = {{
+    'flow_x':     {{ status: 'flow_quality', valid: v => v > 0 }},
+    'flow_y':     {{ status: 'flow_quality', valid: v => v > 0 }},
+    'tof_bottom':  {{ status: 'tof_bottom_status', valid: v => v === 0 }},
+    'tof_front':   {{ status: 'tof_front_status', valid: v => v === 0 }},
+}};
+
+function applyMask(yData, key) {{
+    const rule = INVALID_RULES[key];
+    if (!rule || !DATA[rule.status]) return yData;
+
+    const hideInvalid = document.getElementById('hide-invalid').checked;
+    if (!hideInvalid) return yData;
+
+    const statusArr = DATA[rule.status];
+    return yData.map((v, i) => {{
+        const si = i < statusArr.length ? statusArr[i] : 0;
+        return rule.valid(si) ? v : null;  // null = gap in Plotly
+    }});
+}}
 let colorIndex = 0;
 let _syncBusy = false;  // Guard against recursive relayout sync
 
@@ -920,6 +935,25 @@ function updateTargetSelect() {{
     }} else if (plots.length > 0) {{
         sel.value = plots[plots.length - 1].id;
     }}
+}}
+
+function toggleInvalid() {{
+    // Rebuild all plots with updated mask state
+    // マスク状態を更新して全プロットを再構築
+    const savedPlots = plots.map(p => ({{ id: p.id, traces: [...p.traces] }}));
+    // Remove all traces and re-add with new mask
+    savedPlots.forEach(sp => {{
+        const plot = plots.find(p => p.id === sp.id);
+        if (!plot) return;
+        // Delete all traces
+        const nTraces = plot.traces.length;
+        if (nTraces > 0) {{
+            Plotly.deleteTraces(plot.id, Array.from({{length: nTraces}}, (_, i) => 0));
+        }}
+        plot.traces = [];
+        // Re-add with updated mask
+        sp.traces.forEach(t => addSignalToPlot(plot, t.key, t.label));
+    }});
 }}
 
 function applyDrawMode() {{
@@ -1079,6 +1113,10 @@ function addSignalToPlot(plot, key, label) {{
         xData = DATA[mapping.time];
         yData = DATA[mapping.data];
     }}
+
+    // Apply invalid data mask if applicable
+    // 無効データマスクを適用（該当する場合）
+    yData = applyMask(yData, key);
 
     const drawMode = document.getElementById('draw-mode').value;
     const color = nextColor();
