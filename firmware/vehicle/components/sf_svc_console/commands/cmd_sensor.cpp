@@ -10,9 +10,27 @@
 #include "logger.hpp"
 #include "esp_console.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include <cstring>
+
+// Sensor diagnostics: extern declarations for globals we need
+// センサ診断用: 必要なグローバル変数の extern 宣言
+namespace globals {
+    // Sensor health flags (set by sensor tasks)
+    extern volatile bool g_imu_task_healthy;
+    extern volatile bool g_mag_task_healthy;
+    extern volatile bool g_baro_task_healthy;
+    extern volatile bool g_tof_task_healthy;
+    extern volatile bool g_optflow_task_healthy;
+    // Last timestamps (set by sensor tasks)
+    extern volatile uint32_t g_flow_last_timestamp_us;
+    extern volatile uint32_t g_tof_last_timestamp_us;
+    extern volatile uint32_t g_baro_last_timestamp_us;
+    extern volatile uint32_t g_mag_last_timestamp_us;
+}
+using namespace globals;
 
 // External references
 // 外部参照
@@ -80,9 +98,35 @@ static int cmd_sensor(int argc, char** argv)
         found = true;
     }
 
+    if (strcmp(sensor, "diag") == 0) {
+        // Sensor diagnostics: initialization, health, task loop counts
+        // センサ診断: 初期化状態、ヘルス、タスクループカウント
+        console.print("=== Sensor Diagnostics ===\r\n");
+
+        console.print("IMU:     healthy=%d\r\n", g_imu_task_healthy);
+        console.print("Mag:     healthy=%d\r\n", g_mag_task_healthy);
+        console.print("Baro:    healthy=%d\r\n", g_baro_task_healthy);
+        console.print("ToF:     healthy=%d\r\n", g_tof_task_healthy);
+        console.print("OptFlow: healthy=%d\r\n", g_optflow_task_healthy);
+
+        // Timestamps (last update)
+        // タイムスタンプ（最終更新）
+        uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+        console.print("\r\nLast update (ms ago):\r\n");
+        console.print("  Flow: %lu ms\r\n", (now - g_flow_last_timestamp_us) / 1000);
+        console.print("  ToF:  %lu ms\r\n", (now - g_tof_last_timestamp_us) / 1000);
+        console.print("  Baro: %lu ms\r\n", (now - g_baro_last_timestamp_us) / 1000);
+        console.print("  Mag:  %lu ms\r\n", (now - g_mag_last_timestamp_us) / 1000);
+
+        // ESKF
+        console.print("\r\nESKF: init=%d\r\n", state.isESKFInitialized());
+
+        found = true;
+    }
+
     if (!found) {
         console.print("Unknown sensor: %s\r\n", sensor);
-        console.print("Available: imu, mag, baro, tof, flow, power, all\r\n");
+        console.print("Available: imu, mag, baro, tof, flow, power, all, diag\r\n");
         return 1;
     }
 
