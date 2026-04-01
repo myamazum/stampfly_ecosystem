@@ -533,21 +533,25 @@ def run_viz(args: argparse.Namespace) -> int:
     """Visualize log data"""
     file_path = args.file
 
-    # Find latest CSV if not specified
+    # Find latest log file if not specified
+    # 指定がなければ最新のログファイルを探す
     if not file_path:
-        file_path = _find_latest_log(extension=".csv")
+        # Try JSONL first (new UDP format), then CSV (legacy)
+        file_path = _find_latest_log(extension=".jsonl")
         if not file_path:
-            console.error("No CSV log files found.")
+            file_path = _find_latest_log(extension=".csv")
+        if not file_path:
+            console.error("No log files found (.jsonl or .csv)")
             return 1
-        console.info(f"Using latest CSV: {file_path}")
+        console.info(f"Using latest log: {file_path}")
 
     path = Path(file_path)
     if not path.exists():
         console.error(f"File not found: {path}")
         return 1
 
-    if path.suffix != ".csv":
-        console.error("Visualization requires CSV file. Use 'sf log convert' first.")
+    if path.suffix not in ('.csv', '.jsonl'):
+        console.error("Visualization requires .csv or .jsonl file.")
         return 1
 
     console.info(f"Visualizing: {path.name}")
