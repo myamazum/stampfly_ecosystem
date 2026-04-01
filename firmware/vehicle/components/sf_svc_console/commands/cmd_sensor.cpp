@@ -83,14 +83,19 @@ static int cmd_sensor(int argc, char** argv)
 
     if (strcmp(sensor, "diag") == 0) {
         console.print("=== Sensor Diagnostics ===\r\n");
+        console.print("  %-5s  %s  %8s  %7s  %s\r\n",
+                       "Name", "OK", "Period", "Rate", "Loops");
+        console.print("  %-5s  %s  %8s  %7s  %s\r\n",
+                       "-----", "--", "--------", "-------", "------");
 
-        uint32_t now_us = static_cast<uint32_t>(esp_timer_get_time());
         const char* names[] = {"flow", "tof", "baro", "mag"};
         for (const char* name : names) {
             auto diag = state.getSensorDiag(name);
-            uint32_t ago_ms = (now_us - diag.last_timestamp_us) / 1000;
-            console.print("  %-5s: healthy=%d  last=%lu ms ago\r\n",
-                           name, diag.healthy, ago_ms);
+            float rate_hz = diag.period_us > 0 ? 1e6f / diag.period_us : 0;
+            float period_ms = diag.period_us / 1000.0f;
+            console.print("  %-5s   %d   %6.1fms  %5.1fHz  %lu\r\n",
+                           name, diag.healthy, period_ms, rate_hz,
+                           (unsigned long)diag.loop_count);
         }
 
         console.print("\r\nESKF: init=%d\r\n", state.isESKFInitialized());

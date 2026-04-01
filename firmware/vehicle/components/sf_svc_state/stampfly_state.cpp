@@ -490,18 +490,27 @@ void StampFlyState::updateSensorDiag(const char* name, bool healthy, uint32_t ti
     // Find existing or create new entry
     for (int i = 0; i < sensor_diag_count_; i++) {
         if (strncmp(sensor_diags_[i].name, name, sizeof(sensor_diags_[i].name) - 1) == 0) {
-            sensor_diags_[i].diag.healthy = healthy;
-            sensor_diags_[i].diag.last_timestamp_us = timestamp_us;
+            auto& d = sensor_diags_[i].diag;
+            // Compute period from consecutive timestamps
+            // 連続タイムスタンプから周期を計算
+            if (d.last_timestamp_us > 0 && timestamp_us > d.last_timestamp_us) {
+                d.period_us = timestamp_us - d.last_timestamp_us;
+            }
+            d.healthy = healthy;
+            d.last_timestamp_us = timestamp_us;
+            d.loop_count++;
             xSemaphoreGive(mutex_);
             return;
         }
     }
     // New entry
     if (sensor_diag_count_ < MAX_SENSOR_DIAGS) {
-        strncpy(sensor_diags_[sensor_diag_count_].name, name,
-                sizeof(sensor_diags_[sensor_diag_count_].name) - 1);
-        sensor_diags_[sensor_diag_count_].diag.healthy = healthy;
-        sensor_diags_[sensor_diag_count_].diag.last_timestamp_us = timestamp_us;
+        auto& entry = sensor_diags_[sensor_diag_count_];
+        strncpy(entry.name, name, sizeof(entry.name) - 1);
+        entry.diag.healthy = healthy;
+        entry.diag.last_timestamp_us = timestamp_us;
+        entry.diag.period_us = 0;
+        entry.diag.loop_count = 1;
         sensor_diag_count_++;
     }
 
