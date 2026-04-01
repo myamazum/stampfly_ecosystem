@@ -154,6 +154,15 @@ public:
     void setESKFInitialized(bool initialized);
     bool isESKFInitialized() const;
 
+    // Sensor diagnostics
+    // センサ診断情報
+    struct SensorDiag {
+        bool healthy = false;
+        uint32_t last_timestamp_us = 0;  // Last poll timestamp (μs since boot)
+    };
+    void updateSensorDiag(const char* name, bool healthy, uint32_t timestamp_us);
+    SensorDiag getSensorDiag(const char* name) const;
+
     // Barometer reference altitude (for binlog)
     void setBaroReferenceAltitude(float altitude);
     float getBaroReferenceAltitude() const;
@@ -217,6 +226,16 @@ private:
 
     // Debug mode
     bool debug_mode_ = false;
+
+    // Sensor diagnostics (keyed by short name)
+    // センサ診断情報（短縮名でキー付け）
+    static constexpr int MAX_SENSOR_DIAGS = 8;
+    struct SensorDiagEntry {
+        char name[8] = {};
+        SensorDiag diag;
+    };
+    SensorDiagEntry sensor_diags_[MAX_SENSOR_DIAGS] = {};
+    int sensor_diag_count_ = 0;
 };
 
 }  // namespace stampfly

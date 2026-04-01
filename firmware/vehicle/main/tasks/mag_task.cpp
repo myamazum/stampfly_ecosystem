@@ -80,6 +80,7 @@ void MagTask(void* pvParameters)
             }
         }
 
+        state.updateSensorDiag("mag", g_mag_task_healthy, g_mag_last_timestamp_us);
         vTaskDelayUntil(&last_wake_time, period);
     }
 }

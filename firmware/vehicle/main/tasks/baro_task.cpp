@@ -60,6 +60,7 @@ void BaroTask(void* pvParameters)
             }
         }
 
+        state.updateSensorDiag("baro", g_baro_task_healthy, g_baro_last_timestamp_us);
         vTaskDelayUntil(&last_wake_time, period);
     }
 }

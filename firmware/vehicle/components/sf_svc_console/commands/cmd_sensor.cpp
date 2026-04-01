@@ -10,6 +10,7 @@
 #include "logger.hpp"
 #include "esp_console.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include <cstring>
@@ -80,9 +81,25 @@ static int cmd_sensor(int argc, char** argv)
         found = true;
     }
 
+    if (strcmp(sensor, "diag") == 0) {
+        console.print("=== Sensor Diagnostics ===\r\n");
+
+        uint32_t now_us = static_cast<uint32_t>(esp_timer_get_time());
+        const char* names[] = {"flow", "tof", "baro", "mag"};
+        for (const char* name : names) {
+            auto diag = state.getSensorDiag(name);
+            uint32_t ago_ms = (now_us - diag.last_timestamp_us) / 1000;
+            console.print("  %-5s: healthy=%d  last=%lu ms ago\r\n",
+                           name, diag.healthy, ago_ms);
+        }
+
+        console.print("\r\nESKF: init=%d\r\n", state.isESKFInitialized());
+        found = true;
+    }
+
     if (!found) {
         console.print("Unknown sensor: %s\r\n", sensor);
-        console.print("Available: imu, mag, baro, tof, flow, power, all\r\n");
+        console.print("Available: imu, mag, baro, tof, flow, power, all, diag\r\n");
         return 1;
     }
 

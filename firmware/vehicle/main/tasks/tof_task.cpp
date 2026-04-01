@@ -200,6 +200,7 @@ void ToFTask(void* pvParameters)
             }
         }
 
+        state.updateSensorDiag("tof", g_tof_task_healthy, g_tof_last_timestamp_us);
         vTaskDelayUntil(&last_wake_time, period);
     }
 }

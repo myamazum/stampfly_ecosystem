@@ -82,6 +82,7 @@ void OptFlowTask(void* pvParameters)
         }
 
         g_optflow_checkpoint = 99;  // ループ完了
+        state.updateSensorDiag("flow", g_optflow_task_healthy, g_flow_last_timestamp_us);
         vTaskDelayUntil(&last_wake_time, period);
     }
 }

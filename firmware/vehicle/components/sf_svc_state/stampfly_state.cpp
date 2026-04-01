@@ -478,4 +478,50 @@ uint8_t StampFlyState::getControlFlags() const
     return flags;
 }
 
+// =============================================================================
+// Sensor Diagnostics
+// センサ診断
+// =============================================================================
+
+void StampFlyState::updateSensorDiag(const char* name, bool healthy, uint32_t timestamp_us)
+{
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(1)) != pdTRUE) return;
+
+    // Find existing or create new entry
+    for (int i = 0; i < sensor_diag_count_; i++) {
+        if (strncmp(sensor_diags_[i].name, name, sizeof(sensor_diags_[i].name) - 1) == 0) {
+            sensor_diags_[i].diag.healthy = healthy;
+            sensor_diags_[i].diag.last_timestamp_us = timestamp_us;
+            xSemaphoreGive(mutex_);
+            return;
+        }
+    }
+    // New entry
+    if (sensor_diag_count_ < MAX_SENSOR_DIAGS) {
+        strncpy(sensor_diags_[sensor_diag_count_].name, name,
+                sizeof(sensor_diags_[sensor_diag_count_].name) - 1);
+        sensor_diags_[sensor_diag_count_].diag.healthy = healthy;
+        sensor_diags_[sensor_diag_count_].diag.last_timestamp_us = timestamp_us;
+        sensor_diag_count_++;
+    }
+
+    xSemaphoreGive(mutex_);
+}
+
+StampFlyState::SensorDiag StampFlyState::getSensorDiag(const char* name) const
+{
+    SensorDiag result;
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(1)) != pdTRUE) return result;
+
+    for (int i = 0; i < sensor_diag_count_; i++) {
+        if (strncmp(sensor_diags_[i].name, name, sizeof(sensor_diags_[i].name) - 1) == 0) {
+            result = sensor_diags_[i].diag;
+            break;
+        }
+    }
+
+    xSemaphoreGive(mutex_);
+    return result;
+}
+
 }  // namespace stampfly
