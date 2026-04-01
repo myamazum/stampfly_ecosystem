@@ -1,22 +1,28 @@
 /**
  * @file telemetry_task.cpp
- * @brief Dual-mode telemetry task: UDP full-data + WebSocket visualization
+ * @brief Dual-mode telemetry: UDP full-data + WebSocket visualization
  *
- * デュアルモードテレメトリタスク: UDP フルデータ + WebSocket 可視化
+ * デュアルモードテレメトリ: UDP フルデータ + WebSocket 可視化
  *
- * Mode 1 (default): WebSocket low-rate for browser visualization
- * Mode 2 (sf log wifi): UDP sensor-independent packets at native rates
+ * Architecture: Producer-Consumer with FreeRTOS queue
+ * アーキテクチャ: FreeRTOS キューによる生産者-消費者パターン
  *
- * モード1（デフォルト）: WebSocket 低レートでブラウザ可視化
- * モード2（sf log wifi）: UDP センサ独立パケットを固有レートで送信
+ *   IMU semaphore (400Hz)
+ *     → TelemetryTask: read sensors, fill batches, enqueue (non-blocking)
  *
- * Synchronized with IMU task via semaphore (400Hz).
- * セマフォでIMUタスクと同期（400Hz）。
+ *   TelemetrySendTask: dequeue and sendto() (blocking OK, isolated)
+ *     → UDP or WebSocket depending on mode
+ *
+ * The send task runs independently so sendto() blocking (2-3ms)
+ * never delays the telemetry data collection loop.
+ * 送信タスクは独立して動くので、sendto() のブロック（2-3ms）が
+ * テレメトリデータ収集ループを遅延させることはない。
  */
 
 #include "tasks_common.hpp"
 #include "sensor_fusion.hpp"
 #include "udp_telemetry.hpp"
+#include "esp_timer.h"
 
 static const char* TAG = "TelemetryTask";
 
@@ -25,31 +31,100 @@ using namespace globals;
 using namespace stampfly::udp_telem;
 
 // =============================================================================
-// UDP mode: fill sensor samples from current state
-// UDP モード: 現在の状態からセンササンプルを充填
+// Send queue: decouples data collection from WiFi transmission
+// 送信キュー: データ収集と WiFi 送信を分離
 // =============================================================================
 
-/// Fill IMU+ESKF sample from ring buffer and ESKF state
-/// リングバッファとESKF状態からIMU+ESKFサンプルを充填
+// Generic send item: packet type + data
+// 汎用送信アイテム: パケット型 + データ
+struct SendItem {
+    uint8_t data[340];   // Max packet size (ImuEskfBatchPacket = 325B)
+    uint16_t len;
+};
+
+static QueueHandle_t g_send_queue = nullptr;
+static constexpr int SEND_QUEUE_SIZE = 16;
+
+// =============================================================================
+// Send task: dequeues and sends via UDP or WebSocket
+// 送信タスク: キューから取り出して UDP または WebSocket で送信
+// =============================================================================
+
+static void TelemetrySendTask(void* pvParameters)
+{
+    ESP_LOGI(TAG, "TelemetrySendTask started");
+
+    auto& telemetry = stampfly::Telemetry::getInstance();
+    auto& udp_log = UDPLogServer::getInstance();
+
+    SendItem item;
+    static uint32_t udp_bytes_sent = 0;
+    static uint32_t udp_stats_time = 0;
+
+    while (true) {
+        // Block until a packet is available
+        // パケットが来るまでブロック
+        if (xQueueReceive(g_send_queue, &item, portMAX_DELAY) != pdTRUE) {
+            continue;
+        }
+
+        if (udp_log.isActive()) {
+            int sent = udp_log.send(item.data, item.len);
+            if (sent > 0) udp_bytes_sent += sent;
+        }
+
+        // Bandwidth stats (every 5 seconds)
+        // 帯域統計（5秒ごと）
+        uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+        if (now_ms - udp_stats_time > 5000) {
+            if (udp_bytes_sent > 0) {
+                float kbps = (float)udp_bytes_sent / 5.0f / 1024.0f;
+                ESP_LOGI(TAG, "UDP: %.1f KB/s (%lu bytes/5s), queue free: %d/%d",
+                         kbps, udp_bytes_sent,
+                         (int)uxQueueSpacesAvailable(g_send_queue), SEND_QUEUE_SIZE);
+                udp_bytes_sent = 0;
+            }
+            udp_stats_time = now_ms;
+        }
+    }
+}
+
+// =============================================================================
+// Helper: enqueue a completed batch packet (non-blocking)
+// ヘルパー: 完成したバッチパケットをキューに投入（ノンブロッキング）
+// =============================================================================
+
+static inline void enqueue(const void* pkt, size_t len)
+{
+    SendItem item;
+    if (len > sizeof(item.data)) return;
+    memcpy(item.data, pkt, len);
+    item.len = (uint16_t)len;
+    // Non-blocking: drop if queue full (better than blocking the 400Hz loop)
+    // ノンブロッキング: キュー満杯ならドロップ（400Hzループのブロックより良い）
+    xQueueSend(g_send_queue, &item, 0);
+}
+
+// =============================================================================
+// Fill helpers
+// 充填ヘルパー
+// =============================================================================
+
 static void fillImuEskf(ImuEskfSample& s, int read_idx, uint32_t ts)
 {
     s.timestamp_us = ts;
 
-    // IMU LPF filtered
     const auto& accel = g_accel_buf.raw_at(read_idx);
     const auto& gyro = g_gyro_buf.raw_at(read_idx);
     s.gyro_x = gyro.x;   s.gyro_y = gyro.y;   s.gyro_z = gyro.z;
     s.accel_x = accel.x;  s.accel_y = accel.y;  s.accel_z = accel.z;
 
-    // IMU raw (pre-LPF)
     const auto& accel_raw = g_accel_raw_buf.raw_at(read_idx);
     const auto& gyro_raw = g_gyro_raw_buf.raw_at(read_idx);
     s.gyro_raw_x = gyro_raw.x;  s.gyro_raw_y = gyro_raw.y;  s.gyro_raw_z = gyro_raw.z;
     s.accel_raw_x = accel_raw.x; s.accel_raw_y = accel_raw.y; s.accel_raw_z = accel_raw.z;
 
-    // ESKF attitude + bias
-    auto& eskf = g_fusion.getESKF();
-    auto eskf_state = eskf.getState();
+    auto eskf_state = g_fusion.getESKF().getState();
     s.quat_w = eskf_state.orientation.w;
     s.quat_x = eskf_state.orientation.x;
     s.quat_y = eskf_state.orientation.y;
@@ -62,8 +137,6 @@ static void fillImuEskf(ImuEskfSample& s, int read_idx, uint32_t ts)
     s.accel_bias_z = static_cast<int16_t>(eskf_state.accel_bias.z * 10000.0f);
 }
 
-/// Fill Position+Velocity sample from ESKF state
-/// ESKF状態から位置+速度サンプルを充填
 static void fillPosVel(PosVelSample& s, uint32_t ts)
 {
     s.timestamp_us = ts;
@@ -77,24 +150,38 @@ static void fillPosVel(PosVelSample& s, uint32_t ts)
 }
 
 // =============================================================================
-// Telemetry Task
+// Main telemetry task: collect data, fill batches, enqueue
+// メインテレメトリタスク: データ収集、バッチ充填、キュー投入
 // =============================================================================
 
 void TelemetryTask(void* pvParameters)
 {
-    ESP_LOGI(TAG, "TelemetryTask started - dual mode (UDP/WebSocket)");
+    ESP_LOGI(TAG, "TelemetryTask started - producer-consumer mode");
 
     auto& telemetry = stampfly::Telemetry::getInstance();
     auto& state = stampfly::StampFlyState::getInstance();
     auto& udp_log = UDPLogServer::getInstance();
 
-    // --- WebSocket mode state ---
-    stampfly::TelemetryExtendedBatchPacket ws_batch_pkt = {};
-    int ws_batch_index = 0;
-    static uint32_t ws_send_counter = 0;
+    // Create send queue and send task
+    // 送信キューと送信タスクを作成
+    g_send_queue = xQueueCreate(SEND_QUEUE_SIZE, sizeof(SendItem));
+    if (!g_send_queue) {
+        ESP_LOGE(TAG, "Failed to create send queue");
+        vTaskDelete(nullptr);
+        return;
+    }
 
-    // --- UDP mode: batch accumulators ---
-    // static to avoid stack overflow (WiFi CLI task has limited stack)
+    xTaskCreatePinnedToCore(
+        TelemetrySendTask,
+        "TelemSend",
+        4096,
+        nullptr,
+        10,    // Lower priority than telemetry collection
+        nullptr,
+        0      // Core 0 (protocol core)
+    );
+
+    // --- UDP mode: batch accumulators (static to save stack) ---
     static BatchAccumulator<ImuEskfBatchPacket, ImuEskfSample> imu_eskf_acc;
     static BatchAccumulator<PosVelBatchPacket, PosVelSample> pos_vel_acc;
     static BatchAccumulator<ControlBatchPacket, ControlSample> ctrl_acc;
@@ -103,56 +190,48 @@ void TelemetryTask(void* pvParameters)
     static BatchAccumulator<BaroBatchPacket, BaroSample> baro_acc;
     static BatchAccumulator<MagBatchPacket, MagSample> mag_acc;
 
+    // --- WebSocket mode state ---
+    stampfly::TelemetryExtendedBatchPacket ws_batch_pkt = {};
+    int ws_batch_index = 0;
+    int ws_decimation_counter = 0;
+    constexpr int WS_DECIMATION = 8;  // 400/8 = 50Hz
+
     // --- Common state ---
     int telemetry_read_index = 0;
     uint32_t overrun_count = 0;
 
-    // Counters for WebSocket decimation (400Hz → 10-50Hz)
-    // WebSocket 間引きカウンタ（400Hz → 10-50Hz）
-    int ws_decimation_counter = 0;
-    constexpr int WS_DECIMATION = 8;  // 400/8 = 50Hz
-
-    // UDP mode: cycle counter for control input decimation (400Hz → 50Hz)
-    // UDP モード: 制御入力間引き用サイクルカウンタ
+    // UDP control decimation
     int udp_cycle_counter = 0;
 
-    // Status packet counter (1Hz)
-    int status_counter = 0;
-
-    // Last-seen timestamps for sensor data_ready detection (no flag race)
-    // センサ新データ検出用の前回タイムスタンプ（フラグ競合なし）
+    // Timestamp-based sensor new-data detection (no flag race with imu_task)
+    // タイムスタンプベースのセンサ新データ検出（imu_task とのフラグ競合なし）
     uint32_t last_flow_ts = 0;
     uint32_t last_tof_ts = 0;
     uint32_t last_baro_ts = 0;
     uint32_t last_mag_ts = 0;
 
-    // Bandwidth monitoring
-    static uint32_t udp_bytes_sent = 0;
-    static uint32_t udp_stats_time = 0;
+    // Status packet counter (1Hz)
+    int status_counter = 0;
 
-    ESP_LOGI(TAG, "Modes: UDP (port %d) / WebSocket (port 80)", UDP_LOG_PORT);
+    ESP_LOGI(TAG, "Send queue: %d items, send task on core 0", SEND_QUEUE_SIZE);
 
     // Wait for IMU to start populating the buffer
-    // IMUがバッファにデータを入れ始めるのを待つ
     vTaskDelay(pdMS_TO_TICKS(100));
     telemetry_read_index = g_accel_buf.raw_index();
 
     while (true) {
-        // Wait for IMU update (400Hz, synchronized with IMU task)
-        // IMU更新を待機（400Hz、IMUタスクと同期）
+        // Wait for IMU update (400Hz)
         if (xSemaphoreTake(g_telemetry_imu_semaphore, pdMS_TO_TICKS(10)) != pdTRUE) {
             continue;
         }
 
-        // Proactive catch-up: limit max lag to prevent large data gaps
-        // プロアクティブ追いつき: 大きなデータ欠損を防ぐため最大遅延を制限
+        // Proactive catch-up
         {
             constexpr int MAX_LAG = 40;
             int head = g_accel_buf.raw_index();
             int lag = (head - telemetry_read_index + IMU_BUFFER_SIZE) % IMU_BUFFER_SIZE;
             if (lag > MAX_LAG) {
-                int new_idx = (head - 4 + IMU_BUFFER_SIZE) % IMU_BUFFER_SIZE;
-                telemetry_read_index = new_idx;
+                telemetry_read_index = (head - 4 + IMU_BUFFER_SIZE) % IMU_BUFFER_SIZE;
                 ws_batch_index = 0;
                 imu_eskf_acc.reset();
                 pos_vel_acc.reset();
@@ -160,90 +239,55 @@ void TelemetryTask(void* pvParameters)
         }
 
         // Fallback overrun detection
-        // フォールバックオーバーラン検出
         if (g_accel_buf.is_overrun(telemetry_read_index)) {
             overrun_count++;
             telemetry_read_index = g_accel_buf.safe_read_index(10);
         }
 
-        // Get IMU timestamp
-        // IMU タイムスタンプ取得
         uint32_t imu_ts = g_accel_raw_buf.raw_timestamp_at(telemetry_read_index);
 
         // =================================================================
         // UDP full-data mode
-        // UDP フルデータモード
         // =================================================================
         if (udp_log.isActive()) {
-
             udp_cycle_counter++;
 
-            // --- 400Hz: IMU + ESKF ---
-            // Accumulate sample every cycle, sendto only when batch full
-            // 毎サイクルサンプル蓄積、バッチ満杯時のみ sendto
+            // --- 400Hz: IMU + ESKF → enqueue when batch full ---
             ImuEskfSample imu_sample;
             fillImuEskf(imu_sample, telemetry_read_index, imu_ts);
             auto* imu_pkt = imu_eskf_acc.addSample(imu_sample, PKT_IMU_ESKF);
+            if (imu_pkt) enqueue(imu_pkt, sizeof(*imu_pkt));
 
             // --- 400Hz: Position + Velocity ---
             PosVelSample pv_sample;
             fillPosVel(pv_sample, imu_ts);
             auto* pv_pkt = pos_vel_acc.addSample(pv_sample, PKT_POS_VEL);
+            if (pv_pkt) enqueue(pv_pkt, sizeof(*pv_pkt));
 
-            // Send IMU and PosVel batches when ready
-            // Stagger sends: IMU on even cycles, PosVel on odd to avoid
-            // two consecutive sendto() calls blocking for ~5ms total
-            // 送信をずらす: 偶数サイクルで IMU、奇数で PosVel（連続 sendto 回避）
-            if (imu_pkt) {
-                int sent = udp_log.send(imu_pkt, sizeof(*imu_pkt));
-                if (sent > 0) udp_bytes_sent += sent;
-            }
-            if (pv_pkt) {
-                // PosVel batch fires at the same time as IMU batch (every 4th cycle).
-                // Delay send to next cycle to avoid double sendto blocking.
-                // PosVel は IMU と同時にバッチ完了するため、送信を分散できない。
-                // やむなく連続送信するが、バッチ化で頻度は 100Hz（10ms間隔）なので
-                // 2回の sendto (~4-6ms) は 10ms 周期内に収まる。
-                int sent = udp_log.send(pv_pkt, sizeof(*pv_pkt));
-                if (sent > 0) udp_bytes_sent += sent;
-            }
-
-            // --- 50Hz: Control input (every 8th cycle) ---
+            // --- 50Hz: Control input ---
             if ((udp_cycle_counter & 7) == 0) {
                 ControlSample ctrl_sample;
                 ctrl_sample.timestamp_us = imu_ts;
                 state.getControlInput(ctrl_sample.throttle, ctrl_sample.roll,
                                       ctrl_sample.pitch, ctrl_sample.yaw);
                 auto* ctrl_pkt = ctrl_acc.addSample(ctrl_sample, PKT_CONTROL);
-                if (ctrl_pkt) {
-                    int sent = udp_log.send(ctrl_pkt, sizeof(*ctrl_pkt));
-                    if (sent > 0) udp_bytes_sent += sent;
-                }
+                if (ctrl_pkt) enqueue(ctrl_pkt, sizeof(*ctrl_pkt));
             }
 
-            // --- Sensor data: detect new data via timestamp change ---
-            // --- (avoids race condition with imu_task's data_ready flags) ---
-            // センサデータ: タイムスタンプ変化で新データを検出
-            // （imu_task の data_ready フラグとの競合を回避）
+            // --- Sensor data: timestamp change = new data ---
 
             // Optical Flow (~100Hz)
             {
                 uint32_t ts = g_flow_last_timestamp_us;
                 if (ts != last_flow_ts && ts != 0) {
                     last_flow_ts = ts;
-                    FlowSample flow_sample;
-                    flow_sample.timestamp_us = ts;
-                    int16_t dx, dy;
-                    uint8_t sq;
+                    FlowSample s;
+                    s.timestamp_us = ts;
+                    int16_t dx, dy; uint8_t sq;
                     state.getFlowRawData(dx, dy, sq);
-                    flow_sample.flow_dx = dx;
-                    flow_sample.flow_dy = dy;
-                    flow_sample.quality = sq;
-                    auto* flow_pkt = flow_acc.addSample(flow_sample, PKT_FLOW);
-                    if (flow_pkt) {
-                        int sent = udp_log.send(flow_pkt, sizeof(*flow_pkt));
-                        if (sent > 0) udp_bytes_sent += sent;
-                    }
+                    s.flow_dx = dx; s.flow_dy = dy; s.quality = sq;
+                    auto* pkt = flow_acc.addSample(s, PKT_FLOW);
+                    if (pkt) enqueue(pkt, sizeof(*pkt));
                 }
             }
 
@@ -252,21 +296,16 @@ void TelemetryTask(void* pvParameters)
                 uint32_t ts = g_tof_last_timestamp_us;
                 if (ts != last_tof_ts && ts != 0) {
                     last_tof_ts = ts;
-                    ToFSample tof_sample;
-                    tof_sample.timestamp_us = ts;
+                    ToFSample s;
+                    s.timestamp_us = ts;
                     float tb, tf;
                     state.getToFData(tb, tf);
-                    tof_sample.tof_bottom = tb;
-                    tof_sample.tof_front = tf;
+                    s.tof_bottom = tb; s.tof_front = tf;
                     uint8_t sb, sf_s;
                     state.getToFStatus(sb, sf_s);
-                    tof_sample.status_bottom = sb;
-                    tof_sample.status_front = sf_s;
-                    auto* tof_pkt = tof_acc.addSample(tof_sample, PKT_TOF);
-                    if (tof_pkt) {
-                        int sent = udp_log.send(tof_pkt, sizeof(*tof_pkt));
-                        if (sent > 0) udp_bytes_sent += sent;
-                    }
+                    s.status_bottom = sb; s.status_front = sf_s;
+                    auto* pkt = tof_acc.addSample(s, PKT_TOF);
+                    if (pkt) enqueue(pkt, sizeof(*pkt));
                 }
             }
 
@@ -275,17 +314,13 @@ void TelemetryTask(void* pvParameters)
                 uint32_t ts = g_baro_last_timestamp_us;
                 if (ts != last_baro_ts && ts != 0) {
                     last_baro_ts = ts;
-                    BaroSample baro_sample;
-                    baro_sample.timestamp_us = ts;
+                    BaroSample s;
+                    s.timestamp_us = ts;
                     float ba, bp;
                     state.getBaroData(ba, bp);
-                    baro_sample.altitude = ba;
-                    baro_sample.pressure = bp;
-                    auto* baro_pkt = baro_acc.addSample(baro_sample, PKT_BARO);
-                    if (baro_pkt) {
-                        int sent = udp_log.send(baro_pkt, sizeof(*baro_pkt));
-                        if (sent > 0) udp_bytes_sent += sent;
-                    }
+                    s.altitude = ba; s.pressure = bp;
+                    auto* pkt = baro_acc.addSample(s, PKT_BARO);
+                    if (pkt) enqueue(pkt, sizeof(*pkt));
                 }
             }
 
@@ -294,57 +329,39 @@ void TelemetryTask(void* pvParameters)
                 uint32_t ts = g_mag_last_timestamp_us;
                 if (ts != last_mag_ts && ts != 0) {
                     last_mag_ts = ts;
-                    MagSample mag_sample;
-                    mag_sample.timestamp_us = ts;
+                    MagSample s;
+                    s.timestamp_us = ts;
                     stampfly::Vec3 mag_data;
                     state.getMagData(mag_data);
-                    mag_sample.mag_x = mag_data.x;
-                    mag_sample.mag_y = mag_data.y;
-                    mag_sample.mag_z = mag_data.z;
-                    auto* mag_pkt = mag_acc.addSample(mag_sample, PKT_MAG);
-                    if (mag_pkt) {
-                        int sent = udp_log.send(mag_pkt, sizeof(*mag_pkt));
-                        if (sent > 0) udp_bytes_sent += sent;
-                    }
+                    s.mag_x = mag_data.x; s.mag_y = mag_data.y; s.mag_z = mag_data.z;
+                    auto* pkt = mag_acc.addSample(s, PKT_MAG);
+                    if (pkt) enqueue(pkt, sizeof(*pkt));
                 }
             }
 
-            // --- 1Hz: Status packet ---
+            // --- 1Hz: Status ---
             if (++status_counter >= 400) {
                 status_counter = 0;
-                StatusPacket status_pkt = {};
-                status_pkt.header.packet_id = PKT_STATUS;
-                status_pkt.header.sequence = 0;
-                status_pkt.header.sample_count = 1;
-                status_pkt.uptime_ms = (uint32_t)(esp_timer_get_time() / 1000);
-                status_pkt.voltage = state.getVoltage();
-                status_pkt.flight_state = static_cast<uint8_t>(state.getFlightState());
-                status_pkt.eskf_status = state.isESKFInitialized() ? 0x01 : 0x00;
-                status_pkt.checksum = computeChecksum(&status_pkt, sizeof(status_pkt));
-                udp_log.send(&status_pkt, sizeof(status_pkt));
-            }
-
-            // --- Bandwidth stats (every 5 seconds) ---
-            uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
-            if (now_ms - udp_stats_time > 5000) {
-                float kbps = (float)udp_bytes_sent / 5.0f / 1024.0f;
-                ESP_LOGI(TAG, "UDP: %.1f KB/s (%lu bytes/5s)",
-                         kbps, udp_bytes_sent);
-                udp_bytes_sent = 0;
-                udp_stats_time = now_ms;
+                StatusPacket sp = {};
+                sp.header.packet_id = PKT_STATUS;
+                sp.header.sequence = 0;
+                sp.header.sample_count = 1;
+                sp.uptime_ms = (uint32_t)(esp_timer_get_time() / 1000);
+                sp.voltage = state.getVoltage();
+                sp.flight_state = static_cast<uint8_t>(state.getFlightState());
+                sp.eskf_status = state.isESKFInitialized() ? 0x01 : 0x00;
+                sp.checksum = computeChecksum(&sp, sizeof(sp));
+                enqueue(&sp, sizeof(sp));
             }
         }
         // =================================================================
-        // WebSocket visualization mode (low rate)
-        // WebSocket 可視化モード（低レート）
+        // WebSocket visualization mode (low rate, 50Hz)
         // =================================================================
         else if (telemetry.hasClients()) {
             ws_decimation_counter++;
             if (ws_decimation_counter >= WS_DECIMATION) {
                 ws_decimation_counter = 0;
 
-                // Reuse existing ExtendedSample format for WebSocket
-                // WebSocket 用に既存の ExtendedSample フォーマットを再利用
                 auto& sample = ws_batch_pkt.samples[ws_batch_index];
                 sample.timestamp_us = esp_timer_get_time();
 
@@ -399,19 +416,14 @@ void TelemetryTask(void* pvParameters)
                 sample.tof_bottom_status = sb;
                 sample.tof_front_status = sf_s;
 
-                int16_t fdx, fdy;
-                uint8_t fsq;
+                int16_t fdx, fdy; uint8_t fsq;
                 state.getFlowRawData(fdx, fdy, fsq);
-                sample.flow_x = fdx;
-                sample.flow_y = fdy;
-                sample.flow_quality = fsq;
+                sample.flow_x = fdx; sample.flow_y = fdy; sample.flow_quality = fsq;
 
                 sample.padding2 = 0;
                 stampfly::Vec3 mag;
                 state.getMagData(mag);
-                sample.mag_x = mag.x;
-                sample.mag_y = mag.y;
-                sample.mag_z = mag.z;
+                sample.mag_x = mag.x; sample.mag_y = mag.y; sample.mag_z = mag.z;
 
                 const auto& ar = g_accel_raw_buf.raw_at(telemetry_read_index);
                 const auto& gr = g_gyro_raw_buf.raw_at(telemetry_read_index);
@@ -433,20 +445,19 @@ void TelemetryTask(void* pvParameters)
                     ws_batch_pkt.reserved = 0;
 
                     uint8_t checksum = 0;
-                    const uint8_t* data = reinterpret_cast<const uint8_t*>(&ws_batch_pkt);
+                    const uint8_t* d = reinterpret_cast<const uint8_t*>(&ws_batch_pkt);
                     constexpr size_t co = offsetof(stampfly::TelemetryExtendedBatchPacket, checksum);
-                    for (size_t i = 0; i < co; i++) checksum ^= data[i];
+                    for (size_t i = 0; i < co; i++) checksum ^= d[i];
                     ws_batch_pkt.checksum = checksum;
 
                     telemetry.broadcast(&ws_batch_pkt, sizeof(ws_batch_pkt));
-                    ws_send_counter++;
                     ws_batch_index = 0;
                 }
             }
         }
 
-        // Advance read index
-        // 読み取りインデックスを進める
+        // Advance read index (always, regardless of mode)
+        // 読み取りインデックスを進める（モードに関わらず常に）
         telemetry_read_index = (telemetry_read_index + 1) % IMU_BUFFER_SIZE;
     }
 }
