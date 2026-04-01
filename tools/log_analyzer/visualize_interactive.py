@@ -199,6 +199,139 @@ COLORS = [
 ]
 
 
+def load_jsonl(filepath: str) -> dict:
+    """Load JSONLines telemetry file and return dict of lists.
+    JSONLines テレメトリファイルを読み込み、信号別リストの辞書を返す。
+
+    Each sensor type gets its own time axis (_time_<sensor>) and data arrays.
+    各センサ型は固有の時間軸と数値配列を持つ。
+    """
+    import json as _json
+
+    # JSONLines id → (flat field name prefix, field extraction rules)
+    # Each rule: (key_in_json, output_names, is_array)
+    EXTRACT_RULES = {
+        'imu': [
+            ('gyro', ['gyro_x', 'gyro_y', 'gyro_z'], True),
+            ('accel', ['accel_x', 'accel_y', 'accel_z'], True),
+            ('gyro_raw', ['gyro_raw_x', 'gyro_raw_y', 'gyro_raw_z'], True),
+            ('accel_raw', ['accel_raw_x', 'accel_raw_y', 'accel_raw_z'], True),
+            ('quat', ['quat_w', 'quat_x', 'quat_y', 'quat_z'], True),
+            ('gyro_bias', ['gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z'], True),
+            ('accel_bias', ['accel_bias_x', 'accel_bias_y', 'accel_bias_z'], True),
+        ],
+        'posvel': [
+            ('pos', ['pos_x', 'pos_y', 'pos_z'], True),
+            ('vel', ['vel_x', 'vel_y', 'vel_z'], True),
+        ],
+        'ctrl': [
+            ('throttle', ['ctrl_throttle'], False),
+            ('roll', ['ctrl_roll'], False),
+            ('pitch', ['ctrl_pitch'], False),
+            ('yaw', ['ctrl_yaw'], False),
+        ],
+        'flow': [
+            ('dx', ['flow_x'], False),
+            ('dy', ['flow_y'], False),
+            ('quality', ['flow_quality'], False),
+        ],
+        'tof': [
+            ('bottom', ['tof_bottom'], False),
+            ('front', ['tof_front'], False),
+            ('status_bottom', ['tof_bottom_status'], False),
+            ('status_front', ['tof_front_status'], False),
+        ],
+        'baro': [
+            ('altitude', ['baro_altitude'], False),
+            ('pressure', ['baro_pressure'], False),
+        ],
+        'mag': [
+            ('x', ['mag_x'], False),
+            ('y', ['mag_y'], False),
+            ('z', ['mag_z'], False),
+        ],
+    }
+
+    # Collect per-sensor time and data arrays
+    # センサ別の時間と数値配列を収集
+    sensor_times = {}   # {sensor_id: [ts, ts, ...]}
+    sensor_data = {}    # {field_name: [val, val, ...]}
+
+    with open(filepath, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            obj = _json.loads(line)
+            sid = obj.get('id', '')
+            ts = obj.get('ts', 0)
+
+            if sid not in EXTRACT_RULES:
+                continue
+
+            if sid not in sensor_times:
+                sensor_times[sid] = []
+            sensor_times[sid].append(ts)
+
+            for json_key, out_names, is_array in EXTRACT_RULES[sid]:
+                val = obj.get(json_key)
+                if val is None:
+                    continue
+                if is_array:
+                    for i, name in enumerate(out_names):
+                        if name not in sensor_data:
+                            sensor_data[name] = []
+                        sensor_data[name].append(val[i] if i < len(val) else 0.0)
+                else:
+                    name = out_names[0]
+                    if name not in sensor_data:
+                        sensor_data[name] = []
+                    sensor_data[name].append(float(val))
+
+    # Build output data dict
+    # 出力データ辞書を構築
+    data = {}
+
+    # Find global t0 for time_s computation
+    # time_s 計算用のグローバル t0 を見つける
+    all_first_ts = [ts[0] for ts in sensor_times.values() if ts]
+    t0 = min(all_first_ts) if all_first_ts else 0
+
+    # Create per-sensor time axes and assign data
+    # センサ別時間軸を作成しデータを割り当て
+    SENSOR_TIME_KEY = {
+        'imu': '_time_imu',
+        'posvel': '_time_posvel',
+        'ctrl': '_time_ctrl',
+        'flow': '_time_flow',
+        'tof': '_time_tof',
+        'baro': '_time_baro',
+        'mag': '_time_mag',
+    }
+
+    for sid, times in sensor_times.items():
+        time_key = SENSOR_TIME_KEY.get(sid, f'_time_{sid}')
+        data[time_key] = [(t - t0) / 1e6 for t in times]
+
+    # Use IMU time as the primary time_s (highest rate)
+    # IMU 時間を主要 time_s として使用（最高レート）
+    if '_time_imu' in data:
+        data['time_s'] = data['_time_imu']
+    elif '_time_posvel' in data:
+        data['time_s'] = data['_time_posvel']
+    else:
+        # Fallback: use first available sensor time
+        for key in data:
+            if key.startswith('_time_'):
+                data['time_s'] = data[key]
+                break
+
+    # Add all signal data
+    data.update(sensor_data)
+
+    return data
+
+
 def load_csv(filepath: str) -> dict:
     """Load CSV and return dict of lists (JSON-serializable)"""
     with open(filepath, 'r') as f:
@@ -450,54 +583,58 @@ def generate_html(data: dict, title: str, plotly_js: str = '') -> str:
 
     # Build signal-to-time-axis mapping
     # 信号→時間軸のマッピングを構築
-    # Sensors with dedicated timestamps use their own time axis + dedup data
+    # Each signal maps to its sensor-specific time axis.
+    # 各信号はセンサ固有の時間軸にマッピングされる。
     signal_time_map = {}
-    sensor_signal_map = {
-        'baro': ['baro_altitude', 'baro_pressure'],
-        'tof': ['tof_bottom', 'tof_front', 'tof_bottom_status', 'tof_front_status'],
-        'mag': ['mag_x', 'mag_y', 'mag_z'],
-        'flow': ['flow_x', 'flow_y', 'flow_quality'],
-    }
-    for sensor_name, signals in sensor_signal_map.items():
-        time_key = f'_time_{sensor_name}'
-        if time_key in data:
-            for sig in signals:
-                dedup_key = f'{sig}_dedup'
-                if dedup_key in data:
-                    signal_time_map[sig] = {'time': time_key, 'data': dedup_key}
 
-    # All 400Hz signals use IMU timestamp (they are all computed in the IMU loop)
-    # 全ての400Hz信号はIMUタイムスタンプを使用（全てIMUループ内で計算される）
-    imu_loop_signals = [
-        # IMU raw and filtered
-        'gyro_x', 'gyro_y', 'gyro_z',
-        'accel_x', 'accel_y', 'accel_z',
-        'gyro_raw_x', 'gyro_raw_y', 'gyro_raw_z',
-        'accel_raw_x', 'accel_raw_y', 'accel_raw_z',
-        'gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z',
-        'accel_corrected_x', 'accel_corrected_y', 'accel_corrected_z',
-        # ESKF output (computed in IMU loop)
-        'roll_deg', 'pitch_deg', 'yaw_deg',
-        'quat_w', 'quat_x', 'quat_y', 'quat_z',
-        'pos_x', 'pos_y', 'pos_z',
-        'vel_x', 'vel_y', 'vel_z',
-        'gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z',
-        'accel_bias_x', 'accel_bias_y', 'accel_bias_z',
-        # Controller inputs (read in IMU loop)
-        'ctrl_throttle', 'ctrl_roll', 'ctrl_pitch', 'ctrl_yaw',
-        # Computed signals (derived from IMU data)
-        'gyro_int_roll', 'gyro_int_pitch', 'gyro_int_yaw',
-        'gyro_corr_int_roll', 'gyro_corr_int_pitch', 'gyro_corr_int_yaw',
-        'accel_roll', 'accel_pitch',
-        'accel_corr_roll', 'accel_corr_pitch',
-        # Timing analysis
-        'imu_interval_us', 'telemetry_interval_us',
-        'telemetry_delay_us',
-    ]
-    if '_time_imu' in data:
-        for sig in imu_loop_signals:
-            if sig in data:
-                signal_time_map[sig] = {'time': '_time_imu', 'data': sig}
+    # Mapping: signal name → sensor time axis key
+    # 信号名 → センサ時間軸キー のマッピング
+    signal_sensor_map = {
+        # IMU signals → _time_imu
+        'gyro_x': 'imu', 'gyro_y': 'imu', 'gyro_z': 'imu',
+        'accel_x': 'imu', 'accel_y': 'imu', 'accel_z': 'imu',
+        'gyro_raw_x': 'imu', 'gyro_raw_y': 'imu', 'gyro_raw_z': 'imu',
+        'accel_raw_x': 'imu', 'accel_raw_y': 'imu', 'accel_raw_z': 'imu',
+        'quat_w': 'imu', 'quat_x': 'imu', 'quat_y': 'imu', 'quat_z': 'imu',
+        'gyro_bias_x': 'imu', 'gyro_bias_y': 'imu', 'gyro_bias_z': 'imu',
+        'accel_bias_x': 'imu', 'accel_bias_y': 'imu', 'accel_bias_z': 'imu',
+        # Computed from IMU quaternion
+        'roll_deg': 'imu', 'pitch_deg': 'imu', 'yaw_deg': 'imu',
+        # Corrected (from IMU loop in old CSV format)
+        'gyro_corrected_x': 'imu', 'gyro_corrected_y': 'imu', 'gyro_corrected_z': 'imu',
+        'accel_corrected_x': 'imu', 'accel_corrected_y': 'imu', 'accel_corrected_z': 'imu',
+        # Computed from IMU
+        'gyro_int_roll': 'imu', 'gyro_int_pitch': 'imu', 'gyro_int_yaw': 'imu',
+        'gyro_corr_int_roll': 'imu', 'gyro_corr_int_pitch': 'imu', 'gyro_corr_int_yaw': 'imu',
+        'accel_roll': 'imu', 'accel_pitch': 'imu',
+        'accel_corr_roll': 'imu', 'accel_corr_pitch': 'imu',
+        # Timing
+        'imu_interval_us': 'imu', 'telemetry_interval_us': 'imu', 'telemetry_delay_us': 'imu',
+        # Position/Velocity → _time_posvel (JSONLines) or _time_imu (old CSV)
+        'pos_x': 'posvel', 'pos_y': 'posvel', 'pos_z': 'posvel',
+        'vel_x': 'posvel', 'vel_y': 'posvel', 'vel_z': 'posvel',
+        # Control → _time_ctrl
+        'ctrl_throttle': 'ctrl', 'ctrl_roll': 'ctrl', 'ctrl_pitch': 'ctrl', 'ctrl_yaw': 'ctrl',
+        # Sensors
+        'flow_x': 'flow', 'flow_y': 'flow', 'flow_quality': 'flow',
+        'tof_bottom': 'tof', 'tof_front': 'tof', 'tof_bottom_status': 'tof', 'tof_front_status': 'tof',
+        'baro_altitude': 'baro', 'baro_pressure': 'baro',
+        'mag_x': 'mag', 'mag_y': 'mag', 'mag_z': 'mag', 'mag_yaw': 'mag',
+    }
+
+    for sig, sensor in signal_sensor_map.items():
+        if sig not in data:
+            continue
+        time_key = f'_time_{sensor}'
+        # Check for sensor-specific time axis
+        if time_key in data and len(data[time_key]) == len(data[sig]):
+            signal_time_map[sig] = {'time': time_key, 'data': sig}
+        # Fallback: check for dedup version (old CSV format)
+        elif f'{sig}_dedup' in data and time_key in data:
+            signal_time_map[sig] = {'time': time_key, 'data': f'{sig}_dedup'}
+        # Fallback: use _time_imu if available and lengths match
+        elif '_time_imu' in data and len(data.get('_time_imu', [])) == len(data[sig]):
+            signal_time_map[sig] = {'time': '_time_imu', 'data': sig}
 
     data_json = json.dumps(export_data, separators=(',', ':'))
     categories_json = json.dumps(categories, ensure_ascii=False)
@@ -967,10 +1104,20 @@ buildSidebar();
     return html
 
 
+def load_file(filepath: str) -> dict:
+    """Load telemetry data file (CSV or JSONLines).
+    テレメトリデータファイルを読み込み（CSV または JSONLines）。
+    """
+    if filepath.endswith('.jsonl'):
+        return load_jsonl(filepath)
+    else:
+        return load_csv(filepath)
+
+
 def visualize(filepath: str, groups=None, layout=None, output=None, title=None):
     """Main entry point"""
     print(f"Loading: {filepath}")
-    data = load_csv(filepath)
+    data = load_file(filepath)
 
     n = len(data.get('time_s', []))
     dur = data['time_s'][-1] if 'time_s' in data and n > 0 else 0
