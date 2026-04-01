@@ -1109,7 +1109,7 @@ function addPreset(name) {{
         const p3 = addPlot();
         ['tof_bottom'].forEach(k => addSignalToPlot(p3, k, k));
         const p4 = addPlot();
-        ['gyro_x', 'gyro_y', 'gyro_z'].forEach(k => addSignalToPlot(p4, k, k));
+        ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z'].forEach(k => addSignalToPlot(p4, k, k));
     }} else if (name === 'sensors') {{
         const p1 = addPlot();
         ['tof_bottom', 'baro_altitude'].forEach(k => addSignalToPlot(p1, k, k));
