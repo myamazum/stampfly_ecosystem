@@ -51,7 +51,7 @@ void ToFTask(void* pvParameters)
 
             // Always update timestamp on every poll (data_ready or not)
             // ポーリングごとにタイムスタンプを更新（data_ready に関わらず）
-            g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
+            g_tof_bottom_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
 
             if (data_ready) {
                 uint16_t distance_mm;
@@ -180,7 +180,7 @@ void ToFTask(void* pvParameters)
                 uint8_t status;
                 if (g_tof_front.getDistance(distance_mm, status) == ESP_OK) {
                     front_errors = 0;  // Reset on success
-                    g_tof_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
+                    g_tof_front_last_timestamp_us = static_cast<uint32_t>(esp_timer_get_time());
                     // Only valid if status == 0 and distance > 0
                     if (status == 0 && distance_mm > 0) {
                         float distance_m = distance_mm * 0.001f;
@@ -200,7 +200,10 @@ void ToFTask(void* pvParameters)
             }
         }
 
-        state.updateSensorDiag("tof", g_tof_task_healthy, g_tof_last_timestamp_us);
+        state.updateSensorDiag("tof_b", g_tof_task_healthy, g_tof_bottom_last_timestamp_us);
+        if (g_tof_front.isInitialized() && !front_disabled) {
+            state.updateSensorDiag("tof_f", true, g_tof_front_last_timestamp_us);
+        }
         vTaskDelayUntil(&last_wake_time, period);
     }
 }

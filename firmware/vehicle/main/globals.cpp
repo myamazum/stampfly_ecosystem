@@ -71,7 +71,8 @@ RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_gyro_raw_buf;
 
 // Sensor last-read timestamps
 volatile uint32_t g_baro_last_timestamp_us = 0;
-volatile uint32_t g_tof_last_timestamp_us = 0;
+volatile uint32_t g_tof_bottom_last_timestamp_us = 0;
+volatile uint32_t g_tof_front_last_timestamp_us = 0;
 volatile uint32_t g_mag_last_timestamp_us = 0;
 volatile uint32_t g_flow_last_timestamp_us = 0;
 

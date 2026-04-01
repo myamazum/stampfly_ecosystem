@@ -89,7 +89,7 @@ static int cmd_sensor(int argc, char** argv)
         console.print("  %-5s %s %7s %7s %7s %7s %7s %7s\r\n",
                        "-----", "--", "------", "------", "------", "------", "------", "------");
 
-        const char* names[] = {"imu", "flow", "tof", "baro", "mag"};
+        const char* names[] = {"imu", "flow", "tof_b", "tof_f", "baro", "mag"};
         for (const char* name : names) {
             auto d = state.getSensorDiag(name);
             if (d.period_count == 0) {

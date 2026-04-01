@@ -238,7 +238,7 @@ static void fillWsSample(stampfly::ExtendedSample& s, int idx, uint32_t imu_ts,
 
     s.imu_timestamp_us = imu_ts;
     s.baro_timestamp_us = g_baro_last_timestamp_us;
-    s.tof_timestamp_us = g_tof_last_timestamp_us;
+    s.tof_timestamp_us = g_tof_bottom_last_timestamp_us;
     s.mag_timestamp_us = g_mag_last_timestamp_us;
     s.flow_timestamp_us = g_flow_last_timestamp_us;
     s.padding3 = 0;
@@ -292,7 +292,7 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
     }
 
     // ToF (~30Hz)
-    if (uint32_t ts = g_tof_last_timestamp_us; ts != last_tof_ts && ts != 0) {
+    if (uint32_t ts = g_tof_bottom_last_timestamp_us; ts != last_tof_ts && ts != 0) {
         last_tof_ts = ts;
         ToFSample ts_s;
         ts_s.timestamp_us = ts;

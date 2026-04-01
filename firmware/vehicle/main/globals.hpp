@@ -124,7 +124,8 @@ extern RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_gyro_raw_buf;
 // Sensor last-read timestamps (volatile, set by each sensor task)
 // 各センサータスクが最終取得時刻を記録
 extern volatile uint32_t g_baro_last_timestamp_us;
-extern volatile uint32_t g_tof_last_timestamp_us;
+extern volatile uint32_t g_tof_bottom_last_timestamp_us;
+extern volatile uint32_t g_tof_front_last_timestamp_us;
 extern volatile uint32_t g_mag_last_timestamp_us;
 extern volatile uint32_t g_flow_last_timestamp_us;
 
