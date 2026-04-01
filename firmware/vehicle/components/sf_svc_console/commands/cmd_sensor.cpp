@@ -14,6 +14,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include <cstring>
+#include <cmath>
 
 // External references
 // 外部参照
@@ -83,19 +84,31 @@ static int cmd_sensor(int argc, char** argv)
 
     if (strcmp(sensor, "diag") == 0) {
         console.print("=== Sensor Diagnostics ===\r\n");
-        console.print("  %-5s  %s  %8s  %7s  %s\r\n",
-                       "Name", "OK", "Period", "Rate", "Loops");
-        console.print("  %-5s  %s  %8s  %7s  %s\r\n",
-                       "-----", "--", "--------", "-------", "------");
+        console.print("  %-5s %s %7s %7s %7s %7s %7s %7s\r\n",
+                       "Name", "OK", "AvgHz", "MinHz", "MaxHz", "StdMs", "Loops", "MinMs");
+        console.print("  %-5s %s %7s %7s %7s %7s %7s %7s\r\n",
+                       "-----", "--", "------", "------", "------", "------", "------", "------");
 
         const char* names[] = {"imu", "flow", "tof", "baro", "mag"};
         for (const char* name : names) {
-            auto diag = state.getSensorDiag(name);
-            float rate_hz = diag.period_us > 0 ? 1e6f / diag.period_us : 0;
-            float period_ms = diag.period_us / 1000.0f;
-            console.print("  %-5s   %d   %6.1fms  %5.1fHz  %lu\r\n",
-                           name, diag.healthy, period_ms, rate_hz,
-                           (unsigned long)diag.loop_count);
+            auto d = state.getSensorDiag(name);
+            if (d.period_count == 0) {
+                console.print("  %-5s  %d     ---     ---     ---     ---  %6lu     ---\r\n",
+                               name, d.healthy, (unsigned long)d.loop_count);
+                continue;
+            }
+            float avg_us = (float)d.period_sum_us / d.period_count;
+            float avg_hz = avg_us > 0 ? 1e6f / avg_us : 0;
+            float min_hz = d.period_max_us > 0 ? 1e6f / d.period_max_us : 0;
+            float max_hz = d.period_min_us > 0 ? 1e6f / d.period_min_us : 0;
+            float min_ms = d.period_min_us / 1000.0f;
+            // Variance = E[x²] - E[x]²
+            float mean_sq = (float)d.period_sq_sum / d.period_count;
+            float variance = mean_sq - avg_us * avg_us;
+            float std_ms = variance > 0 ? sqrtf(variance) / 1000.0f : 0;
+            console.print("  %-5s  %d  %5.1f  %5.1f  %5.1f  %5.2f  %6lu  %5.1f\r\n",
+                           name, d.healthy, avg_hz, min_hz, max_hz, std_ms,
+                           (unsigned long)d.loop_count, min_ms);
         }
 
         console.print("\r\nESKF: init=%d\r\n", state.isESKFInitialized());

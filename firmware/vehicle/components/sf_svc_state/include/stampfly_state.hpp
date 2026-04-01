@@ -159,8 +159,13 @@ public:
     struct SensorDiag {
         bool healthy = false;
         uint32_t last_timestamp_us = 0;  // Last poll timestamp (μs since boot)
-        uint32_t period_us = 0;          // Measured period (μs between polls)
         uint32_t loop_count = 0;         // Total loop count
+        uint32_t first_timestamp_us = 0; // First timestamp for avg calculation
+        uint32_t period_min_us = UINT32_MAX;
+        uint32_t period_max_us = 0;
+        uint64_t period_sum_us = 0;      // Sum for average
+        uint32_t period_count = 0;       // Number of period samples
+        uint64_t period_sq_sum = 0;      // Sum of squares for variance
     };
     void updateSensorDiag(const char* name, bool healthy, uint32_t timestamp_us);
     SensorDiag getSensorDiag(const char* name) const;

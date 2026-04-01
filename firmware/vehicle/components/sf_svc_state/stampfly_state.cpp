@@ -491,10 +491,15 @@ void StampFlyState::updateSensorDiag(const char* name, bool healthy, uint32_t ti
     for (int i = 0; i < sensor_diag_count_; i++) {
         if (strncmp(sensor_diags_[i].name, name, sizeof(sensor_diags_[i].name) - 1) == 0) {
             auto& d = sensor_diags_[i].diag;
-            // Compute period from consecutive timestamps
-            // 連続タイムスタンプから周期を計算
+            // Accumulate period statistics from consecutive timestamps
+            // 連続タイムスタンプから周期統計を蓄積
             if (d.last_timestamp_us > 0 && timestamp_us > d.last_timestamp_us) {
-                d.period_us = timestamp_us - d.last_timestamp_us;
+                uint32_t p = timestamp_us - d.last_timestamp_us;
+                d.period_sum_us += p;
+                d.period_sq_sum += (uint64_t)p * p;
+                d.period_count++;
+                if (p < d.period_min_us) d.period_min_us = p;
+                if (p > d.period_max_us) d.period_max_us = p;
             }
             d.healthy = healthy;
             d.last_timestamp_us = timestamp_us;
@@ -509,7 +514,7 @@ void StampFlyState::updateSensorDiag(const char* name, bool healthy, uint32_t ti
         strncpy(entry.name, name, sizeof(entry.name) - 1);
         entry.diag.healthy = healthy;
         entry.diag.last_timestamp_us = timestamp_us;
-        entry.diag.period_us = 0;
+        entry.diag.first_timestamp_us = timestamp_us;
         entry.diag.loop_count = 1;
         sensor_diag_count_++;
     }
