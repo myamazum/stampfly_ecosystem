@@ -112,18 +112,25 @@ def load_jsonl(filepath: str, hide_invalid: bool = True) -> dict:
             invalid = result['flow_q'] == 0
             result['flow'][invalid] = np.nan
 
-    # ToF
-    if 'tof' in sensor_data:
-        d = sensor_data['tof']
-        result['tof_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
-        result['tof_bottom'] = np.array([o['bottom'] for _, o in d], dtype=float)
-        result['tof_status'] = np.array([o['status_bottom'] for _, o in d])
-
-        # Mask invalid ToF data (status != 0) with NaN
-        # 無効 ToF データ（status != 0）を NaN でマスク
+    # ToF Bottom
+    if 'tof_b' in sensor_data:
+        d = sensor_data['tof_b']
+        result['tof_b_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
+        result['tof_bottom'] = np.array([o['distance'] for _, o in d], dtype=float)
+        result['tof_bottom_status'] = np.array([o['status'] for _, o in d])
         if hide_invalid:
-            invalid = result['tof_status'] != 0
+            invalid = result['tof_bottom_status'] != 0
             result['tof_bottom'][invalid] = np.nan
+
+    # ToF Front
+    if 'tof_f' in sensor_data:
+        d = sensor_data['tof_f']
+        result['tof_f_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
+        result['tof_front'] = np.array([o['distance'] for _, o in d], dtype=float)
+        result['tof_front_status'] = np.array([o['status'] for _, o in d])
+        if hide_invalid:
+            invalid = result['tof_front_status'] != 0
+            result['tof_front'][invalid] = np.nan
 
     # Baro
     if 'baro' in sensor_data:
@@ -232,7 +239,9 @@ def plot_overview(data: dict, title: str = '', save: str = None,
     # ToF + Baro combined
     ax = make_ax(2, 2)
     if 'tof_bottom' in data:
-        ax.plot(data['tof_t'], data['tof_bottom'], '#e6194b', linewidth=0.5, label='ToF')
+        ax.plot(data['tof_b_t'], data['tof_bottom'], '#e6194b', linewidth=0.5, label='ToF Bot')
+    if 'tof_front' in data:
+        ax.plot(data['tof_f_t'], data['tof_front'], '#f58231', linewidth=0.5, label='ToF Frt')
     if 'baro_alt' in data:
         ax.plot(data['baro_t'], data['baro_alt'], '#4363d8', linewidth=0.5, label='Baro')
     ax.set_title('Height', fontsize=9, fontweight='bold')

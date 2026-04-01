@@ -58,7 +58,8 @@ inline constexpr uint8_t PKT_IMU_ESKF      = 0x40;
 inline constexpr uint8_t PKT_POS_VEL       = 0x41;
 inline constexpr uint8_t PKT_CONTROL       = 0x42;
 inline constexpr uint8_t PKT_FLOW          = 0x43;
-inline constexpr uint8_t PKT_TOF           = 0x44;
+inline constexpr uint8_t PKT_TOF_BOTTOM    = 0x44;
+inline constexpr uint8_t PKT_TOF_FRONT     = 0x47;
 inline constexpr uint8_t PKT_BARO          = 0x45;
 inline constexpr uint8_t PKT_MAG           = 0x46;
 inline constexpr uint8_t PKT_STATUS        = 0x4F;
@@ -193,27 +194,25 @@ struct FlowBatchPacket {
 static_assert(sizeof(FlowBatchPacket) == 41, "FlowBatchPacket size mismatch");
 
 // =============================================================================
-// 0x44: ToF (14B/sample, batch 4 → 61B)
-// ToF距離（14B/サンプル、4バッチ → 61B）
+// 0x44/0x47: ToF Bottom/Front (9B/sample, batch 4 → 41B each)
+// ToF底面/前方（9B/サンプル、4バッチ → 各41B）
 // =============================================================================
 
-struct ToFSample {
+struct ToFSingleSample {
     uint32_t timestamp_us;
-    float tof_bottom;          // [m]
-    float tof_front;           // [m]
-    uint8_t status_bottom;     // 0=valid
-    uint8_t status_front;      // 0=valid
+    float distance;            // [m]
+    uint8_t status;            // 0=valid, 254=no target, 255=stale
 };
 
-static_assert(sizeof(ToFSample) == 14, "ToFSample size mismatch");
+static_assert(sizeof(ToFSingleSample) == 9, "ToFSingleSample size mismatch");
 
 struct ToFBatchPacket {
     PacketHeader header;
-    ToFSample samples[BATCH_SIZE];
+    ToFSingleSample samples[BATCH_SIZE];
     uint8_t checksum;
 };
 
-static_assert(sizeof(ToFBatchPacket) == 61, "ToFBatchPacket size mismatch");
+static_assert(sizeof(ToFBatchPacket) == 41, "ToFBatchPacket size mismatch");
 
 // =============================================================================
 // 0x45: Barometer (12B/sample, batch 4 → 53B)

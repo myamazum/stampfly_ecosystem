@@ -235,11 +235,13 @@ def load_jsonl(filepath: str) -> dict:
             ('dy', ['flow_y'], False),
             ('quality', ['flow_quality'], False),
         ],
-        'tof': [
-            ('bottom', ['tof_bottom'], False),
-            ('front', ['tof_front'], False),
-            ('status_bottom', ['tof_bottom_status'], False),
-            ('status_front', ['tof_front_status'], False),
+        'tof_b': [
+            ('distance', ['tof_bottom'], False),
+            ('status', ['tof_bottom_status'], False),
+        ],
+        'tof_f': [
+            ('distance', ['tof_front'], False),
+            ('status', ['tof_front_status'], False),
         ],
         'baro': [
             ('altitude', ['baro_altitude'], False),
@@ -307,7 +309,8 @@ def load_jsonl(filepath: str) -> dict:
         'posvel': '_time_posvel',
         'ctrl': '_time_ctrl',
         'flow': '_time_flow',
-        'tof': '_time_tof',
+        'tof_b': '_time_tof_b',
+        'tof_f': '_time_tof_f',
         'baro': '_time_baro',
         'mag': '_time_mag',
     }
@@ -425,7 +428,8 @@ def load_csv(filepath: str) -> dict:
     # We create deduplicated time+value arrays (suffix _dedup).
     sensor_ts_map = {
         'baro': ('baro_timestamp_us', ['baro_altitude', 'baro_pressure']),
-        'tof': ('tof_timestamp_us', ['tof_bottom', 'tof_front', 'tof_bottom_status', 'tof_front_status']),
+        'tof_b': ('tof_timestamp_us', ['tof_bottom', 'tof_bottom_status']),
+        'tof_f': ('tof_timestamp_us', ['tof_front', 'tof_front_status']),
         'mag': ('mag_timestamp_us', ['mag_x', 'mag_y', 'mag_z']),
         'flow': ('flow_timestamp_us', ['flow_x', 'flow_y', 'flow_quality']),
     }

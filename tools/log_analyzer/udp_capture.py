@@ -46,7 +46,8 @@ PKT_IMU_ESKF  = 0x40
 PKT_POS_VEL   = 0x41
 PKT_CONTROL   = 0x42
 PKT_FLOW      = 0x43
-PKT_TOF       = 0x44
+PKT_TOF_BOTTOM = 0x44
+PKT_TOF_FRONT  = 0x47
 PKT_BARO      = 0x45
 PKT_MAG       = 0x46
 PKT_STATUS    = 0x4F
@@ -78,9 +79,9 @@ assert struct.calcsize(FMT_CONTROL) == 20
 FMT_FLOW = '<I 2h B'
 assert struct.calcsize(FMT_FLOW) == 9
 
-# ToFSample: 14 bytes
-FMT_TOF = '<I 2f 2B'
-assert struct.calcsize(FMT_TOF) == 14
+# ToFSingleSample: 9 bytes
+FMT_TOF = '<I f B'
+assert struct.calcsize(FMT_TOF) == 9
 
 # BaroSample: 12 bytes
 FMT_BARO = '<I 2f'
@@ -95,13 +96,14 @@ FMT_HEADER = '<B H B'
 assert struct.calcsize(FMT_HEADER) == 4
 
 SAMPLE_INFO = {
-    PKT_IMU_ESKF: ('IMU+ESKF',  FMT_IMU_ESKF, 80),
-    PKT_POS_VEL:  ('Pos+Vel',   FMT_POS_VEL,  28),
-    PKT_CONTROL:  ('Control',   FMT_CONTROL,   20),
-    PKT_FLOW:     ('Flow',      FMT_FLOW,       9),
-    PKT_TOF:      ('ToF',       FMT_TOF,       14),
-    PKT_BARO:     ('Baro',      FMT_BARO,      12),
-    PKT_MAG:      ('Mag',       FMT_MAG,       16),
+    PKT_IMU_ESKF:  ('IMU+ESKF',  FMT_IMU_ESKF, 80),
+    PKT_POS_VEL:   ('Pos+Vel',   FMT_POS_VEL,  28),
+    PKT_CONTROL:   ('Control',   FMT_CONTROL,   20),
+    PKT_FLOW:      ('Flow',      FMT_FLOW,       9),
+    PKT_TOF_BOTTOM:('ToF_Bot',   FMT_TOF,        9),
+    PKT_BARO:      ('Baro',      FMT_BARO,      12),
+    PKT_MAG:       ('Mag',       FMT_MAG,       16),
+    PKT_TOF_FRONT: ('ToF_Frt',   FMT_TOF,        9),
 }
 
 # CSV column names per packet type
@@ -130,9 +132,13 @@ CSV_COLUMNS = {
         'timestamp_us',
         'flow_x', 'flow_y', 'flow_quality',
     ],
-    PKT_TOF: [
+    PKT_TOF_BOTTOM: [
         'timestamp_us',
-        'tof_bottom', 'tof_front', 'tof_bottom_status', 'tof_front_status',
+        'tof_distance', 'tof_status',
+    ],
+    PKT_TOF_FRONT: [
+        'timestamp_us',
+        'tof_distance', 'tof_status',
     ],
     PKT_BARO: [
         'timestamp_us',
@@ -466,13 +472,17 @@ class UDPTelemetryCapture:
                 'dy': s['flow_y'],
                 'quality': s['flow_quality'],
             },
-            PKT_TOF: lambda s: {
-                'id': 'tof',
+            PKT_TOF_BOTTOM: lambda s: {
+                'id': 'tof_b',
                 'ts': s['timestamp_us'],
-                'bottom': s['tof_bottom'],
-                'front': s['tof_front'],
-                'status_bottom': s['tof_bottom_status'],
-                'status_front': s['tof_front_status'],
+                'distance': s['tof_distance'],
+                'status': s['tof_status'],
+            },
+            PKT_TOF_FRONT: lambda s: {
+                'id': 'tof_f',
+                'ts': s['timestamp_us'],
+                'distance': s['tof_distance'],
+                'status': s['tof_status'],
             },
             PKT_BARO: lambda s: {
                 'id': 'baro',

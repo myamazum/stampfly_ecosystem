@@ -53,7 +53,8 @@ static BatchAccumulator<ImuEskfBatchPacket, ImuEskfSample> s_imu_acc;
 static BatchAccumulator<PosVelBatchPacket, PosVelSample> s_posvel_acc;
 static BatchAccumulator<ControlBatchPacket, ControlSample> s_ctrl_acc;
 static BatchAccumulator<FlowBatchPacket, FlowSample> s_flow_acc;
-static BatchAccumulator<ToFBatchPacket, ToFSample> s_tof_acc;
+static BatchAccumulator<ToFBatchPacket, ToFSingleSample> s_tof_bottom_acc;
+static BatchAccumulator<ToFBatchPacket, ToFSingleSample> s_tof_front_acc;
 static BatchAccumulator<BaroBatchPacket, BaroSample> s_baro_acc;
 static BatchAccumulator<MagBatchPacket, MagSample> s_mag_acc;
 
@@ -76,7 +77,8 @@ static void resetUdpState()
     s_posvel_acc.reset();
     s_ctrl_acc.reset();
     s_flow_acc.reset();
-    s_tof_acc.reset();
+    s_tof_bottom_acc.reset();
+    s_tof_front_acc.reset();
     s_baro_acc.reset();
     s_mag_acc.reset();
     if (s_send_queue) xQueueReset(s_send_queue);
@@ -253,6 +255,7 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
                             stampfly::StampFlyState& state,
                             int cycle, int& status_cnt,
                             uint32_t& last_flow_ts, uint32_t& last_tof_ts,
+                            uint32_t& last_tof_front_ts,
                             uint32_t& last_baro_ts, uint32_t& last_mag_ts)
 {
     // 400Hz: IMU + ESKF
@@ -291,18 +294,31 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         if (pkt) enqueue(pkt, sizeof(*pkt));
     }
 
-    // ToF (~30Hz)
+    // ToF Bottom (~30Hz)
     if (uint32_t ts = g_tof_bottom_last_timestamp_us; ts != last_tof_ts && ts != 0) {
         last_tof_ts = ts;
-        ToFSample ts_s;
-        ts_s.timestamp_us = ts;
+        ToFSingleSample s;
+        s.timestamp_us = ts;
         float tb, tf;
         state.getToFData(tb, tf);
-        ts_s.tof_bottom = tb; ts_s.tof_front = tf;
         uint8_t sb, sf_s;
         state.getToFStatus(sb, sf_s);
-        ts_s.status_bottom = sb; ts_s.status_front = sf_s;
-        auto* pkt = s_tof_acc.addSample(ts_s, PKT_TOF);
+        s.distance = tb; s.status = sb;
+        auto* pkt = s_tof_bottom_acc.addSample(s, PKT_TOF_BOTTOM);
+        if (pkt) enqueue(pkt, sizeof(*pkt));
+    }
+
+    // ToF Front (~30Hz, may not be initialized)
+    if (uint32_t ts = g_tof_front_last_timestamp_us; ts != last_tof_front_ts && ts != 0) {
+        last_tof_front_ts = ts;
+        ToFSingleSample s;
+        s.timestamp_us = ts;
+        float tb, tf;
+        state.getToFData(tb, tf);
+        uint8_t sb, sf_s;
+        state.getToFStatus(sb, sf_s);
+        s.distance = tf; s.status = sf_s;
+        auto* pkt = s_tof_front_acc.addSample(s, PKT_TOF_FRONT);
         if (pkt) enqueue(pkt, sizeof(*pkt));
     }
 
@@ -379,7 +395,7 @@ void TelemetryTask(void* pvParameters)
     int ws_decim = 0;
     int udp_cycle = 0;
     int status_cnt = 0;
-    uint32_t last_flow_ts = 0, last_tof_ts = 0;
+    uint32_t last_flow_ts = 0, last_tof_ts = 0, last_tof_front_ts = 0;
     uint32_t last_baro_ts = 0, last_mag_ts = 0;
     bool was_udp_active = false;
 
@@ -430,7 +446,7 @@ void TelemetryTask(void* pvParameters)
             resetUdpState();
             udp_cycle = 0;
             status_cnt = 0;
-            last_flow_ts = last_tof_ts = last_baro_ts = last_mag_ts = 0;
+            last_flow_ts = last_tof_ts = last_tof_front_ts = last_baro_ts = last_mag_ts = 0;
             ESP_LOGI(TAG, "UDP capture started — state reset");
         }
         was_udp_active = udp_active;
@@ -438,7 +454,8 @@ void TelemetryTask(void* pvParameters)
         // --- UDP full-data mode ---
         if (udp_active) {
             udpCollectCycle(read_idx, imu_ts, state, ++udp_cycle, status_cnt,
-                            last_flow_ts, last_tof_ts, last_baro_ts, last_mag_ts);
+                            last_flow_ts, last_tof_ts, last_tof_front_ts,
+                            last_baro_ts, last_mag_ts);
         }
         // --- WebSocket visualization mode (50Hz) ---
         else if (telemetry.hasClients()) {
