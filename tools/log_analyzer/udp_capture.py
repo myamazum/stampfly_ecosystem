@@ -347,9 +347,9 @@ class UDPTelemetryCapture:
 
         # Per-sensor statistics
         # センサごとの統計
-        print(f"  {'Type':<10} {'Samples':>7} {'AvgHz':>7} {'MinHz':>7} {'MaxHz':>7}"
+        print(f"  {'Type':<10} {'Samples':>7} {'MedHz':>7} {'AvgHz':>7} {'MinHz':>7} {'MaxHz':>7}"
               f" {'StdMs':>6} {'Loss':>6} {'Gaps':>5}")
-        print(f"  {'-'*10} {'-'*7} {'-'*7} {'-'*7} {'-'*7}"
+        print(f"  {'-'*10} {'-'*7} {'-'*7} {'-'*7} {'-'*7} {'-'*7}"
               f" {'-'*6} {'-'*6} {'-'*5}")
 
         for pkt_id, (name, _, _) in sorted(SAMPLE_INFO.items()):
@@ -359,29 +359,43 @@ class UDPTelemetryCapture:
 
             if len(samples) < 2:
                 if samps > 0:
-                    print(f"  {name:<10} {samps:>7}     ---     ---     ---"
+                    print(f"  {name:<10} {samps:>7}     ---     ---     ---     ---"
                           f"    ---    ---  {gaps:>5}")
                 continue
 
             # Compute intervals from timestamps
             # タイムスタンプからインターバルを計算
             timestamps = [s['timestamp_us'] for s in samples]
-            intervals = [timestamps[i+1] - timestamps[i]
-                         for i in range(len(timestamps)-1)
-                         if timestamps[i+1] > timestamps[i]]
+            all_intervals = [timestamps[i+1] - timestamps[i]
+                             for i in range(len(timestamps)-1)
+                             if timestamps[i+1] > timestamps[i]]
 
-            if not intervals:
+            if not all_intervals:
                 print(f"  {name:<10} {samps:>7}     ---     ---     ---"
                       f"    ---    ---  {gaps:>5}")
                 continue
 
-            # Statistics
+            # Filter out packet-loss gaps: intervals > 3× median are likely
+            # caused by dropped packets, not actual sensor timing variation.
+            # パケットロスによるギャップを除外: 中央値の3倍を超える間隔は
+            # センサのタイミング変動ではなくパケット欠損と判断。
+            all_intervals.sort()
+            median_us = all_intervals[len(all_intervals) // 2]
+            threshold = median_us * 3
+            intervals = [x for x in all_intervals if x <= threshold]
+
+            if not intervals:
+                intervals = all_intervals  # fallback
+
+            # Statistics on filtered intervals (true sensor timing)
+            # フィルタ後の間隔で統計（真のセンサタイミング）
             avg_us = sum(intervals) / len(intervals)
             min_us = min(intervals)
             max_us = max(intervals)
             variance = sum((x - avg_us) ** 2 for x in intervals) / len(intervals)
             std_ms = math.sqrt(variance) / 1000.0
 
+            med_hz = 1e6 / median_us if median_us > 0 else 0
             avg_hz = 1e6 / avg_us if avg_us > 0 else 0
             min_hz = 1e6 / max_us if max_us > 0 else 0  # min freq = max period
             max_hz = 1e6 / min_us if min_us > 0 else 0  # max freq = min period
@@ -391,15 +405,15 @@ class UDPTelemetryCapture:
             expected = samps + gaps
             loss_pct = (gaps / expected * 100) if expected > 0 else 0
 
-            print(f"  {name:<10} {samps:>7} {avg_hz:>6.1f} {min_hz:>6.1f} {max_hz:>6.1f}"
+            print(f"  {name:<10} {samps:>7} {med_hz:>6.1f} {avg_hz:>6.1f} {min_hz:>6.1f} {max_hz:>6.1f}"
                   f" {std_ms:>5.2f} {loss_pct:>5.1f}% {gaps:>5}")
 
-        print(f"  {'─'*10} {'─'*7} {'─'*7} {'─'*7} {'─'*7}"
+        print(f"  {'─'*10} {'─'*7} {'─'*7} {'─'*7} {'─'*7} {'─'*7}"
               f" {'─'*6} {'─'*6} {'─'*5}")
         total_gaps = sum(self.seq_gaps.values())
         total_expected = total_samples + total_gaps
         total_loss = (total_gaps / total_expected * 100) if total_expected > 0 else 0
-        print(f"  {'TOTAL':<10} {total_samples:>7} {'':>7} {'':>7} {'':>7}"
+        print(f"  {'TOTAL':<10} {total_samples:>7} {'':>7} {'':>7} {'':>7} {'':>7}"
               f" {'':>6} {total_loss:>5.1f}% {total_gaps:>5}")
         print()
 
