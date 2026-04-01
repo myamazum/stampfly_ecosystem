@@ -45,7 +45,7 @@ struct SendItem {
 };
 
 static QueueHandle_t s_send_queue = nullptr;
-static constexpr int SEND_QUEUE_SIZE = 32;
+static constexpr int SEND_QUEUE_SIZE = 16;
 
 // UDP batch accumulators
 // UDP バッチ蓄積器
@@ -87,12 +87,16 @@ static void resetUdpState()
 // エンキュー: パケットを static SendItem にコピーしてキューへ（ノンブロッキング）
 // =============================================================================
 
+static uint32_t s_enqueue_drops = 0;
+
 static void enqueue(const void* pkt, size_t len)
 {
     if (len > sizeof(s_send_item.data) || !s_send_queue) return;
     memcpy(s_send_item.data, pkt, len);
     s_send_item.len = (uint16_t)len;
-    xQueueSend(s_send_queue, &s_send_item, 0);  // Drop if full
+    if (xQueueSend(s_send_queue, &s_send_item, 0) != pdTRUE) {
+        s_enqueue_drops++;
+    }
 }
 
 // =============================================================================
@@ -125,9 +129,10 @@ static void TelemetrySendTask(void* pvParameters)
         uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
         if (now_ms - stats_time > 5000) {
             if (bytes_sent > 0) {
-                ESP_LOGI(TAG, "UDP: %.1f KB/s, queue free: %d/%d",
+                ESP_LOGI(TAG, "UDP: %.1f KB/s, queue free: %d/%d, enq_drops: %lu",
                          (float)bytes_sent / 5.0f / 1024.0f,
-                         (int)uxQueueSpacesAvailable(s_send_queue), SEND_QUEUE_SIZE);
+                         (int)uxQueueSpacesAvailable(s_send_queue), SEND_QUEUE_SIZE,
+                         s_enqueue_drops);
                 bytes_sent = 0;
             }
             stats_time = now_ms;
