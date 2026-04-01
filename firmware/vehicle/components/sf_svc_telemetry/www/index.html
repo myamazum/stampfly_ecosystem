@@ -1325,9 +1325,12 @@ function connect() {
                 history.ctrl_yaw.push(ctrl_yaw);
                 history.tof_bottom.push(tof_bottom);
                 history.tof_front.push(tof_front);
-                history.mag_x.push(0); // Not in extended packet
-                history.mag_y.push(0);
-                history.mag_z.push(0);
+                const mag_x_ext = data.getFloat32(base + SAMPLE.MAG_X, true);
+                const mag_y_ext = data.getFloat32(base + SAMPLE.MAG_Y, true);
+                const mag_z_ext = data.getFloat32(base + SAMPLE.MAG_Z, true);
+                history.mag_x.push(mag_x_ext);
+                history.mag_y.push(mag_y_ext);
+                history.mag_z.push(mag_z_ext);
 
                 // Log if recording (all 4 samples for full 400Hz logging)
                 if (isLogging) {
@@ -1405,9 +1408,9 @@ function connect() {
                 document.getElementById('accel_x').textContent = accel_x.toFixed(2);
                 document.getElementById('accel_y').textContent = accel_y.toFixed(2);
                 document.getElementById('accel_z').textContent = accel_z.toFixed(2);
-                document.getElementById('mag_x').textContent = '---';
-                document.getElementById('mag_y').textContent = '---';
-                document.getElementById('mag_z').textContent = '---';
+                document.getElementById('mag_x').textContent = mag_x_ext.toFixed(1);
+                document.getElementById('mag_y').textContent = mag_y_ext.toFixed(1);
+                document.getElementById('mag_z').textContent = mag_z_ext.toFixed(1);
                 document.getElementById('ctrl_throttle').textContent = (ctrl_throttle * 100).toFixed(0);
                 document.getElementById('ctrl_roll').textContent = ctrl_roll.toFixed(2);
                 document.getElementById('ctrl_pitch').textContent = ctrl_pitch.toFixed(2);
