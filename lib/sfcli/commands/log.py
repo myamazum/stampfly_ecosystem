@@ -241,6 +241,11 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Hide additional sensor panels (baro, tof, flow)",
     )
     viz_parser.add_argument(
+        "--show-invalid",
+        action="store_true",
+        help="Show invalid sensor data (default: hidden as gaps)",
+    )
+    viz_parser.add_argument(
         "-i", "--interactive",
         action="store_true",
         help="Interactive mode (Plotly, opens in browser)",
@@ -567,7 +572,8 @@ def run_viz(args: argparse.Namespace) -> int:
             sys.path.insert(0, str(paths.root() / "tools" / "log_analyzer"))
             import visualize_jsonl
 
-            data = visualize_jsonl.load_jsonl(str(path))
+            show_invalid = getattr(args, 'show_invalid', False)
+            data = visualize_jsonl.load_jsonl(str(path), hide_invalid=not show_invalid)
             tr = None
             if hasattr(args, 'time_range') and args.time_range:
                 tr = tuple(args.time_range)

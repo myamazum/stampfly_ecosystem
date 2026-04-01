@@ -332,6 +332,24 @@ def load_jsonl(filepath: str) -> dict:
     # Add all signal data
     data.update(sensor_data)
 
+    # Mask invalid sensor data with NaN for clean visualization
+    # 無効センサデータを NaN でマスクして見やすく表示
+    if 'flow_quality' in data and 'flow_x' in data:
+        for i, q in enumerate(data['flow_quality']):
+            if q == 0:
+                data['flow_x'][i] = float('nan')
+                data['flow_y'][i] = float('nan')
+
+    if 'tof_bottom_status' in data and 'tof_bottom' in data:
+        for i, s in enumerate(data['tof_bottom_status']):
+            if s != 0:
+                data['tof_bottom'][i] = float('nan')
+
+    if 'tof_front_status' in data and 'tof_front' in data:
+        for i, s in enumerate(data['tof_front_status']):
+            if s != 0:
+                data['tof_front'][i] = float('nan')
+
     # Compute corrected IMU (gyro - bias, accel - bias)
     # バイアス補正済み IMU を計算（gyro - bias, accel - bias）
     if all(k in data for k in ['gyro_x', 'gyro_bias_x']):

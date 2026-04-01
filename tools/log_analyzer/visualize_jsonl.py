@@ -30,9 +30,14 @@ except ImportError:
     sys.exit(1)
 
 
-def load_jsonl(filepath: str) -> dict:
+def load_jsonl(filepath: str, hide_invalid: bool = True) -> dict:
     """Load JSONL and return per-sensor numpy arrays with time axes.
     JSONL を読み込みセンサごとの numpy 配列と時間軸を返す。
+
+    Args:
+        hide_invalid: If True, replace invalid sensor values with NaN
+                      (Flow quality=0, ToF status!=0). Default True.
+                      無効センサ値を NaN に置換するか。デフォルト True。
     """
     sensor_data = {}  # {sensor_id: [(ts, {fields}), ...]}
 
@@ -98,15 +103,27 @@ def load_jsonl(filepath: str) -> dict:
     if 'flow' in sensor_data:
         d = sensor_data['flow']
         result['flow_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
-        result['flow'] = np.array([[o['dx'], o['dy']] for _, o in d])
+        result['flow'] = np.array([[o['dx'], o['dy']] for _, o in d], dtype=float)
         result['flow_q'] = np.array([o['quality'] for _, o in d])
+
+        # Mask invalid flow data (quality=0) with NaN
+        # 無効フローデータ（quality=0）を NaN でマスク
+        if hide_invalid:
+            invalid = result['flow_q'] == 0
+            result['flow'][invalid] = np.nan
 
     # ToF
     if 'tof' in sensor_data:
         d = sensor_data['tof']
         result['tof_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
-        result['tof_bottom'] = np.array([o['bottom'] for _, o in d])
+        result['tof_bottom'] = np.array([o['bottom'] for _, o in d], dtype=float)
         result['tof_status'] = np.array([o['status_bottom'] for _, o in d])
+
+        # Mask invalid ToF data (status != 0) with NaN
+        # 無効 ToF データ（status != 0）を NaN でマスク
+        if hide_invalid:
+            invalid = result['tof_status'] != 0
+            result['tof_bottom'][invalid] = np.nan
 
     # Baro
     if 'baro' in sensor_data:
@@ -279,10 +296,12 @@ def main():
     parser.add_argument('file', help="JSONL telemetry file")
     parser.add_argument('--save', help="Save to PNG file")
     parser.add_argument('--time-range', nargs=2, type=float, metavar=('START', 'END'))
+    parser.add_argument('--show-invalid', action='store_true',
+                        help="Show invalid sensor data (default: hidden as gaps)")
     args = parser.parse_args()
 
     print(f"Loading: {args.file}")
-    data = load_jsonl(args.file)
+    data = load_jsonl(args.file, hide_invalid=not args.show_invalid)
 
     n_imu = len(data.get('imu_t', []))
     dur = data['imu_t'][-1] if n_imu > 0 else 0
