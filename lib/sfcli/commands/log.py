@@ -556,9 +556,37 @@ def run_viz(args: argparse.Namespace) -> int:
 
     console.info(f"Visualizing: {path.name}")
 
-    # JSONL files always use interactive mode (no matplotlib support)
-    # JSONL ファイルは常にインタラクティブモード（matplotlib 非対応）
-    is_interactive = getattr(args, 'interactive', False) or path.suffix == '.jsonl'
+    # JSONL default: static overview. JSONL + -i: interactive Plotly.
+    # JSONL デフォルト: 静的一覧。JSONL + -i: インタラクティブ Plotly。
+    is_interactive = getattr(args, 'interactive', False)
+
+    # JSONL static overview (default for .jsonl files)
+    # JSONL 静的一覧表示（.jsonl ファイルのデフォルト）
+    if path.suffix == '.jsonl' and not is_interactive:
+        try:
+            sys.path.insert(0, str(paths.root() / "tools" / "log_analyzer"))
+            import visualize_jsonl
+
+            data = visualize_jsonl.load_jsonl(str(path))
+            tr = None
+            if hasattr(args, 'time_range') and args.time_range:
+                tr = tuple(args.time_range)
+            visualize_jsonl.plot_overview(
+                data,
+                title=path.name,
+                save=getattr(args, 'save', None),
+                time_range=tr,
+            )
+            return 0
+        except ImportError as e:
+            console.error(f"Failed to import visualizer: {e}")
+            console.print("  Required: pip install matplotlib numpy")
+            return 1
+        except Exception as e:
+            console.error(f"Visualization failed: {e}")
+            return 1
+        finally:
+            sys.path.pop(0)
 
     # Interactive mode (Plotly)
     if is_interactive:
