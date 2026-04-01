@@ -190,8 +190,9 @@ void TelemetryTask(void* pvParameters)
     static BatchAccumulator<BaroBatchPacket, BaroSample> baro_acc;
     static BatchAccumulator<MagBatchPacket, MagSample> mag_acc;
 
-    // --- WebSocket mode state ---
-    stampfly::TelemetryExtendedBatchPacket ws_batch_pkt = {};
+    // --- WebSocket mode state (static to save stack) ---
+    static stampfly::TelemetryExtendedBatchPacket ws_batch_pkt;
+    memset(&ws_batch_pkt, 0, sizeof(ws_batch_pkt));
     int ws_batch_index = 0;
     int ws_decimation_counter = 0;
     constexpr int WS_DECIMATION = 8;  // 400/8 = 50Hz
@@ -262,10 +263,7 @@ void TelemetryTask(void* pvParameters)
                 mag_acc.reset();
                 udp_cycle_counter = 0;
                 status_counter = 0;
-                // Drain send queue to discard any stale packets
-                // 送信キューを空にして古いパケットを破棄
-                SendItem dummy;
-                while (xQueueReceive(g_send_queue, &dummy, 0) == pdTRUE) {}
+                xQueueReset(g_send_queue);
                 ESP_LOGI(TAG, "UDP capture started — accumulators reset");
             }
 
