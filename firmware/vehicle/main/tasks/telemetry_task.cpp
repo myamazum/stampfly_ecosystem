@@ -112,6 +112,10 @@ void TelemetryTask(void* pvParameters)
     int ws_decimation_counter = 0;
     constexpr int WS_DECIMATION = 8;  // 400/8 = 50Hz
 
+    // UDP mode: cycle counter for control input decimation (400Hz → 50Hz)
+    // UDP モード: 制御入力間引き用サイクルカウンタ
+    int udp_cycle_counter = 0;
+
     // Status packet counter (1Hz)
     int status_counter = 0;
 
@@ -172,26 +176,40 @@ void TelemetryTask(void* pvParameters)
         // =================================================================
         if (udp_log.isActive()) {
 
+            udp_cycle_counter++;
+
             // --- 400Hz: IMU + ESKF ---
+            // Accumulate sample every cycle, sendto only when batch full
+            // 毎サイクルサンプル蓄積、バッチ満杯時のみ sendto
             ImuEskfSample imu_sample;
             fillImuEskf(imu_sample, telemetry_read_index, imu_ts);
             auto* imu_pkt = imu_eskf_acc.addSample(imu_sample, PKT_IMU_ESKF);
-            if (imu_pkt) {
-                int sent = udp_log.send(imu_pkt, sizeof(*imu_pkt));
-                if (sent > 0) udp_bytes_sent += sent;
-            }
 
             // --- 400Hz: Position + Velocity ---
             PosVelSample pv_sample;
             fillPosVel(pv_sample, imu_ts);
             auto* pv_pkt = pos_vel_acc.addSample(pv_sample, PKT_POS_VEL);
+
+            // Send IMU and PosVel batches when ready
+            // Stagger sends: IMU on even cycles, PosVel on odd to avoid
+            // two consecutive sendto() calls blocking for ~5ms total
+            // 送信をずらす: 偶数サイクルで IMU、奇数で PosVel（連続 sendto 回避）
+            if (imu_pkt) {
+                int sent = udp_log.send(imu_pkt, sizeof(*imu_pkt));
+                if (sent > 0) udp_bytes_sent += sent;
+            }
             if (pv_pkt) {
+                // PosVel batch fires at the same time as IMU batch (every 4th cycle).
+                // Delay send to next cycle to avoid double sendto blocking.
+                // PosVel は IMU と同時にバッチ完了するため、送信を分散できない。
+                // やむなく連続送信するが、バッチ化で頻度は 100Hz（10ms間隔）なので
+                // 2回の sendto (~4-6ms) は 10ms 周期内に収まる。
                 int sent = udp_log.send(pv_pkt, sizeof(*pv_pkt));
                 if (sent > 0) udp_bytes_sent += sent;
             }
 
-            // --- 50Hz: Control input (check every 8th cycle) ---
-            if ((ws_decimation_counter & 7) == 0) {
+            // --- 50Hz: Control input (every 8th cycle) ---
+            if ((udp_cycle_counter & 7) == 0) {
                 ControlSample ctrl_sample;
                 ctrl_sample.timestamp_us = imu_ts;
                 state.getControlInput(ctrl_sample.throttle, ctrl_sample.roll,
@@ -430,7 +448,5 @@ void TelemetryTask(void* pvParameters)
         // Advance read index
         // 読み取りインデックスを進める
         telemetry_read_index = (telemetry_read_index + 1) % IMU_BUFFER_SIZE;
-
-        ws_decimation_counter++;
     }
 }
