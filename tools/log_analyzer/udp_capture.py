@@ -328,49 +328,79 @@ class UDPTelemetryCapture:
         return sum(self.sample_count.values()) > 0
 
     def print_stats(self):
-        """Print capture statistics."""
+        """Print capture statistics with detailed timing analysis.
+        詳細タイミング分析付きキャプチャ統計を表示。
+        """
+        import math
+
         duration = (self.end_time or time.time()) - self.start_time
         total_samples = sum(self.sample_count.values())
 
-        print(f"\n{'='*60}")
+        print(f"\n{'='*70}")
         print(f"  UDP Telemetry Capture Statistics")
-        print(f"{'='*60}")
+        print(f"{'='*70}")
         print(f"  Duration:     {duration:.1f}s")
         print(f"  Total bytes:  {self.bytes_received:,}")
         print(f"  Bandwidth:    {self.bytes_received / duration / 1024:.1f} KB/s")
         print(f"  Checksum err: {self.checksum_errors}")
         print()
 
-        pkt_names = {v[0]: k for k, v in SAMPLE_INFO.items()}
-        print(f"  {'Type':<12} {'Packets':>8} {'Samples':>8} {'RxRate':>8} {'SrcRate':>8} {'Gaps':>6}")
-        print(f"  {'-'*12} {'-'*8} {'-'*8} {'-'*8} {'-'*8} {'-'*6}")
+        # Per-sensor statistics
+        # センサごとの統計
+        print(f"  {'Type':<10} {'Samples':>7} {'AvgHz':>7} {'MinHz':>7} {'MaxHz':>7}"
+              f" {'StdMs':>6} {'Loss':>6} {'Gaps':>5}")
+        print(f"  {'-'*10} {'-'*7} {'-'*7} {'-'*7} {'-'*7}"
+              f" {'-'*6} {'-'*6} {'-'*5}")
 
         for pkt_id, (name, _, _) in sorted(SAMPLE_INFO.items()):
-            pkts = self.packet_count.get(pkt_id, 0)
             samps = self.sample_count.get(pkt_id, 0)
-            rx_rate = samps / duration if duration > 0 else 0
             gaps = self.seq_gaps.get(pkt_id, 0)
-
-            # Compute source rate from timestamps (median interval)
-            # タイムスタンプから送信元レートを計算（中央値インターバル）
-            src_rate_str = '   ---'
             samples = self.samples.get(pkt_id, [])
-            if len(samples) >= 2:
-                timestamps = [s['timestamp_us'] for s in samples]
-                intervals = [timestamps[i+1] - timestamps[i]
-                             for i in range(len(timestamps)-1)
-                             if timestamps[i+1] > timestamps[i]]
-                if intervals:
-                    intervals.sort()
-                    median_us = intervals[len(intervals) // 2]
-                    if median_us > 0:
-                        src_rate = 1e6 / median_us
-                        src_rate_str = f'{src_rate:7.1f}'
 
-            print(f"  {name:<12} {pkts:>8} {samps:>8} {rx_rate:>7.1f}Hz {src_rate_str}Hz {gaps:>6}")
+            if len(samples) < 2:
+                if samps > 0:
+                    print(f"  {name:<10} {samps:>7}     ---     ---     ---"
+                          f"    ---    ---  {gaps:>5}")
+                continue
 
-        print(f"  {'─'*12} {'─'*8} {'─'*8} {'─'*8} {'─'*6}")
-        print(f"  {'TOTAL':<12} {sum(self.packet_count.values()):>8} {total_samples:>8}")
+            # Compute intervals from timestamps
+            # タイムスタンプからインターバルを計算
+            timestamps = [s['timestamp_us'] for s in samples]
+            intervals = [timestamps[i+1] - timestamps[i]
+                         for i in range(len(timestamps)-1)
+                         if timestamps[i+1] > timestamps[i]]
+
+            if not intervals:
+                print(f"  {name:<10} {samps:>7}     ---     ---     ---"
+                      f"    ---    ---  {gaps:>5}")
+                continue
+
+            # Statistics
+            avg_us = sum(intervals) / len(intervals)
+            min_us = min(intervals)
+            max_us = max(intervals)
+            variance = sum((x - avg_us) ** 2 for x in intervals) / len(intervals)
+            std_ms = math.sqrt(variance) / 1000.0
+
+            avg_hz = 1e6 / avg_us if avg_us > 0 else 0
+            min_hz = 1e6 / max_us if max_us > 0 else 0  # min freq = max period
+            max_hz = 1e6 / min_us if min_us > 0 else 0  # max freq = min period
+
+            # Packet loss rate
+            # パケットロス率
+            expected = samps + gaps
+            loss_pct = (gaps / expected * 100) if expected > 0 else 0
+
+            print(f"  {name:<10} {samps:>7} {avg_hz:>6.1f} {min_hz:>6.1f} {max_hz:>6.1f}"
+                  f" {std_ms:>5.2f} {loss_pct:>5.1f}% {gaps:>5}")
+
+        print(f"  {'─'*10} {'─'*7} {'─'*7} {'─'*7} {'─'*7}"
+              f" {'─'*6} {'─'*6} {'─'*5}")
+        total_gaps = sum(self.seq_gaps.values())
+        total_expected = total_samples + total_gaps
+        total_loss = (total_gaps / total_expected * 100) if total_expected > 0 else 0
+        print(f"  {'TOTAL':<10} {total_samples:>7} {'':>7} {'':>7} {'':>7}"
+              f" {'':>6} {total_loss:>5.1f}% {total_gaps:>5}")
         print()
 
     def save_jsonl(self, filepath: str):
