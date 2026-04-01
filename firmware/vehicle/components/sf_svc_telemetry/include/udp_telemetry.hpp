@@ -352,6 +352,13 @@ public:
     /// UDP ログクライアントがアクティブに接続されているか
     bool isActive() const { return active_.load(); }
 
+    /// Check and consume the "just started" flag (returns true once after start)
+    /// 「開始直後」フラグを確認して消費する（開始後1回だけ true を返す）
+    bool consumeStartEvent() {
+        bool expected = true;
+        return just_started_.compare_exchange_strong(expected, false);
+    }
+
     /// Send data to the registered client (fire-and-forget)
     /// 登録されたクライアントにデータを送信（送りっぱなし）
     /// @return bytes sent, or -1 on error
@@ -372,6 +379,7 @@ private:
     struct sockaddr_in client_addr_ = {};
     bool client_registered_ = false;
     std::atomic<bool> active_{false};
+    std::atomic<bool> just_started_{false};
     uint32_t last_heartbeat_ms_ = 0;
     TaskHandle_t rx_task_handle_ = nullptr;
 };

@@ -250,6 +250,25 @@ void TelemetryTask(void* pvParameters)
         // UDP full-data mode
         // =================================================================
         if (udp_log.isActive()) {
+            // Reset all accumulators on capture start to discard stale data
+            // キャプチャ開始時に全アキュムレータをリセットして古いデータを破棄
+            if (udp_log.consumeStartEvent()) {
+                imu_eskf_acc.reset();
+                pos_vel_acc.reset();
+                ctrl_acc.reset();
+                flow_acc.reset();
+                tof_acc.reset();
+                baro_acc.reset();
+                mag_acc.reset();
+                udp_cycle_counter = 0;
+                status_counter = 0;
+                // Drain send queue to discard any stale packets
+                // 送信キューを空にして古いパケットを破棄
+                SendItem dummy;
+                while (xQueueReceive(g_send_queue, &dummy, 0) == pdTRUE) {}
+                ESP_LOGI(TAG, "UDP capture started — accumulators reset");
+            }
+
             udp_cycle_counter++;
 
             // --- 400Hz: IMU + ESKF → enqueue when batch full ---

@@ -167,6 +167,7 @@ void UDPLogServer::rxTask(void* arg)
                 server->client_addr_ = src_addr;
                 server->client_registered_ = true;
                 server->last_heartbeat_ms_ = (uint32_t)(esp_timer_get_time() / 1000);
+                server->just_started_.store(true);
                 server->active_.store(true);
 
                 char ip_str[16];
