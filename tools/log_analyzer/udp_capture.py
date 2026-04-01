@@ -400,10 +400,14 @@ class UDPTelemetryCapture:
 
         # Per-sensor statistics
         # センサごとの統計
-        print(f"  {'Type':<10} {'Samples':>7} {'MedHz':>7} {'AvgHz':>7} {'MinHz':>7} {'MaxHz':>7}"
-              f" {'StdMs':>6} {'Loss':>6} {'Gaps':>5}")
-        print(f"  {'-'*10} {'-'*7} {'-'*7} {'-'*7} {'-'*7} {'-'*7}"
-              f" {'-'*6} {'-'*6} {'-'*5}")
+        # Column widths: name=10, samples=7, hz=7, hz=7, hz=7, hz=7, std=6, loss=6, gaps=5
+        W = '  {:<10s} {:>7s} {:>7s} {:>7s} {:>7s} {:>7s} {:>6s} {:>6s} {:>5s}'
+        D = '  {:<10s} {:>7d} {:>7s} {:>7s} {:>7s} {:>7s} {:>6s} {:>6s} {:>5d}'
+
+        print(W.format('Type', 'Samples', 'MedHz', 'AvgHz', 'MinHz', 'MaxHz',
+                        'StdMs', 'Loss', 'Gaps'))
+        print(W.format('─'*10, '─'*7, '─'*7, '─'*7, '─'*7, '─'*7,
+                        '─'*6, '─'*6, '─'*5))
 
         for pkt_id, (name, _, _) in sorted(SAMPLE_INFO.items()):
             samps = self.sample_count.get(pkt_id, 0)
@@ -412,8 +416,7 @@ class UDPTelemetryCapture:
 
             if len(samples) < 2:
                 if samps > 0:
-                    print(f"  {name:<10} {samps:>7}     ---     ---     ---     ---"
-                          f"    ---    ---  {gaps:>5}")
+                    print(D.format(name, samps, '-', '-', '-', '-', '-', '-', gaps))
                 continue
 
             # Compute intervals from timestamps
@@ -424,8 +427,7 @@ class UDPTelemetryCapture:
                              if timestamps[i+1] > timestamps[i]]
 
             if not all_intervals:
-                print(f"  {name:<10} {samps:>7}     ---     ---     ---"
-                      f"    ---    ---  {gaps:>5}")
+                print(D.format(name, samps, '-', '-', '-', '-', '-', '-', gaps))
                 continue
 
             # Filter out packet-loss gaps: intervals > 3× median are likely
@@ -458,16 +460,18 @@ class UDPTelemetryCapture:
             expected = samps + gaps
             loss_pct = (gaps / expected * 100) if expected > 0 else 0
 
-            print(f"  {name:<10} {samps:>7} {med_hz:>6.1f} {avg_hz:>6.1f} {min_hz:>6.1f} {max_hz:>6.1f}"
-                  f" {std_ms:>5.2f} {loss_pct:>5.1f}% {gaps:>5}")
+            print(D.format(name, samps,
+                           f'{med_hz:.1f}', f'{avg_hz:.1f}',
+                           f'{min_hz:.1f}', f'{max_hz:.1f}',
+                           f'{std_ms:.2f}', f'{loss_pct:.1f}%', gaps))
 
-        print(f"  {'─'*10} {'─'*7} {'─'*7} {'─'*7} {'─'*7} {'─'*7}"
-              f" {'─'*6} {'─'*6} {'─'*5}")
+        print(W.format('─'*10, '─'*7, '─'*7, '─'*7, '─'*7, '─'*7,
+                        '─'*6, '─'*6, '─'*5))
         total_gaps = sum(self.seq_gaps.values())
         total_expected = total_samples + total_gaps
         total_loss = (total_gaps / total_expected * 100) if total_expected > 0 else 0
-        print(f"  {'TOTAL':<10} {total_samples:>7} {'':>7} {'':>7} {'':>7} {'':>7}"
-              f" {'':>6} {total_loss:>5.1f}% {total_gaps:>5}")
+        print(D.format('TOTAL', total_samples, '', '', '', '',
+                        '', f'{total_loss:.1f}%', total_gaps))
         print()
 
     def save_jsonl(self, filepath: str):
