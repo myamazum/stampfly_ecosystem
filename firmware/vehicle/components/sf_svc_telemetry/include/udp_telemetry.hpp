@@ -63,6 +63,7 @@ inline constexpr uint8_t PKT_TOF_FRONT     = 0x47;
 inline constexpr uint8_t PKT_BARO          = 0x45;
 inline constexpr uint8_t PKT_MAG           = 0x46;
 inline constexpr uint8_t PKT_STATUS        = 0x4F;
+inline constexpr uint8_t PKT_UNIFIED       = 0x50;  // 8-cycle unified packet
 
 // PC → Vehicle (commands)
 // PC → Vehicle（コマンド）
@@ -71,6 +72,7 @@ inline constexpr uint8_t CMD_STOP_LOG      = 0xF1;
 inline constexpr uint8_t CMD_HEARTBEAT     = 0xF2;
 
 inline constexpr int BATCH_SIZE = 4;
+inline constexpr int UNIFIED_BATCH_SIZE = 8;
 inline constexpr int UDP_LOG_PORT = 8890;
 inline constexpr int HEARTBEAT_TIMEOUT_MS = 5000;
 
@@ -272,6 +274,61 @@ struct StatusPacket {
 };
 
 static_assert(sizeof(StatusPacket) == 17, "StatusPacket size mismatch");
+
+// =============================================================================
+// 0x50: Unified Packet (8 IMU cycles + sensor entries, ~950B max, 50Hz)
+// 統合パケット（8 IMUサイクル + センサエントリ、最大~950B、50Hz）
+//
+// Structure:
+//   [PacketHeader 4B]
+//   [ImuEskfSample × 8]  (640B, fixed)
+//   [PosVelSample × 8]   (224B, fixed)
+//   [entry_count 1B]      (number of sensor entries that follow)
+//   [SensorEntry × N]     (variable, each prefixed with sensor_id + size)
+//   [checksum 1B]
+//
+// SensorEntry:
+//   [sensor_id 1B][size 1B][data ...]
+//
+// This packs all data from 8 IMU cycles into a single sendto() call.
+// 8 IMUサイクル分の全データを1回の sendto() に詰める。
+// =============================================================================
+
+/// Sensor entry header for variable-length sensor data in unified packet
+/// 統合パケット内の可変長センサデータ用エントリヘッダ
+struct SensorEntryHeader {
+    uint8_t sensor_id;   // PKT_CONTROL, PKT_FLOW, etc.
+    uint8_t data_size;   // Size of data following this header
+};
+
+static_assert(sizeof(SensorEntryHeader) == 2, "SensorEntryHeader size mismatch");
+
+/// Maximum unified packet size (must fit in UDP MTU)
+/// 統合パケットの最大サイズ（UDP MTU に収まること）
+inline constexpr int UNIFIED_MAX_SIZE = 1024;
+
+/// Unified packet buffer (built dynamically)
+/// 統合パケットバッファ（動的に構築）
+struct UnifiedPacket {
+    uint8_t buf[UNIFIED_MAX_SIZE];
+    int len = 0;
+
+    void reset() { len = 0; }
+
+    bool append(const void* data, int size) {
+        if (len + size > UNIFIED_MAX_SIZE) return false;
+        memcpy(&buf[len], data, size);
+        len += size;
+        return true;
+    }
+
+    void finalize() {
+        // Append checksum (XOR of all preceding bytes)
+        uint8_t xor_val = 0;
+        for (int i = 0; i < len; i++) xor_val ^= buf[i];
+        if (len < UNIFIED_MAX_SIZE) buf[len++] = xor_val;
+    }
+};
 
 #pragma pack(pop)
 

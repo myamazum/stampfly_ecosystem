@@ -177,6 +177,53 @@ def parse_packet(data: bytes) -> list:
     # Parse header
     pkt_id, seq, count = struct.unpack_from(FMT_HEADER, data, 0)
 
+    # Unified packet (0x50): 8× IMU+ESKF + 8× PosVel + sensor entries
+    # 統合パケット: 8× IMU+ESKF + 8× PosVel + センサエントリ
+    PKT_UNIFIED = 0x50
+    if pkt_id == PKT_UNIFIED:
+        results = []
+        offset = 4  # after header
+
+        # 8× ImuEskfSample (80B each)
+        for i in range(8):
+            values = struct.unpack_from(FMT_IMU_ESKF, data, offset)
+            sample = dict(zip(CSV_COLUMNS[PKT_IMU_ESKF], values))
+            for key in ['gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z',
+                        'accel_bias_x', 'accel_bias_y', 'accel_bias_z']:
+                sample[key] = sample[key] / 10000.0
+            results.append((PKT_IMU_ESKF, sample))
+            offset += 80
+
+        # 8× PosVelSample (28B each)
+        for i in range(8):
+            values = struct.unpack_from(FMT_POS_VEL, data, offset)
+            sample = dict(zip(CSV_COLUMNS[PKT_POS_VEL], values))
+            results.append((PKT_POS_VEL, sample))
+            offset += 28
+
+        # Entry count (1B)
+        entry_count = data[offset]
+        offset += 1
+
+        # Sensor entries (variable)
+        for i in range(entry_count):
+            if offset + 2 > len(data) - 1:  # -1 for checksum
+                break
+            sensor_id = data[offset]
+            data_size = data[offset + 1]
+            offset += 2
+
+            if sensor_id in SAMPLE_INFO and offset + data_size <= len(data) - 1:
+                _, fmt, sample_size = SAMPLE_INFO[sensor_id]
+                if data_size == sample_size:
+                    columns = CSV_COLUMNS[sensor_id]
+                    values = struct.unpack_from(fmt, data, offset)
+                    sample = dict(zip(columns, values))
+                    results.append((sensor_id, sample))
+            offset += data_size
+
+        return results
+
     if pkt_id not in SAMPLE_INFO:
         # Status packet (0x4F) — handle separately
         if pkt_id == PKT_STATUS:

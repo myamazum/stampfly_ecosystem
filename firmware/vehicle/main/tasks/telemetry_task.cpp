@@ -40,23 +40,28 @@ using namespace stampfly::udp_telem;
 // Send queue
 // 送信キュー
 struct SendItem {
-    uint8_t data[340];   // Max: ImuEskfBatchPacket = 325B
+    uint8_t data[UNIFIED_MAX_SIZE];  // Max: unified packet ~950B
     uint16_t len;
 };
 
 static QueueHandle_t s_send_queue = nullptr;
 static constexpr int SEND_QUEUE_SIZE = 4;
 
-// UDP batch accumulators
-// UDP バッチ蓄積器
-static BatchAccumulator<ImuEskfBatchPacket, ImuEskfSample> s_imu_acc;
-static BatchAccumulator<PosVelBatchPacket, PosVelSample> s_posvel_acc;
-static BatchAccumulator<ControlBatchPacket, ControlSample> s_ctrl_acc;
-static BatchAccumulator<FlowBatchPacket, FlowSample> s_flow_acc;
-static BatchAccumulator<ToFBatchPacket, ToFSingleSample> s_tof_bottom_acc;
-static BatchAccumulator<ToFBatchPacket, ToFSingleSample> s_tof_front_acc;
-static BatchAccumulator<BaroBatchPacket, BaroSample> s_baro_acc;
-static BatchAccumulator<MagBatchPacket, MagSample> s_mag_acc;
+// Unified packet: accumulate 8 IMU cycles + sensor entries
+// 統合パケット: 8 IMUサイクル + センサエントリを蓄積
+static ImuEskfSample s_imu_buf[UNIFIED_BATCH_SIZE];
+static PosVelSample s_posvel_buf[UNIFIED_BATCH_SIZE];
+static int s_unified_count = 0;  // 0..7, send when reaches 8
+
+// Sensor entries accumulated during 8 cycles (variable part)
+// 8サイクル中に蓄積されるセンサエントリ（可変部分）
+struct PendingSensor {
+    uint8_t id;
+    uint8_t data[20];  // max single sensor sample size
+    uint8_t size;
+};
+static PendingSensor s_pending_sensors[32];  // max entries per unified packet
+static int s_pending_count = 0;
 
 // WebSocket batch packet
 // WebSocket バッチパケット
@@ -73,14 +78,8 @@ static SendItem s_send_item;
 
 static void resetUdpState()
 {
-    s_imu_acc.reset();
-    s_posvel_acc.reset();
-    s_ctrl_acc.reset();
-    s_flow_acc.reset();
-    s_tof_bottom_acc.reset();
-    s_tof_front_acc.reset();
-    s_baro_acc.reset();
-    s_mag_acc.reset();
+    s_unified_count = 0;
+    s_pending_count = 0;
     if (s_send_queue) xQueueReset(s_send_queue);
 }
 
@@ -251,6 +250,59 @@ static void fillWsSample(stampfly::ExtendedSample& s, int idx, uint32_t imu_ts,
 // UDP モード: 1サイクル分のセンサデータを収集
 // =============================================================================
 
+/// Add a sensor entry to pending list
+/// センサエントリを保留リストに追加
+static void addSensorEntry(uint8_t id, const void* data, uint8_t size)
+{
+    if (s_pending_count >= 32 || size > sizeof(PendingSensor::data)) return;
+    auto& e = s_pending_sensors[s_pending_count++];
+    e.id = id;
+    e.size = size;
+    memcpy(e.data, data, size);
+}
+
+/// Build and enqueue the unified packet from accumulated data
+/// 蓄積データから統合パケットを構築してキューに投入
+static void sendUnifiedPacket()
+{
+    static UnifiedPacket pkt;
+    pkt.reset();
+
+    // Header
+    PacketHeader hdr;
+    hdr.packet_id = PKT_UNIFIED;
+    hdr.sequence = 0;  // TODO: add sequence counter if needed
+    hdr.sample_count = UNIFIED_BATCH_SIZE;
+    pkt.append(&hdr, sizeof(hdr));
+
+    // Fixed part: 8× IMU+ESKF + 8× PosVel
+    pkt.append(s_imu_buf, sizeof(s_imu_buf));
+    pkt.append(s_posvel_buf, sizeof(s_posvel_buf));
+
+    // Entry count
+    uint8_t entry_count = (uint8_t)s_pending_count;
+    pkt.append(&entry_count, 1);
+
+    // Variable part: sensor entries
+    for (int i = 0; i < s_pending_count; i++) {
+        SensorEntryHeader eh;
+        eh.sensor_id = s_pending_sensors[i].id;
+        eh.data_size = s_pending_sensors[i].size;
+        pkt.append(&eh, sizeof(eh));
+        pkt.append(s_pending_sensors[i].data, s_pending_sensors[i].size);
+    }
+
+    // Checksum
+    pkt.finalize();
+
+    // Enqueue
+    enqueue(pkt.buf, pkt.len);
+
+    // Reset for next cycle
+    s_unified_count = 0;
+    s_pending_count = 0;
+}
+
 static void udpCollectCycle(int read_idx, uint32_t imu_ts,
                             stampfly::StampFlyState& state,
                             int cycle, int& status_cnt,
@@ -258,29 +310,21 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
                             uint32_t& last_tof_front_ts,
                             uint32_t& last_baro_ts, uint32_t& last_mag_ts)
 {
-    // 400Hz: IMU + ESKF
-    ImuEskfSample imu_s;
-    fillImuEskf(imu_s, read_idx, imu_ts);
-    auto* imu_pkt = s_imu_acc.addSample(imu_s, PKT_IMU_ESKF);
-    if (imu_pkt) enqueue(imu_pkt, sizeof(*imu_pkt));
+    // 400Hz: accumulate IMU + PosVel into buffers
+    // 400Hz: IMU + PosVel をバッファに蓄積
+    fillImuEskf(s_imu_buf[s_unified_count], read_idx, imu_ts);
+    fillPosVel(s_posvel_buf[s_unified_count], imu_ts);
 
-    // 400Hz: Position + Velocity
-    PosVelSample pv_s;
-    fillPosVel(pv_s, imu_ts);
-    auto* pv_pkt = s_posvel_acc.addSample(pv_s, PKT_POS_VEL);
-    if (pv_pkt) enqueue(pv_pkt, sizeof(*pv_pkt));
+    // Sensor data: detect new data via timestamp change, add as entries
+    // センサデータ: タイムスタンプ変化で検出、エントリとして追加
 
-    // 50Hz: Control (every 8th cycle)
+    // Control (~50Hz)
     if ((cycle & 7) == 0) {
         ControlSample cs;
         cs.timestamp_us = imu_ts;
         state.getControlInput(cs.throttle, cs.roll, cs.pitch, cs.yaw);
-        auto* pkt = s_ctrl_acc.addSample(cs, PKT_CONTROL);
-        if (pkt) enqueue(pkt, sizeof(*pkt));
+        addSensorEntry(PKT_CONTROL, &cs, sizeof(cs));
     }
-
-    // Sensor data: detect new data via timestamp change
-    // センサデータ: タイムスタンプ変化で新データを検出
 
     // Optical Flow (~100Hz)
     if (uint32_t ts = g_flow_last_timestamp_us; ts != last_flow_ts && ts != 0) {
@@ -290,8 +334,7 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         int16_t dx, dy; uint8_t sq;
         state.getFlowRawData(dx, dy, sq);
         fs.flow_dx = dx; fs.flow_dy = dy; fs.quality = sq;
-        auto* pkt = s_flow_acc.addSample(fs, PKT_FLOW);
-        if (pkt) enqueue(pkt, sizeof(*pkt));
+        addSensorEntry(PKT_FLOW, &fs, sizeof(fs));
     }
 
     // ToF Bottom (~30Hz)
@@ -304,11 +347,10 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         uint8_t sb, sf_s;
         state.getToFStatus(sb, sf_s);
         s.distance = tb; s.status = sb;
-        auto* pkt = s_tof_bottom_acc.addSample(s, PKT_TOF_BOTTOM);
-        if (pkt) enqueue(pkt, sizeof(*pkt));
+        addSensorEntry(PKT_TOF_BOTTOM, &s, sizeof(s));
     }
 
-    // ToF Front (~30Hz, may not be initialized)
+    // ToF Front (~30Hz)
     if (uint32_t ts = g_tof_front_last_timestamp_us; ts != last_tof_front_ts && ts != 0) {
         last_tof_front_ts = ts;
         ToFSingleSample s;
@@ -318,8 +360,7 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         uint8_t sb, sf_s;
         state.getToFStatus(sb, sf_s);
         s.distance = tf; s.status = sf_s;
-        auto* pkt = s_tof_front_acc.addSample(s, PKT_TOF_FRONT);
-        if (pkt) enqueue(pkt, sizeof(*pkt));
+        addSensorEntry(PKT_TOF_FRONT, &s, sizeof(s));
     }
 
     // Barometer (~50Hz)
@@ -330,8 +371,7 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         float ba, bp;
         state.getBaroData(ba, bp);
         bs.altitude = ba; bs.pressure = bp;
-        auto* pkt = s_baro_acc.addSample(bs, PKT_BARO);
-        if (pkt) enqueue(pkt, sizeof(*pkt));
+        addSensorEntry(PKT_BARO, &bs, sizeof(bs));
     }
 
     // Magnetometer (~25Hz)
@@ -342,11 +382,18 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         stampfly::Vec3 md;
         state.getMagData(md);
         ms.mag_x = md.x; ms.mag_y = md.y; ms.mag_z = md.z;
-        auto* pkt = s_mag_acc.addSample(ms, PKT_MAG);
-        if (pkt) enqueue(pkt, sizeof(*pkt));
+        addSensorEntry(PKT_MAG, &ms, sizeof(ms));
     }
 
-    // 1Hz: Status
+    // Advance unified counter, send when 8 cycles accumulated
+    // 統合カウンタを進め、8サイクル蓄積で送信
+    s_unified_count++;
+    if (s_unified_count >= UNIFIED_BATCH_SIZE) {
+        sendUnifiedPacket();
+    }
+
+    // 1Hz: Status (sent as separate small packet)
+    // 1Hz: ステータス（別パケットで送信）
     if (++status_cnt >= 400) {
         status_cnt = 0;
         StatusPacket sp = {};
@@ -427,8 +474,8 @@ void TelemetryTask(void* pvParameters)
             if (lag > MAX_LAG) {
                 read_idx = (head - 4 + IMU_BUFFER_SIZE) % IMU_BUFFER_SIZE;
                 ws_batch_idx = 0;
-                s_imu_acc.reset();
-                s_posvel_acc.reset();
+                s_unified_count = 0;
+                s_pending_count = 0;
             }
         }
 
