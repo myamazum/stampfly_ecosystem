@@ -440,6 +440,18 @@ class UDPTelemetryCapture:
 
         all_entries.sort(key=lambda e: e[0])
 
+        # Trim startup gap: if there's a gap > 1 second in the first 10 entries,
+        # discard everything before the gap (partial batch from before capture start)
+        # 起動時ギャップ除去: 最初の10エントリ内に1秒以上のギャップがあれば
+        # ギャップ前のデータを破棄（キャプチャ開始前の不完全バッチ）
+        if len(all_entries) > 10:
+            for i in range(1, min(10, len(all_entries))):
+                gap_us = all_entries[i][0] - all_entries[i-1][0]
+                if gap_us > 1_000_000:  # > 1 second
+                    all_entries = all_entries[i:]
+                    print(f"  Trimmed {i} startup samples (gap: {gap_us/1e6:.1f}s)")
+                    break
+
         # Write JSONLines
         with open(filepath, 'w') as f:
             for ts, pkt_id, sample in all_entries:
