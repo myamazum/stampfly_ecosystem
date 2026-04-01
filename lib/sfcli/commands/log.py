@@ -556,8 +556,12 @@ def run_viz(args: argparse.Namespace) -> int:
 
     console.info(f"Visualizing: {path.name}")
 
+    # JSONL files always use interactive mode (no matplotlib support)
+    # JSONL ファイルは常にインタラクティブモード（matplotlib 非対応）
+    is_interactive = getattr(args, 'interactive', False) or path.suffix == '.jsonl'
+
     # Interactive mode (Plotly)
-    if getattr(args, 'interactive', False):
+    if is_interactive:
         try:
             sys.path.insert(0, str(paths.root() / "tools" / "log_analyzer"))
             import visualize_interactive
