@@ -332,6 +332,22 @@ def load_jsonl(filepath: str) -> dict:
     # Add all signal data
     data.update(sensor_data)
 
+    # Compute corrected IMU (gyro - bias, accel - bias)
+    # バイアス補正済み IMU を計算（gyro - bias, accel - bias）
+    if all(k in data for k in ['gyro_x', 'gyro_bias_x']):
+        n = len(data['gyro_x'])
+        for axis in ['x', 'y', 'z']:
+            g = data[f'gyro_{axis}']
+            b = data[f'gyro_bias_{axis}']
+            data[f'gyro_corrected_{axis}'] = [g[i] - b[i] for i in range(n)]
+
+    if all(k in data for k in ['accel_x', 'accel_bias_x']):
+        n = len(data['accel_x'])
+        for axis in ['x', 'y', 'z']:
+            a = data[f'accel_{axis}']
+            b = data[f'accel_bias_{axis}']
+            data[f'accel_corrected_{axis}'] = [a[i] - b[i] for i in range(n)]
+
     # Compute derived signals from quaternion (same as load_csv)
     # クォータニオンから派生信号を計算（load_csv と同じ）
     if all(k in data for k in ['quat_w', 'quat_x', 'quat_y', 'quat_z']):
