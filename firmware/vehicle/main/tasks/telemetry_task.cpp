@@ -45,7 +45,7 @@ struct SendItem {
 };
 
 static QueueHandle_t s_send_queue = nullptr;
-static constexpr int SEND_QUEUE_SIZE = 16;
+static constexpr int SEND_QUEUE_SIZE = 4;
 
 // UDP batch accumulators
 // UDP バッチ蓄積器
