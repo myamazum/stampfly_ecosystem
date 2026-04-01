@@ -37,37 +37,43 @@ using namespace stampfly;
 // 統計ヘルパー
 // =============================================================================
 
+// Use static buffer to avoid stack overflow (WiFi CLI task has only 4KB stack)
+// スタックオーバーフロー防止のため static バッファ使用（WiFi CLIタスクは4KBのみ）
+static constexpr int MAX_BENCH_SAMPLES = 200;
+
 struct BenchStats {
-    uint64_t times[200];
+    static uint32_t times[MAX_BENCH_SAMPLES];  // shared static buffer (uint32 saves space)
     int count = 0;
 
-    void record(uint64_t us) {
-        if (count < 200) {
+    void reset() { count = 0; }
+
+    void record(uint32_t us) {
+        if (count < MAX_BENCH_SAMPLES) {
             times[count++] = us;
         }
     }
 
-    void compute(uint64_t& avg, uint64_t& min_v, uint64_t& max_v, uint64_t& p99) const {
+    void compute(uint32_t& avg, uint32_t& min_v, uint32_t& max_v, uint32_t& p99) const {
         if (count == 0) {
             avg = min_v = max_v = p99 = 0;
             return;
         }
 
-        // Copy and sort for percentile
-        // ソートしてパーセンタイル計算
-        uint64_t sorted[200];
-        memcpy(sorted, times, count * sizeof(uint64_t));
-        std::sort(sorted, sorted + count);
+        // Sort in-place (static buffer, only one bench runs at a time)
+        // ソート（staticバッファ、ベンチは同時に1つだけ実行）
+        std::sort(times, times + count);
 
-        min_v = sorted[0];
-        max_v = sorted[count - 1];
-        p99 = sorted[(int)(count * 0.99)];
+        min_v = times[0];
+        max_v = times[count - 1];
+        p99 = times[(int)(count * 0.99)];
 
         uint64_t sum = 0;
-        for (int i = 0; i < count; i++) sum += sorted[i];
-        avg = sum / count;
+        for (int i = 0; i < count; i++) sum += times[i];
+        avg = (uint32_t)(sum / count);
     }
 };
+
+uint32_t BenchStats::times[MAX_BENCH_SAMPLES];
 
 // =============================================================================
 // UDP benchmark
@@ -89,9 +95,9 @@ static void bench_udp(Console& console, const char* dest_ip, int iterations)
     dest_addr.sin_port = htons(8890);
     inet_aton(dest_ip, &dest_addr.sin_addr);
 
-    // Test buffer (filled with dummy data)
-    // テストバッファ（ダミーデータ）
-    uint8_t buf[1024];
+    // Test buffer (static to avoid stack overflow)
+    // テストバッファ（スタックオーバーフロー防止のため static）
+    static uint8_t buf[1024];
     memset(buf, 0xAA, sizeof(buf));
 
     int sizes[] = {117, 325, 840};
@@ -106,10 +112,10 @@ static void bench_udp(Console& console, const char* dest_ip, int iterations)
         BenchStats stats;
 
         for (int i = 0; i < iterations; i++) {
-            uint64_t start = esp_timer_get_time();
+            uint32_t start = (uint32_t)esp_timer_get_time();
             sendto(sock, buf, size, 0,
                    (struct sockaddr*)&dest_addr, sizeof(dest_addr));
-            uint64_t elapsed = esp_timer_get_time() - start;
+            uint32_t elapsed = (uint32_t)esp_timer_get_time() - start;
             stats.record(elapsed);
 
             // Small delay to avoid flooding
@@ -117,9 +123,9 @@ static void bench_udp(Console& console, const char* dest_ip, int iterations)
             vTaskDelay(pdMS_TO_TICKS(1));
         }
 
-        uint64_t avg, min_v, max_v, p99;
+        uint32_t avg, min_v, max_v, p99;
         stats.compute(avg, min_v, max_v, p99);
-        console.print("  %3dB:  %-8llu %-8llu %-8llu %-8llu\r\n",
+        console.print("  %3dB:  %-8lu %-8lu %-8lu %-8lu\r\n",
                        size, avg, min_v, max_v, p99);
     }
 
@@ -145,7 +151,7 @@ static void bench_udp_continuous(Console& console, const char* dest_ip,
     dest_addr.sin_port = htons(8890);
     inet_aton(dest_ip, &dest_addr.sin_addr);
 
-    uint8_t buf[1024];
+    static uint8_t buf[1024];
     memset(buf, 0xBB, sizeof(buf));
 
     int total_sends = rate_hz * duration_sec;
@@ -155,22 +161,19 @@ static void bench_udp_continuous(Console& console, const char* dest_ip,
     console.print("\r\nUDP continuous: %dB × %dHz × %ds = %d packets\r\n",
                    size, rate_hz, duration_sec, total_sends);
 
-    TickType_t next_wake = xTaskGetTickCount();
-
     for (int i = 0; i < total_sends && i < 200; i++) {
-        uint64_t start = esp_timer_get_time();
+        uint32_t start = (uint32_t)esp_timer_get_time();
         sendto(sock, buf, size, 0,
                (struct sockaddr*)&dest_addr, sizeof(dest_addr));
-        uint64_t elapsed = esp_timer_get_time() - start;
+        uint32_t elapsed = (uint32_t)esp_timer_get_time() - start;
         stats.record(elapsed);
 
-        next_wake += pdMS_TO_TICKS(interval_ms);
-        vTaskDelayUntil(&next_wake, pdMS_TO_TICKS(interval_ms));
+        vTaskDelay(pdMS_TO_TICKS(interval_ms));
     }
 
-    uint64_t avg, min_v, max_v, p99;
+    uint32_t avg, min_v, max_v, p99;
     stats.compute(avg, min_v, max_v, p99);
-    console.print("  avg=%-6lluus  min=%-6lluus  max=%-6lluus  P99=%-6lluus\r\n",
+    console.print("  avg=%-6luus  min=%-6luus  max=%-6luus  P99=%-6luus\r\n",
                    avg, min_v, max_v, p99);
 
     close(sock);
@@ -191,7 +194,7 @@ static void bench_tcp(Console& console, int iterations)
         return;
     }
 
-    uint8_t buf[840];
+    static uint8_t buf[840];
     memset(buf, 0xCC, sizeof(buf));
 
     console.print("\r\nTCP httpd_ws_send_frame_async() [WebSocket client]\r\n");
@@ -201,9 +204,9 @@ static void bench_tcp(Console& console, int iterations)
     BenchStats stats;
 
     for (int i = 0; i < iterations; i++) {
-        uint64_t start = esp_timer_get_time();
+        uint32_t start = (uint32_t)esp_timer_get_time();
         telemetry.broadcast(buf, 840);
-        uint64_t elapsed = esp_timer_get_time() - start;
+        uint32_t elapsed = (uint32_t)esp_timer_get_time() - start;
         stats.record(elapsed);
 
         // Match telemetry send rate (~10ms)
@@ -211,9 +214,9 @@ static void bench_tcp(Console& console, int iterations)
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
-    uint64_t avg, min_v, max_v, p99;
+    uint32_t avg, min_v, max_v, p99;
     stats.compute(avg, min_v, max_v, p99);
-    console.print("  840B:  %-8llu %-8llu %-8llu %-8llu\r\n",
+    console.print("  840B:  %-8lu %-8lu %-8lu %-8lu\r\n",
                    avg, min_v, max_v, p99);
 }
 
