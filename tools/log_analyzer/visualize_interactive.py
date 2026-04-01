@@ -332,6 +332,19 @@ def load_jsonl(filepath: str) -> dict:
     # Add all signal data
     data.update(sensor_data)
 
+    # Compute derived signals from quaternion (same as load_csv)
+    # クォータニオンから派生信号を計算（load_csv と同じ）
+    if all(k in data for k in ['quat_w', 'quat_x', 'quat_y', 'quat_z']):
+        n = len(data['quat_w'])
+        data['roll_deg'] = [0.0] * n
+        data['pitch_deg'] = [0.0] * n
+        data['yaw_deg'] = [0.0] * n
+        for i in range(n):
+            w, x, y, z = data['quat_w'][i], data['quat_x'][i], data['quat_y'][i], data['quat_z'][i]
+            data['roll_deg'][i] = math.degrees(math.atan2(2*(w*x + y*z), 1 - 2*(x*x + y*y)))
+            data['pitch_deg'][i] = math.degrees(math.asin(max(-1, min(1, 2*(w*y - z*x)))))
+            data['yaw_deg'][i] = math.degrees(math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z)))
+
     return data
 
 
@@ -718,9 +731,11 @@ button.danger {{ color: #e6194b; border-color: #e6194b; }}
 
     <div id="controls">
         <button class="primary" onclick="addPlot()">+ Add Plot</button>
-        <button onclick="addPreset('imu')">IMU Preset</button>
-        <button onclick="addPreset('eskf')">ESKF Preset</button>
-        <button onclick="addPreset('bias')">Bias Preset</button>
+        <button onclick="addPreset('imu')">IMU</button>
+        <button onclick="addPreset('eskf')">ESKF</button>
+        <button onclick="addPreset('bias')">Bias</button>
+        <button onclick="addPreset('flight')">Flight</button>
+        <button onclick="addPreset('sensors')">Sensors</button>
         <button onclick="clearAll()">Clear All</button>
         <div style="margin-top:6px">
             <label><input type="checkbox" id="sync-x" checked> Sync time axis</label>
@@ -1058,8 +1073,6 @@ function addPreset(name) {{
         ['gyro_x', 'gyro_y', 'gyro_z'].forEach(k => addSignalToPlot(p1, k, k));
         const p2 = addPlot();
         ['accel_x', 'accel_y', 'accel_z'].forEach(k => addSignalToPlot(p2, k, k));
-        const p3 = addPlot();
-        ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z'].forEach(k => addSignalToPlot(p3, k, k));
     }} else if (name === 'eskf') {{
         const p1 = addPlot();
         ['roll_deg', 'pitch_deg', 'yaw_deg'].forEach(k => addSignalToPlot(p1, k, k));
@@ -1072,6 +1085,22 @@ function addPreset(name) {{
         ['gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z'].forEach(k => addSignalToPlot(p1, k, k));
         const p2 = addPlot();
         ['accel_bias_x', 'accel_bias_y', 'accel_bias_z'].forEach(k => addSignalToPlot(p2, k, k));
+    }} else if (name === 'flight') {{
+        const p1 = addPlot();
+        ['roll_deg', 'pitch_deg'].forEach(k => addSignalToPlot(p1, k, k));
+        const p2 = addPlot();
+        ['ctrl_throttle'].forEach(k => addSignalToPlot(p2, k, k));
+        const p3 = addPlot();
+        ['tof_bottom'].forEach(k => addSignalToPlot(p3, k, k));
+        const p4 = addPlot();
+        ['gyro_x', 'gyro_y', 'gyro_z'].forEach(k => addSignalToPlot(p4, k, k));
+    }} else if (name === 'sensors') {{
+        const p1 = addPlot();
+        ['tof_bottom', 'baro_altitude'].forEach(k => addSignalToPlot(p1, k, k));
+        const p2 = addPlot();
+        ['flow_x', 'flow_y'].forEach(k => addSignalToPlot(p2, k, k));
+        const p3 = addPlot();
+        ['mag_x', 'mag_y', 'mag_z'].forEach(k => addSignalToPlot(p3, k, k));
     }}
 }}
 
