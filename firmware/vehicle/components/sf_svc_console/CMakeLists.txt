@@ -10,6 +10,7 @@ idf_component_register(
         "commands/cmd_misc.cpp"
         "commands/cmd_flight.cpp"
         "commands/cmd_query.cpp"
+        "commands/cmd_wifi_bench.cpp"
     INCLUDE_DIRS
         "include"
     REQUIRES
@@ -30,6 +31,7 @@ idf_component_register(
         sf_algo_control
         sf_algo_pid
         sf_svc_flight_command
+        sf_svc_telemetry
 )
 
 # vehicle/main/rate_controller.hpp へのアクセス（コンソールからゲイン調整用）

@@ -56,6 +56,14 @@ void TelemetryTask(void* pvParameters)
     vTaskDelay(pdMS_TO_TICKS(100));
     telemetry_read_index = g_accel_buf.raw_index();
 
+    // TODO: テレメトリ送信を一時無効化（ESP-NOW干渉テスト用）
+    // Re-enable after confirming control stability without telemetry TX
+    ESP_LOGW(TAG, "Telemetry TX DISABLED for ESP-NOW interference test");
+    while (true) {
+        xSemaphoreTake(g_telemetry_imu_semaphore, pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(100));  // Idle loop
+    }
+
     while (true) {
         // Wait for IMU update (400Hz, synchronized with IMU task)
         // IMU更新を待機（400Hz、IMUタスクと同期）

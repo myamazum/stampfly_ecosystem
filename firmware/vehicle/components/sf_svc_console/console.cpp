@@ -24,6 +24,7 @@ void register_calib_commands();
 void register_misc_commands();
 void register_flight_commands();
 void register_query_commands();
+void register_wifi_bench_command();
 }
 
 namespace stampfly {
@@ -92,6 +93,7 @@ void Console::registerAllCommands()
     register_misc_commands();
     register_flight_commands();
     register_query_commands();
+    register_wifi_bench_command();
 
     ESP_LOGI(TAG, "All commands registered");
 }
