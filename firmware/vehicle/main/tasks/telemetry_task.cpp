@@ -115,6 +115,13 @@ void TelemetryTask(void* pvParameters)
     // Status packet counter (1Hz)
     int status_counter = 0;
 
+    // Last-seen timestamps for sensor data_ready detection (no flag race)
+    // センサ新データ検出用の前回タイムスタンプ（フラグ競合なし）
+    uint32_t last_flow_ts = 0;
+    uint32_t last_tof_ts = 0;
+    uint32_t last_baro_ts = 0;
+    uint32_t last_mag_ts = 0;
+
     // Bandwidth monitoring
     static uint32_t udp_bytes_sent = 0;
     static uint32_t udp_stats_time = 0;
@@ -196,77 +203,91 @@ void TelemetryTask(void* pvParameters)
                 }
             }
 
-            // --- Sensor data: send when new data is ready ---
-            // センサデータ: 新しいデータがあるときだけ送信
+            // --- Sensor data: detect new data via timestamp change ---
+            // --- (avoids race condition with imu_task's data_ready flags) ---
+            // センサデータ: タイムスタンプ変化で新データを検出
+            // （imu_task の data_ready フラグとの競合を回避）
 
             // Optical Flow (~100Hz)
-            if (g_optflow_data_ready) {
-                g_optflow_data_ready = false;
-                FlowSample flow_sample;
-                flow_sample.timestamp_us = g_flow_last_timestamp_us;
-                int16_t dx, dy;
-                uint8_t sq;
-                state.getFlowRawData(dx, dy, sq);
-                flow_sample.flow_dx = dx;
-                flow_sample.flow_dy = dy;
-                flow_sample.quality = sq;
-                auto* flow_pkt = flow_acc.addSample(flow_sample, PKT_FLOW);
-                if (flow_pkt) {
-                    int sent = udp_log.send(flow_pkt, sizeof(*flow_pkt));
-                    if (sent > 0) udp_bytes_sent += sent;
+            {
+                uint32_t ts = g_flow_last_timestamp_us;
+                if (ts != last_flow_ts && ts != 0) {
+                    last_flow_ts = ts;
+                    FlowSample flow_sample;
+                    flow_sample.timestamp_us = ts;
+                    int16_t dx, dy;
+                    uint8_t sq;
+                    state.getFlowRawData(dx, dy, sq);
+                    flow_sample.flow_dx = dx;
+                    flow_sample.flow_dy = dy;
+                    flow_sample.quality = sq;
+                    auto* flow_pkt = flow_acc.addSample(flow_sample, PKT_FLOW);
+                    if (flow_pkt) {
+                        int sent = udp_log.send(flow_pkt, sizeof(*flow_pkt));
+                        if (sent > 0) udp_bytes_sent += sent;
+                    }
                 }
             }
 
             // ToF (~30Hz)
-            if (g_tof_bottom_data_ready) {
-                g_tof_bottom_data_ready = false;
-                ToFSample tof_sample;
-                tof_sample.timestamp_us = g_tof_last_timestamp_us;
-                float tb, tf;
-                state.getToFData(tb, tf);
-                tof_sample.tof_bottom = tb;
-                tof_sample.tof_front = tf;
-                uint8_t sb, sf_s;
-                state.getToFStatus(sb, sf_s);
-                tof_sample.status_bottom = sb;
-                tof_sample.status_front = sf_s;
-                auto* tof_pkt = tof_acc.addSample(tof_sample, PKT_TOF);
-                if (tof_pkt) {
-                    int sent = udp_log.send(tof_pkt, sizeof(*tof_pkt));
-                    if (sent > 0) udp_bytes_sent += sent;
+            {
+                uint32_t ts = g_tof_last_timestamp_us;
+                if (ts != last_tof_ts && ts != 0) {
+                    last_tof_ts = ts;
+                    ToFSample tof_sample;
+                    tof_sample.timestamp_us = ts;
+                    float tb, tf;
+                    state.getToFData(tb, tf);
+                    tof_sample.tof_bottom = tb;
+                    tof_sample.tof_front = tf;
+                    uint8_t sb, sf_s;
+                    state.getToFStatus(sb, sf_s);
+                    tof_sample.status_bottom = sb;
+                    tof_sample.status_front = sf_s;
+                    auto* tof_pkt = tof_acc.addSample(tof_sample, PKT_TOF);
+                    if (tof_pkt) {
+                        int sent = udp_log.send(tof_pkt, sizeof(*tof_pkt));
+                        if (sent > 0) udp_bytes_sent += sent;
+                    }
                 }
             }
 
             // Barometer (~50Hz)
-            if (g_baro_data_ready) {
-                g_baro_data_ready = false;
-                BaroSample baro_sample;
-                baro_sample.timestamp_us = g_baro_last_timestamp_us;
-                float ba, bp;
-                state.getBaroData(ba, bp);
-                baro_sample.altitude = ba;
-                baro_sample.pressure = bp;
-                auto* baro_pkt = baro_acc.addSample(baro_sample, PKT_BARO);
-                if (baro_pkt) {
-                    int sent = udp_log.send(baro_pkt, sizeof(*baro_pkt));
-                    if (sent > 0) udp_bytes_sent += sent;
+            {
+                uint32_t ts = g_baro_last_timestamp_us;
+                if (ts != last_baro_ts && ts != 0) {
+                    last_baro_ts = ts;
+                    BaroSample baro_sample;
+                    baro_sample.timestamp_us = ts;
+                    float ba, bp;
+                    state.getBaroData(ba, bp);
+                    baro_sample.altitude = ba;
+                    baro_sample.pressure = bp;
+                    auto* baro_pkt = baro_acc.addSample(baro_sample, PKT_BARO);
+                    if (baro_pkt) {
+                        int sent = udp_log.send(baro_pkt, sizeof(*baro_pkt));
+                        if (sent > 0) udp_bytes_sent += sent;
+                    }
                 }
             }
 
             // Magnetometer (~25Hz)
-            if (g_mag_data_ready) {
-                g_mag_data_ready = false;
-                MagSample mag_sample;
-                mag_sample.timestamp_us = g_mag_last_timestamp_us;
-                stampfly::Vec3 mag_data;
-                state.getMagData(mag_data);
-                mag_sample.mag_x = mag_data.x;
-                mag_sample.mag_y = mag_data.y;
-                mag_sample.mag_z = mag_data.z;
-                auto* mag_pkt = mag_acc.addSample(mag_sample, PKT_MAG);
-                if (mag_pkt) {
-                    int sent = udp_log.send(mag_pkt, sizeof(*mag_pkt));
-                    if (sent > 0) udp_bytes_sent += sent;
+            {
+                uint32_t ts = g_mag_last_timestamp_us;
+                if (ts != last_mag_ts && ts != 0) {
+                    last_mag_ts = ts;
+                    MagSample mag_sample;
+                    mag_sample.timestamp_us = ts;
+                    stampfly::Vec3 mag_data;
+                    state.getMagData(mag_data);
+                    mag_sample.mag_x = mag_data.x;
+                    mag_sample.mag_y = mag_data.y;
+                    mag_sample.mag_z = mag_data.z;
+                    auto* mag_pkt = mag_acc.addSample(mag_sample, PKT_MAG);
+                    if (mag_pkt) {
+                        int sent = udp_log.send(mag_pkt, sizeof(*mag_pkt));
+                        if (sent > 0) udp_bytes_sent += sent;
+                    }
                 }
             }
 

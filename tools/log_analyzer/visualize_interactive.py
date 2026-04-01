@@ -208,11 +208,22 @@ def load_csv(filepath: str) -> dict:
 
     data = {}
     for col in columns:
-        try:
-            vals = [float(r[col]) for r in rows]
+        vals = []
+        valid_count = 0
+        for r in rows:
+            v = r.get(col, '')
+            if v == '' or v is None:
+                vals.append(float('nan'))
+            else:
+                try:
+                    vals.append(float(v))
+                    valid_count += 1
+                except ValueError:
+                    vals.append(float('nan'))
+        # Only include columns that have at least some valid data
+        # 有効なデータが1つ以上ある列のみ含める
+        if valid_count > 0:
             data[col] = vals
-        except (ValueError, KeyError):
-            pass
 
     # Compute time in seconds (telemetry capture time)
     if 'timestamp_us' in data:
