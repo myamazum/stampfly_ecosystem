@@ -136,6 +136,77 @@ struct Vec3 {
 };
 
 /**
+ * @brief 2nd order Notch (Band-Reject) Filter
+ *
+ * H(s) = (s² + ω₀²) / (s² + (ω₀/Q)·s + ω₀²)
+ * Discretized using bilinear transform (Tustin).
+ *
+ * 2次ノッチフィルタ。双一次変換で離散化。
+ */
+class NotchFilter {
+public:
+    NotchFilter() = default;
+
+    /**
+     * @brief Initialize notch filter
+     * @param sample_freq Sampling frequency [Hz]
+     * @param notch_freq Center frequency to reject [Hz]
+     * @param Q Quality factor (higher = narrower notch)
+     */
+    void init(float sample_freq, float notch_freq, float Q) {
+        float w0 = 2.0f * 3.14159265f * notch_freq / sample_freq;
+        float sin_w0 = std::sin(w0);
+        float cos_w0 = std::cos(w0);
+        float alpha = sin_w0 / (2.0f * Q);
+
+        float a0_inv = 1.0f / (1.0f + alpha);
+        b0_ = a0_inv;
+        b1_ = -2.0f * cos_w0 * a0_inv;
+        b2_ = a0_inv;
+        a1_ = -2.0f * cos_w0 * a0_inv;
+        a2_ = (1.0f - alpha) * a0_inv;
+
+        reset();
+    }
+
+    /**
+     * @brief Apply filter to input sample
+     * @param input Input value
+     * @return Filtered value
+     */
+    float apply(float input) {
+        float output = b0_ * input + b1_ * x1_ + b2_ * x2_
+                        - a1_ * y1_ - a2_ * y2_;
+        x2_ = x1_; x1_ = input;
+        y2_ = y1_; y1_ = output;
+        return output;
+    }
+
+    /**
+     * @brief Reset filter state
+     */
+    void reset() {
+        x1_ = x2_ = y1_ = y2_ = 0.0f;
+    }
+
+    /**
+     * @brief Update notch frequency at runtime
+     * @param sample_freq Sampling frequency [Hz]
+     * @param notch_freq New center frequency [Hz]
+     * @param Q Quality factor
+     */
+    void setFrequency(float sample_freq, float notch_freq, float Q) {
+        init(sample_freq, notch_freq, Q);
+    }
+
+private:
+    float b0_ = 1.0f, b1_ = 0.0f, b2_ = 0.0f;
+    float a1_ = 0.0f, a2_ = 0.0f;
+    float x1_ = 0.0f, x2_ = 0.0f;
+    float y1_ = 0.0f, y2_ = 0.0f;
+};
+
+/**
  * @brief Outlier Detector
  */
 class OutlierDetector {

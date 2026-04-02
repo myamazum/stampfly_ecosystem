@@ -24,6 +24,7 @@
 #include "command_queue.hpp"    // for command queue processing
 #include "control_arbiter.hpp"  // for multi-source control input arbitration
 #include "sensor_fusion.hpp"    // for g_fusion state access (altitude/velocity)
+#include "filter.hpp"           // for NotchFilter
 #include <algorithm>            // for std::clamp
 
 // Trim values (defined in cli.cpp)
@@ -256,6 +257,19 @@ void ControlTask(void* pvParameters)
     g_attitude_controller.init();
     g_altitude_controller.init();
     g_position_controller.init();
+
+    // Gyro notch filter initialization
+    // ジャイロノッチフィルタ初期化
+    stampfly::NotchFilter gyro_notch[3];  // Roll, Pitch, Yaw
+    if (config::gyro_notch::ENABLED) {
+        constexpr float fs = 1.0f / IMU_DT;  // 400Hz
+        for (int i = 0; i < 3; i++) {
+            gyro_notch[i].init(fs, config::gyro_notch::CENTER_FREQ_HZ,
+                               config::gyro_notch::Q);
+        }
+        ESP_LOGI(TAG, "Gyro notch filter: %.0fHz Q=%.1f",
+                 config::gyro_notch::CENTER_FREQ_HZ, config::gyro_notch::Q);
+    }
 
     // 初期フライトモードをLEDに反映（デフォルト: ACRO=青）
     // Set initial flight mode LED (default: ACRO=blue)
@@ -691,6 +705,14 @@ void ControlTask(void* pvParameters)
         float roll_rate_current = gyro.x;   // [rad/s]
         float pitch_rate_current = gyro.y;  // [rad/s]
         float yaw_rate_current = gyro.z;    // [rad/s]
+
+        // Apply notch filter to gyro feedback (before PID)
+        // ノッチフィルタをジャイロフィードバックに適用（PID前）
+        if (config::gyro_notch::ENABLED) {
+            roll_rate_current = gyro_notch[0].apply(roll_rate_current);
+            pitch_rate_current = gyro_notch[1].apply(pitch_rate_current);
+            yaw_rate_current = gyro_notch[2].apply(yaw_rate_current);
+        }
 
         // デバッグ: ヨー関連の急変検出 → LED表示（1秒間維持）
         static float prev_yaw_cmd = 0.0f;
