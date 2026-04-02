@@ -451,24 +451,56 @@ def load_jsonl(filepath: str) -> dict:
         gyro_keys = ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z']
         pid_names = ['pid_out_roll', 'pid_out_pitch', 'pid_out_yaw']
 
-        # Reconstruct PID outputs
-        # PID出力を再構成
+        # Reconstruct PID outputs (matching firmware pid.cpp exactly)
+        # PID出力を再構成（ファームウェア pid.cpp を忠実に再現）
+        # - Trapezoidal integration (bilinear transform)
+        # - Derivative-on-Measurement (D-on-M)
+        # - Bilinear transform derivative filter
+        # - Back-calculation anti-windup (Tt = sqrt(Ti*Td))
         pid_out = [[0.0]*n for _ in range(3)]
         for axis in range(3):
             p = pid_cfg[axis]
             Kp, Ti, Td, eta, lim = p['Kp'], p['Ti'], p['Td'], p['eta'], p['lim']
+            Tt = math.sqrt(Ti * Td) if Ti > 0 and Td > 0 else Ti
             ref = data[rate_ref_keys[axis]]
             act = data[gyro_keys[axis]]
-            alpha = dt / (eta * Td + dt)
+
             integral = 0.0
             d_filt = 0.0
+            prev_error = 0.0
+            prev_d_input = -act[0]  # D-on-M: derivative of -measurement
+
             for i in range(1, n):
                 e = ref[i] - act[i]
-                integral += e * dt
-                de = (ref[i] - act[i] - ref[i-1] + act[i-1]) / dt
-                d_filt = alpha * de + (1 - alpha) * d_filt
-                out = Kp * (e + integral / Ti + Td * d_filt)
-                out = max(-lim, min(lim, out))
+
+                # P term
+                P = Kp * e
+
+                # I term: trapezoidal integration
+                integral += (dt / (2.0 * Ti)) * (e + prev_error)
+                I = Kp * integral
+
+                # D term: D-on-Measurement with bilinear transform filter
+                d_input = -act[i]  # D-on-M
+                alpha_d = 2.0 * eta * Td / dt
+                deriv_a = (alpha_d - 1.0) / (alpha_d + 1.0)
+                deriv_b = 2.0 * Td / ((alpha_d + 1.0) * dt)
+                d_filt = deriv_a * d_filt + deriv_b * (d_input - prev_d_input)
+                D = Kp * d_filt
+
+                # Unlimited output
+                out_unlimited = P + I + D
+
+                # Clamp
+                out = max(-lim, min(lim, out_unlimited))
+
+                # Anti-windup: back-calculation
+                saturation = out - out_unlimited
+                if saturation != 0.0:
+                    integral += saturation * (dt / Tt) / Kp
+
+                prev_error = e
+                prev_d_input = d_input
                 pid_out[axis][i] = out
             data[pid_names[axis]] = pid_out[axis]
 
