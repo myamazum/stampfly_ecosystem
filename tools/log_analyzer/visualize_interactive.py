@@ -136,6 +136,16 @@ SIGNAL_CATEGORIES = {
         ('ctrl_pitch', 'Pitch Cmd'),
         ('ctrl_yaw', 'Yaw Cmd'),
     ],
+    'Control - Angle Reference': [
+        ('angle_ref_roll_deg', 'Angle Ref Roll [deg]'),
+        ('angle_ref_pitch_deg', 'Angle Ref Pitch [deg]'),
+        ('flight_mode', 'Flight Mode'),
+    ],
+    'Control - Rate Reference': [
+        ('rate_ref_roll', 'Rate Ref Roll [rad/s]'),
+        ('rate_ref_pitch', 'Rate Ref Pitch [rad/s]'),
+        ('rate_ref_yaw', 'Rate Ref Yaw [rad/s]'),
+    ],
     'Sensors - Height': [
         ('baro_altitude', 'Baro Alt [m]'),
         ('baro_pressure', 'Baro Press [hPa]'),
@@ -252,6 +262,11 @@ def load_jsonl(filepath: str) -> dict:
             ('y', ['mag_y'], False),
             ('z', ['mag_z'], False),
         ],
+        'ctrl_ref': [
+            ('angle_ref', ['angle_ref_roll', 'angle_ref_pitch'], True),
+            ('rate_ref', ['rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw'], True),
+            ('mode', ['flight_mode'], False),
+        ],
     }
 
     # Collect per-sensor time and data arrays
@@ -313,6 +328,7 @@ def load_jsonl(filepath: str) -> dict:
         'tof_f': '_time_tof_f',
         'baro': '_time_baro',
         'mag': '_time_mag',
+        'ctrl_ref': '_time_ctrl_ref',
     }
 
     for sid, times in sensor_times.items():
@@ -370,6 +386,12 @@ def load_jsonl(filepath: str) -> dict:
             data['roll_deg'][i] = math.degrees(math.atan2(2*(w*x + y*z), 1 - 2*(x*x + y*y)))
             data['pitch_deg'][i] = math.degrees(math.asin(max(-1, min(1, 2*(w*y - z*x)))))
             data['yaw_deg'][i] = math.degrees(math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z)))
+
+    # Convert angle_ref from rad to deg for display
+    # 表示用に angle_ref を rad → deg 変換
+    if 'angle_ref_roll' in data:
+        data['angle_ref_roll_deg'] = [math.degrees(v) for v in data['angle_ref_roll']]
+        data['angle_ref_pitch_deg'] = [math.degrees(v) for v in data['angle_ref_pitch']]
 
     return data
 
