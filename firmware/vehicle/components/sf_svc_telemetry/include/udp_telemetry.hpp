@@ -179,18 +179,27 @@ static_assert(sizeof(ControlBatchPacket) == 85, "ControlBatchPacket size mismatc
 // 制御ループ目標値（18B/サンプル）
 // =============================================================================
 
+/// Control angle reference + flight mode (50Hz, variable sensor entry)
+/// 姿勢角目標値 + フライトモード（50Hz、可変センサエントリ）
 struct CtrlRefSample {
     uint32_t timestamp_us;       // 4B
     uint8_t  flight_mode;        // 1B (0=ACRO, 1=STABILIZE, 2=ALT_HOLD, 3=POS_HOLD)
     uint8_t  reserved;           // 1B
     int16_t  angle_ref_roll;     // 2B [rad × 10000] outer loop target angle
     int16_t  angle_ref_pitch;    // 2B [rad × 10000] outer loop target angle
+};
+
+static_assert(sizeof(CtrlRefSample) == 10, "CtrlRefSample size mismatch");
+
+/// Rate reference (400Hz, fixed part of unified packet, no timestamp - shares IMU ts)
+/// レート目標値（400Hz、統合パケット固定部分、タイムスタンプなし - IMU ts と共有）
+struct RateRefFixed {
     int16_t  rate_ref_roll;      // 2B [rad/s × 1000] inner loop target rate
     int16_t  rate_ref_pitch;     // 2B [rad/s × 1000] inner loop target rate
     int16_t  rate_ref_yaw;       // 2B [rad/s × 1000] inner loop target rate
 };
 
-static_assert(sizeof(CtrlRefSample) == 16, "CtrlRefSample size mismatch");
+static_assert(sizeof(RateRefFixed) == 6, "RateRefFixed size mismatch");
 
 // =============================================================================
 // 0x43: Optical Flow (9B/sample, batch 4 → 41B)
@@ -302,6 +311,7 @@ static_assert(sizeof(StatusPacket) == 17, "StatusPacket size mismatch");
 //   [PacketHeader 4B]
 //   [ImuEskfSample × 8]  (640B, fixed)
 //   [PosVelSample × 8]   (224B, fixed)
+//   [RateRefFixed × 8]   (48B, fixed)
 //   [entry_count 1B]      (number of sensor entries that follow)
 //   [SensorEntry × N]     (variable, each prefixed with sensor_id + size)
 //   [checksum 1B]

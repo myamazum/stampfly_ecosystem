@@ -51,6 +51,7 @@ static constexpr int SEND_QUEUE_SIZE = 4;
 // 統合パケット: 8 IMUサイクル + センサエントリを蓄積
 static ImuEskfSample s_imu_buf[UNIFIED_BATCH_SIZE];
 static PosVelSample s_posvel_buf[UNIFIED_BATCH_SIZE];
+static RateRefFixed s_rate_ref_buf[UNIFIED_BATCH_SIZE];
 static int s_unified_count = 0;  // 0..7, send when reaches 8
 
 // Sensor entries accumulated during 8 cycles (variable part)
@@ -275,9 +276,10 @@ static void sendUnifiedPacket()
     hdr.sample_count = UNIFIED_BATCH_SIZE;
     pkt.append(&hdr, sizeof(hdr));
 
-    // Fixed part: 8× IMU+ESKF + 8× PosVel
+    // Fixed part: 8× IMU+ESKF + 8× PosVel + 8× RateRef
     pkt.append(s_imu_buf, sizeof(s_imu_buf));
     pkt.append(s_posvel_buf, sizeof(s_posvel_buf));
+    pkt.append(s_rate_ref_buf, sizeof(s_rate_ref_buf));
 
     // Entry count
     uint8_t entry_count = (uint8_t)s_pending_count;
@@ -310,10 +312,21 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
                             uint32_t& last_tof_front_ts,
                             uint32_t& last_baro_ts, uint32_t& last_mag_ts)
 {
-    // 400Hz: accumulate IMU + PosVel into buffers
-    // 400Hz: IMU + PosVel をバッファに蓄積
+    // 400Hz: accumulate IMU + PosVel + RateRef into buffers
+    // 400Hz: IMU + PosVel + RateRef をバッファに蓄積
     fillImuEskf(s_imu_buf[s_unified_count], read_idx, imu_ts);
     fillPosVel(s_posvel_buf[s_unified_count], imu_ts);
+
+    // 400Hz: Rate reference targets from control loop
+    // 400Hz: 制御ループからのレート目標値
+    {
+        float ar, ap, rr, rp, ry;
+        state.getControlRef(ar, ap, rr, rp, ry);
+        auto& rrf = s_rate_ref_buf[s_unified_count];
+        rrf.rate_ref_roll  = static_cast<int16_t>(rr * 1000.0f);
+        rrf.rate_ref_pitch = static_cast<int16_t>(rp * 1000.0f);
+        rrf.rate_ref_yaw   = static_cast<int16_t>(ry * 1000.0f);
+    }
 
     // Sensor data: detect new data via timestamp change, add as entries
     // センサデータ: タイムスタンプ変化で検出、エントリとして追加
@@ -325,8 +338,8 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         state.getControlInput(cs.throttle, cs.roll, cs.pitch, cs.yaw);
         addSensorEntry(PKT_CONTROL, &cs, sizeof(cs));
 
-        // Control loop references (~50Hz, same cycle as control input)
-        // 制御ループ目標値（制御入力と同じサイクル）
+        // Angle reference + flight mode (~50Hz)
+        // 角度目標値 + フライトモード（50Hz）
         CtrlRefSample cr;
         cr.timestamp_us = imu_ts;
         cr.flight_mode = static_cast<uint8_t>(state.getFlightMode());
@@ -335,9 +348,6 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         state.getControlRef(ar, ap, rr, rp, ry);
         cr.angle_ref_roll  = static_cast<int16_t>(ar * 10000.0f);
         cr.angle_ref_pitch = static_cast<int16_t>(ap * 10000.0f);
-        cr.rate_ref_roll   = static_cast<int16_t>(rr * 1000.0f);
-        cr.rate_ref_pitch  = static_cast<int16_t>(rp * 1000.0f);
-        cr.rate_ref_yaw    = static_cast<int16_t>(ry * 1000.0f);
         addSensorEntry(PKT_CTRL_REF, &cr, sizeof(cr));
     }
 

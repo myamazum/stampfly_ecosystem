@@ -51,6 +51,7 @@ PKT_TOF_FRONT  = 0x47
 PKT_BARO      = 0x45
 PKT_MAG       = 0x46
 PKT_CTRL_REF  = 0x48
+PKT_RATE_REF  = 0x99  # virtual ID for 400Hz rate_ref (fixed part of unified packet)
 PKT_STATUS    = 0x4F
 
 CMD_START_LOG  = 0xF0
@@ -92,10 +93,15 @@ assert struct.calcsize(FMT_BARO) == 12
 FMT_MAG = '<I 3f'
 assert struct.calcsize(FMT_MAG) == 16
 
-# CtrlRefSample: 16 bytes
-#   timestamp(I) + flight_mode(B) + reserved(B) + angle_ref(2h) + rate_ref(3h)
-FMT_CTRL_REF = '<I 2B 5h'
-assert struct.calcsize(FMT_CTRL_REF) == 16
+# CtrlRefSample: 10 bytes (angle ref + flight mode, 50Hz)
+#   timestamp(I) + flight_mode(B) + reserved(B) + angle_ref(2h)
+FMT_CTRL_REF = '<I 2B 2h'
+assert struct.calcsize(FMT_CTRL_REF) == 10
+
+# RateRefFixed: 6 bytes (rate ref, 400Hz, fixed part of unified packet)
+#   rate_ref_roll(h) + rate_ref_pitch(h) + rate_ref_yaw(h)
+FMT_RATE_REF = '<3h'
+assert struct.calcsize(FMT_RATE_REF) == 6
 
 # Header: 4 bytes
 FMT_HEADER = '<B H B'
@@ -110,7 +116,7 @@ SAMPLE_INFO = {
     PKT_BARO:      ('Baro',      FMT_BARO,      12),
     PKT_MAG:       ('Mag',       FMT_MAG,       16),
     PKT_TOF_FRONT: ('ToF_Frt',   FMT_TOF,        9),
-    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  16),
+    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  10),
 }
 
 # CSV column names per packet type
@@ -159,7 +165,6 @@ CSV_COLUMNS = {
         'timestamp_us',
         'flight_mode', 'reserved',
         'angle_ref_roll', 'angle_ref_pitch',
-        'rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw',
     ],
 }
 
@@ -190,11 +195,12 @@ def parse_packet(data: bytes) -> list:
     # Parse header
     pkt_id, seq, count = struct.unpack_from(FMT_HEADER, data, 0)
 
-    # Unified packet (0x50): 8× IMU+ESKF + 8× PosVel + sensor entries
-    # 統合パケット: 8× IMU+ESKF + 8× PosVel + センサエントリ
+    # Unified packet (0x50): 8× IMU+ESKF + 8× PosVel + 8× RateRef + sensor entries
+    # 統合パケット: 8× IMU+ESKF + 8× PosVel + 8× RateRef + センサエントリ
     PKT_UNIFIED = 0x50
     if pkt_id == PKT_UNIFIED:
         results = []
+        imu_timestamps = []
         offset = 4  # after header
 
         # 8× ImuEskfSample (80B each)
@@ -204,6 +210,7 @@ def parse_packet(data: bytes) -> list:
             for key in ['gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z',
                         'accel_bias_x', 'accel_bias_y', 'accel_bias_z']:
                 sample[key] = sample[key] / 10000.0
+            imu_timestamps.append(sample['timestamp_us'])
             results.append((PKT_IMU_ESKF, sample))
             offset += 80
 
@@ -213,6 +220,18 @@ def parse_packet(data: bytes) -> list:
             sample = dict(zip(CSV_COLUMNS[PKT_POS_VEL], values))
             results.append((PKT_POS_VEL, sample))
             offset += 28
+
+        # 8× RateRefFixed (6B each) — shares IMU timestamp
+        for i in range(8):
+            values = struct.unpack_from(FMT_RATE_REF, data, offset)
+            sample = {
+                'timestamp_us': imu_timestamps[i],
+                'rate_ref_roll': values[0],
+                'rate_ref_pitch': values[1],
+                'rate_ref_yaw': values[2],
+            }
+            results.append((PKT_RATE_REF, sample))
+            offset += 6
 
         # Entry count (1B)
         entry_count = data[offset]
@@ -566,6 +585,10 @@ class UDPTelemetryCapture:
                 'ts': s['timestamp_us'],
                 'mode': s['flight_mode'],
                 'angle_ref': [s['angle_ref_roll'] / 10000.0, s['angle_ref_pitch'] / 10000.0],
+            },
+            PKT_RATE_REF: lambda s: {
+                'id': 'rate_ref',
+                'ts': s['timestamp_us'],
                 'rate_ref': [s['rate_ref_roll'] / 1000.0, s['rate_ref_pitch'] / 1000.0, s['rate_ref_yaw'] / 1000.0],
             },
         }

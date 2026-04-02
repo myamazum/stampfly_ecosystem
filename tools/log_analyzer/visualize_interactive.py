@@ -264,8 +264,10 @@ def load_jsonl(filepath: str) -> dict:
         ],
         'ctrl_ref': [
             ('angle_ref', ['angle_ref_roll', 'angle_ref_pitch'], True),
-            ('rate_ref', ['rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw'], True),
             ('mode', ['flight_mode'], False),
+        ],
+        'rate_ref': [
+            ('rate_ref', ['rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw'], True),
         ],
     }
 
@@ -329,6 +331,7 @@ def load_jsonl(filepath: str) -> dict:
         'baro': '_time_baro',
         'mag': '_time_mag',
         'ctrl_ref': '_time_ctrl_ref',
+        'rate_ref': '_time_rate_ref',
     }
 
     for sid, times in sensor_times.items():

@@ -145,13 +145,17 @@ def load_jsonl(filepath: str, hide_invalid: bool = True) -> dict:
         result['mag_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
         result['mag'] = np.array([[o['x'], o['y'], o['z']] for _, o in d])
 
-    # Control loop references
+    # Control loop references (angle_ref: 50Hz, rate_ref: 400Hz)
     if 'ctrl_ref' in sensor_data:
         d = sensor_data['ctrl_ref']
         result['ctrl_ref_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
         result['angle_ref'] = np.array([o['angle_ref'] for _, o in d])   # [roll, pitch] rad
-        result['rate_ref'] = np.array([o['rate_ref'] for _, o in d])     # [roll, pitch, yaw] rad/s
         result['flight_mode'] = np.array([o['mode'] for _, o in d])
+
+    if 'rate_ref' in sensor_data:
+        d = sensor_data['rate_ref']
+        result['rate_ref_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
+        result['rate_ref'] = np.array([o['rate_ref'] for _, o in d])     # [roll, pitch, yaw] rad/s
 
     return result
 
@@ -319,23 +323,23 @@ def plot_overview(data: dict, title: str = '', save: str = None,
         ax.grid(True, alpha=0.3)
 
     if 'rate_ref' in data:
-        # (4,1) Rate: Target vs Actual
+        # (4,1) Rate: Target vs Actual (both at 400Hz)
         ax = make_ax(4, 1)
-        t_ref = data['ctrl_ref_t']
-        ax.plot(t_ref, data['rate_ref'][:, 0], '#e6194b', linewidth=1.0,
+        t_ref = data['rate_ref_t']
+        ax.plot(t_ref, data['rate_ref'][:, 0], '#e6194b', linewidth=0.8,
                 linestyle='--', label='Roll ref')
-        ax.plot(t_ref, data['rate_ref'][:, 1], '#4363d8', linewidth=1.0,
+        ax.plot(t_ref, data['rate_ref'][:, 1], '#4363d8', linewidth=0.8,
                 linestyle='--', label='Pitch ref')
-        ax.plot(t_ref, data['rate_ref'][:, 2], '#f58231', linewidth=1.0,
+        ax.plot(t_ref, data['rate_ref'][:, 2], '#f58231', linewidth=0.8,
                 linestyle='--', label='Yaw ref')
         if 'gyro_corr' in data:
             ax.plot(data['imu_t'], data['gyro_corr'][:, 0], '#e6194b',
-                    linewidth=0.5, alpha=0.6, label='Roll act')
+                    linewidth=0.5, alpha=0.5, label='Roll act')
             ax.plot(data['imu_t'], data['gyro_corr'][:, 1], '#4363d8',
-                    linewidth=0.5, alpha=0.6, label='Pitch act')
+                    linewidth=0.5, alpha=0.5, label='Pitch act')
             ax.plot(data['imu_t'], data['gyro_corr'][:, 2], '#f58231',
-                    linewidth=0.5, alpha=0.6, label='Yaw act')
-        ax.set_title('Rate: Target vs Actual', fontsize=9, fontweight='bold')
+                    linewidth=0.5, alpha=0.5, label='Yaw act')
+        ax.set_title('Rate: Target vs Actual (400Hz)', fontsize=9, fontweight='bold')
         ax.set_ylabel('rad/s', fontsize=8)
         ax.legend(fontsize=7, loc='upper right', ncol=2)
         ax.tick_params(labelsize=7)
