@@ -406,13 +406,13 @@ inline constexpr float YAW_RATE_MAX = 5.0f;        // ヨー最大角速度 [rad
 // 物理単位ベースゲイン (Physical Units: Torque [Nm])
 // ==========================================================================
 
-// Roll rate PID (Kp×3: improved tracking with notch filter)
-inline constexpr float ROLL_RATE_KP = 2.73e-3f;    // [Nm/(rad/s)] = 0.65 × 1.4e-3 × 3
+// Roll rate PID
+inline constexpr float ROLL_RATE_KP = 9.1e-4f;     // [Nm/(rad/s)] = 0.65 × 1.4e-3
 inline constexpr float ROLL_RATE_TI = 0.7f;        // 積分時間 [s]
 inline constexpr float ROLL_RATE_TD = 0.01f;       // 微分時間 [s]
 
-// Pitch rate PID (Kp×3: improved tracking with notch filter)
-inline constexpr float PITCH_RATE_KP = 3.99e-3f;   // [Nm/(rad/s)] = 0.95 × 1.4e-3 × 3
+// Pitch rate PID
+inline constexpr float PITCH_RATE_KP = 1.33e-3f;   // [Nm/(rad/s)] = 0.95 × 1.4e-3
 inline constexpr float PITCH_RATE_TI = 0.7f;       // 積分時間 [s]
 inline constexpr float PITCH_RATE_TD = 0.01f;      // 微分時間 [s]
 
@@ -485,11 +485,11 @@ inline constexpr float MAX_PITCH_ANGLE = 0.5236f;  // 30 deg = π/6 rad
 // Attitude PID Gains (Outer Loop) - 姿勢PIDゲイン（外側ループ）
 // 出力: レートセットポイント [rad/s]
 // -----------------------------------------------------------------------------
-inline constexpr float ROLL_ANGLE_KP = 3.0f;    // 比例ゲイン [(rad/s) / rad] (5.0→3.0, rate Kp×3に合わせて低減)
+inline constexpr float ROLL_ANGLE_KP = 5.0f;    // 比例ゲイン [(rad/s) / rad]
 inline constexpr float ROLL_ANGLE_TI = 4.0f;    // 積分時間 [s]
 inline constexpr float ROLL_ANGLE_TD = 0.04f;   // 微分時間 [s]
 
-inline constexpr float PITCH_ANGLE_KP = 3.0f;   // 比例ゲイン [(rad/s) / rad] (5.0→3.0, rate Kp×3に合わせて低減)
+inline constexpr float PITCH_ANGLE_KP = 5.0f;   // 比例ゲイン [(rad/s) / rad]
 inline constexpr float PITCH_ANGLE_TI = 4.0f;   // 積分時間 [s]
 inline constexpr float PITCH_ANGLE_TD = 0.04f;  // 微分時間 [s]
 
