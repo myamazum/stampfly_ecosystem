@@ -146,6 +146,24 @@ SIGNAL_CATEGORIES = {
         ('rate_ref_pitch', 'Rate Ref Pitch [rad/s]'),
         ('rate_ref_yaw', 'Rate Ref Yaw [rad/s]'),
     ],
+    'Computed - PID Output': [
+        ('pid_out_roll', 'PID Roll [Nm]'),
+        ('pid_out_pitch', 'PID Pitch [Nm]'),
+        ('pid_out_yaw', 'PID Yaw [Nm]'),
+    ],
+    'Computed - Motor Thrust': [
+        ('motor_thrust_FR', 'FR(M1) Thrust [N]'),
+        ('motor_thrust_RR', 'RR(M2) Thrust [N]'),
+        ('motor_thrust_RL', 'RL(M3) Thrust [N]'),
+        ('motor_thrust_FL', 'FL(M4) Thrust [N]'),
+    ],
+    'Computed - Motor Duty': [
+        ('motor_duty_FR', 'FR(M1) Duty'),
+        ('motor_duty_RR', 'RR(M2) Duty'),
+        ('motor_duty_RL', 'RL(M3) Duty'),
+        ('motor_duty_FL', 'FL(M4) Duty'),
+        ('motor_saturated', 'Saturated (any)'),
+    ],
     'Sensors - Height': [
         ('baro_altitude', 'Baro Alt [m]'),
         ('baro_pressure', 'Baro Press [hPa]'),
@@ -395,6 +413,125 @@ def load_jsonl(filepath: str) -> dict:
     if 'angle_ref_roll' in data:
         data['angle_ref_roll_deg'] = [math.degrees(v) for v in data['angle_ref_roll']]
         data['angle_ref_pitch_deg'] = [math.degrees(v) for v in data['angle_ref_pitch']]
+
+    # =========================================================================
+    # Computed: PID output + Motor duty reconstruction
+    # PID出力 + モータDuty再構成
+    # Requires: rate_ref (400Hz) + gyro_corrected (400Hz) + ctrl_throttle (50Hz)
+    # =========================================================================
+    if all(k in data for k in ['rate_ref_roll', 'gyro_corrected_x', 'ctrl_throttle']):
+        n_imu = len(data['gyro_corrected_x'])
+        n_rate = len(data['rate_ref_roll'])
+        n = min(n_imu, n_rate)
+        dt = 2.5e-3  # 400Hz
+
+        # Resample throttle (50Hz ctrl) to 400Hz via ZOH
+        # スロットルを50Hz→400Hzにリサンプル
+        t_imu = data.get('_time_imu', list(range(n)))
+        t_ctrl = data.get('_time_ctrl', t_imu)
+        n_ctrl = len(data['ctrl_throttle'])
+        if n_ctrl < n:
+            import numpy as _np
+            thr_400 = _np.interp(
+                t_imu[:n] if len(t_imu) >= n else list(range(n)),
+                t_ctrl[:n_ctrl] if len(t_ctrl) >= n_ctrl else list(range(n_ctrl)),
+                data['ctrl_throttle'][:n_ctrl]
+            ).tolist()
+        else:
+            thr_400 = data['ctrl_throttle'][:n]
+
+        # PID parameters (physical units mode)
+        # PIDパラメータ（物理単位モード）
+        pid_cfg = [
+            {'Kp': 9.1e-4,  'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Roll
+            {'Kp': 1.33e-3, 'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Pitch
+            {'Kp': 1.77e-3, 'Ti': 0.8, 'Td': 0.01, 'eta': 0.125, 'lim': 2.2e-3},  # Yaw
+        ]
+        rate_ref_keys = ['rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw']
+        gyro_keys = ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z']
+        pid_names = ['pid_out_roll', 'pid_out_pitch', 'pid_out_yaw']
+
+        # Reconstruct PID outputs
+        # PID出力を再構成
+        pid_out = [[0.0]*n for _ in range(3)]
+        for axis in range(3):
+            p = pid_cfg[axis]
+            Kp, Ti, Td, eta, lim = p['Kp'], p['Ti'], p['Td'], p['eta'], p['lim']
+            ref = data[rate_ref_keys[axis]]
+            act = data[gyro_keys[axis]]
+            alpha = dt / (eta * Td + dt)
+            integral = 0.0
+            d_filt = 0.0
+            for i in range(1, n):
+                e = ref[i] - act[i]
+                integral += e * dt
+                de = (ref[i] - act[i] - ref[i-1] + act[i-1]) / dt
+                d_filt = alpha * de + (1 - alpha) * d_filt
+                out = Kp * (e + integral / Ti + Td * d_filt)
+                out = max(-lim, min(lim, out))
+                pid_out[axis][i] = out
+            data[pid_names[axis]] = pid_out[axis]
+
+        # Mixer matrix B⁻¹ (from ControlAllocator)
+        # ミキサー行列 B⁻¹（ControlAllocatorと同一）
+        d_arm = 0.023   # arm length [m]
+        kappa = 9.71e-3  # Cq/Ct ratio
+        inv_d = 1.0 / d_arm
+        inv_k = 1.0 / kappa
+        #              Thrust    Roll      Pitch     Yaw
+        B_inv = [
+            [ 0.25, -0.25*inv_d,  0.25*inv_d,  0.25*inv_k],  # FR M1
+            [ 0.25, -0.25*inv_d, -0.25*inv_d, -0.25*inv_k],  # RR M2
+            [ 0.25,  0.25*inv_d, -0.25*inv_d,  0.25*inv_k],  # RL M3
+            [ 0.25,  0.25*inv_d,  0.25*inv_d, -0.25*inv_k],  # FL M4
+        ]
+
+        # Motor model parameters (from motor_model.cpp DEFAULT_MOTOR_PARAMS)
+        # モータモデルパラメータ
+        Ct = 1.0e-8
+        Cq = 9.71e-11
+        Rm = 0.34
+        Km = 6.125e-4
+        Dm = 3.69e-8
+        Qf = 2.76e-5
+        Vbat = 3.7
+        max_thrust = 0.15
+        MAX_TOTAL_THRUST = 4 * max_thrust
+
+        def thrust_to_duty(thrust):
+            if thrust <= 0:
+                return 0.0
+            omega = math.sqrt(thrust / Ct)
+            viscous = (Dm + Km*Km/Rm) * omega
+            aero = Cq * omega * omega
+            voltage = Rm * (viscous + aero + Qf) / Km
+            duty = voltage / Vbat
+            return max(0.0, min(1.0, duty))
+
+        # Compute motor thrusts and duties
+        # モータ推力とDutyを計算
+        motor_names = ['FR', 'RR', 'RL', 'FL']
+        for m in range(4):
+            data[f'motor_thrust_{motor_names[m]}'] = [0.0] * n
+            data[f'motor_duty_{motor_names[m]}'] = [0.0] * n
+        data['motor_saturated'] = [0.0] * n
+
+        for i in range(n):
+            total_thrust = thr_400[i] * MAX_TOTAL_THRUST
+            u = [total_thrust, pid_out[0][i], pid_out[1][i], pid_out[2][i]]
+
+            saturated = 0
+            for m in range(4):
+                thrust = sum(B_inv[m][j] * u[j] for j in range(4))
+                if thrust < 0:
+                    thrust = 0.0
+                    saturated = 1
+                elif thrust > max_thrust:
+                    thrust = max_thrust
+                    saturated = 1
+                data[f'motor_thrust_{motor_names[m]}'][i] = thrust
+                data[f'motor_duty_{motor_names[m]}'][i] = thrust_to_duty(thrust)
+            data['motor_saturated'][i] = float(saturated)
 
     return data
 
