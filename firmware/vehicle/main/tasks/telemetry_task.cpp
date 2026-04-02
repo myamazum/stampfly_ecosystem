@@ -324,6 +324,21 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         cs.timestamp_us = imu_ts;
         state.getControlInput(cs.throttle, cs.roll, cs.pitch, cs.yaw);
         addSensorEntry(PKT_CONTROL, &cs, sizeof(cs));
+
+        // Control loop references (~50Hz, same cycle as control input)
+        // 制御ループ目標値（制御入力と同じサイクル）
+        CtrlRefSample cr;
+        cr.timestamp_us = imu_ts;
+        cr.flight_mode = static_cast<uint8_t>(state.getFlightMode());
+        cr.reserved = 0;
+        float ar, ap, rr, rp, ry;
+        state.getControlRef(ar, ap, rr, rp, ry);
+        cr.angle_ref_roll  = static_cast<int16_t>(ar * 10000.0f);
+        cr.angle_ref_pitch = static_cast<int16_t>(ap * 10000.0f);
+        cr.rate_ref_roll   = static_cast<int16_t>(rr * 1000.0f);
+        cr.rate_ref_pitch  = static_cast<int16_t>(rp * 1000.0f);
+        cr.rate_ref_yaw    = static_cast<int16_t>(ry * 1000.0f);
+        addSensorEntry(PKT_CTRL_REF, &cr, sizeof(cr));
     }
 
     // Optical Flow (~100Hz)

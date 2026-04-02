@@ -62,6 +62,7 @@ inline constexpr uint8_t PKT_TOF_BOTTOM    = 0x44;
 inline constexpr uint8_t PKT_TOF_FRONT     = 0x47;
 inline constexpr uint8_t PKT_BARO          = 0x45;
 inline constexpr uint8_t PKT_MAG           = 0x46;
+inline constexpr uint8_t PKT_CTRL_REF      = 0x48;  // Control loop reference targets
 inline constexpr uint8_t PKT_STATUS        = 0x4F;
 inline constexpr uint8_t PKT_UNIFIED       = 0x50;  // 8-cycle unified packet
 
@@ -172,6 +173,24 @@ struct ControlBatchPacket {
 };
 
 static_assert(sizeof(ControlBatchPacket) == 85, "ControlBatchPacket size mismatch");
+
+// =============================================================================
+// 0x48: Control Loop References (18B/sample)
+// 制御ループ目標値（18B/サンプル）
+// =============================================================================
+
+struct CtrlRefSample {
+    uint32_t timestamp_us;       // 4B
+    uint8_t  flight_mode;        // 1B (0=ACRO, 1=STABILIZE, 2=ALT_HOLD, 3=POS_HOLD)
+    uint8_t  reserved;           // 1B
+    int16_t  angle_ref_roll;     // 2B [rad × 10000] outer loop target angle
+    int16_t  angle_ref_pitch;    // 2B [rad × 10000] outer loop target angle
+    int16_t  rate_ref_roll;      // 2B [rad/s × 1000] inner loop target rate
+    int16_t  rate_ref_pitch;     // 2B [rad/s × 1000] inner loop target rate
+    int16_t  rate_ref_yaw;       // 2B [rad/s × 1000] inner loop target rate
+};
+
+static_assert(sizeof(CtrlRefSample) == 16, "CtrlRefSample size mismatch");
 
 // =============================================================================
 // 0x43: Optical Flow (9B/sample, batch 4 → 41B)

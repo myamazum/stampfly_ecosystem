@@ -145,6 +145,14 @@ def load_jsonl(filepath: str, hide_invalid: bool = True) -> dict:
         result['mag_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
         result['mag'] = np.array([[o['x'], o['y'], o['z']] for _, o in d])
 
+    # Control loop references
+    if 'ctrl_ref' in sensor_data:
+        d = sensor_data['ctrl_ref']
+        result['ctrl_ref_t'] = np.array([(ts - t0) / 1e6 for ts, _ in d])
+        result['angle_ref'] = np.array([o['angle_ref'] for _, o in d])   # [roll, pitch] rad
+        result['rate_ref'] = np.array([o['rate_ref'] for _, o in d])     # [roll, pitch, yaw] rad/s
+        result['flight_mode'] = np.array([o['mode'] for _, o in d])
+
     return result
 
 
@@ -153,11 +161,11 @@ def plot_overview(data: dict, title: str = '', save: str = None,
     """Plot all sensor data in a grid overview.
     全センサデータをグリッドで一覧表示。
     """
-    fig = plt.figure(figsize=(18, 14))
+    fig = plt.figure(figsize=(18, 17))
     fig.suptitle(title or 'StampFly Telemetry Overview', fontsize=14, fontweight='bold')
 
-    # 4 columns × 4 rows = 16 panels max
-    gs = GridSpec(4, 4, figure=fig, hspace=0.4, wspace=0.3)
+    # 4 columns × 5 rows = 20 panels max
+    gs = GridSpec(5, 4, figure=fig, hspace=0.4, wspace=0.3)
 
     def make_ax(row, col, colspan=1, rowspan=1):
         ax = fig.add_subplot(gs[row:row+rowspan, col:col+colspan])
@@ -288,6 +296,63 @@ def plot_overview(data: dict, title: str = '', save: str = None,
         ax = make_ax(3, 3)
         plot_xyz(ax, data['imu_t'], data['accel_raw'],
                  ['X', 'Y', 'Z'], 'Accel (Raw)', 'm/s²')
+
+    # Row 4: Control loop references (Target vs Actual)
+    if 'angle_ref' in data:
+        # (4,0) Attitude: Target vs Actual
+        ax = make_ax(4, 0)
+        t_ref = data['ctrl_ref_t']
+        angle_ref_deg = np.degrees(data['angle_ref'])  # rad -> deg
+        ax.plot(t_ref, angle_ref_deg[:, 0], '#e6194b', linewidth=1.0,
+                linestyle='--', label='Roll ref')
+        ax.plot(t_ref, angle_ref_deg[:, 1], '#4363d8', linewidth=1.0,
+                linestyle='--', label='Pitch ref')
+        if 'euler' in data:
+            ax.plot(data['imu_t'], data['euler'][:, 0], '#e6194b',
+                    linewidth=0.5, alpha=0.6, label='Roll act')
+            ax.plot(data['imu_t'], data['euler'][:, 1], '#4363d8',
+                    linewidth=0.5, alpha=0.6, label='Pitch act')
+        ax.set_title('Attitude: Target vs Actual', fontsize=9, fontweight='bold')
+        ax.set_ylabel('deg', fontsize=8)
+        ax.legend(fontsize=7, loc='upper right', ncol=2)
+        ax.tick_params(labelsize=7)
+        ax.grid(True, alpha=0.3)
+
+    if 'rate_ref' in data:
+        # (4,1) Rate: Target vs Actual
+        ax = make_ax(4, 1)
+        t_ref = data['ctrl_ref_t']
+        ax.plot(t_ref, data['rate_ref'][:, 0], '#e6194b', linewidth=1.0,
+                linestyle='--', label='Roll ref')
+        ax.plot(t_ref, data['rate_ref'][:, 1], '#4363d8', linewidth=1.0,
+                linestyle='--', label='Pitch ref')
+        ax.plot(t_ref, data['rate_ref'][:, 2], '#f58231', linewidth=1.0,
+                linestyle='--', label='Yaw ref')
+        if 'gyro_corr' in data:
+            ax.plot(data['imu_t'], data['gyro_corr'][:, 0], '#e6194b',
+                    linewidth=0.5, alpha=0.6, label='Roll act')
+            ax.plot(data['imu_t'], data['gyro_corr'][:, 1], '#4363d8',
+                    linewidth=0.5, alpha=0.6, label='Pitch act')
+            ax.plot(data['imu_t'], data['gyro_corr'][:, 2], '#f58231',
+                    linewidth=0.5, alpha=0.6, label='Yaw act')
+        ax.set_title('Rate: Target vs Actual', fontsize=9, fontweight='bold')
+        ax.set_ylabel('rad/s', fontsize=8)
+        ax.legend(fontsize=7, loc='upper right', ncol=2)
+        ax.tick_params(labelsize=7)
+        ax.grid(True, alpha=0.3)
+
+    if 'flight_mode' in data:
+        # (4,2) Flight Mode
+        ax = make_ax(4, 2)
+        t_ref = data['ctrl_ref_t']
+        mode_names = {0: 'ACRO', 1: 'STAB', 2: 'ALT', 3: 'POS'}
+        ax.step(t_ref, data['flight_mode'], '#911eb4', linewidth=1.0, where='post')
+        ax.set_yticks([0, 1, 2, 3])
+        ax.set_yticklabels([mode_names.get(i, str(i)) for i in range(4)])
+        ax.set_title('Flight Mode', fontsize=9, fontweight='bold')
+        ax.tick_params(labelsize=7)
+        ax.grid(True, alpha=0.3)
+        ax.set_ylim(-0.5, 3.5)
 
     # Add time label to bottom row
     for ax in fig.get_axes():

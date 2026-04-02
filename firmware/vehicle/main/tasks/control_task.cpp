@@ -509,6 +509,7 @@ void ControlTask(void* pvParameters)
         // 2. 目標角速度計算
         // =====================================================================
         float roll_rate_target, pitch_rate_target, yaw_rate_target;
+        float angle_ref_roll = 0.0f, angle_ref_pitch = 0.0f;
 
         stampfly::FlightMode current_mode = state.getFlightMode();
 
@@ -610,6 +611,11 @@ void ControlTask(void* pvParameters)
                 dt,
                 roll_rate_target, pitch_rate_target, yaw_rate_target
             );
+
+            // Record outer loop angle targets for telemetry
+            // テレメトリ用に外側ループの角度目標を記録
+            angle_ref_roll = roll_input * g_attitude_controller.max_roll_angle;
+            angle_ref_pitch = pitch_input * g_attitude_controller.max_pitch_angle;
         } else {
             // ACRO: 直接レート制御（既存）
             // ACRO: Direct rate control (existing)
@@ -617,6 +623,11 @@ void ControlTask(void* pvParameters)
             pitch_rate_target = pitch_cmd * g_rate_controller.pitch_rate_max;
             yaw_rate_target = yaw_cmd * g_rate_controller.yaw_rate_max;
         }
+
+        // Publish control loop reference values for telemetry
+        // テレメトリ用に制御ループ目標値を公開
+        state.updateControlRef(angle_ref_roll, angle_ref_pitch,
+                               roll_rate_target, pitch_rate_target, yaw_rate_target);
 
         // =====================================================================
         // 3. 現在の角速度取得（バイアス補正済み）

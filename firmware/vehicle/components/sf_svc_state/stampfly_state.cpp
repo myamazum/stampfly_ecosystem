@@ -478,6 +478,30 @@ uint8_t StampFlyState::getControlFlags() const
     return flags;
 }
 
+void StampFlyState::updateControlRef(float angle_ref_roll, float angle_ref_pitch,
+                                     float rate_ref_roll, float rate_ref_pitch, float rate_ref_yaw)
+{
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    ctrl_angle_ref_roll_ = angle_ref_roll;
+    ctrl_angle_ref_pitch_ = angle_ref_pitch;
+    ctrl_rate_ref_roll_ = rate_ref_roll;
+    ctrl_rate_ref_pitch_ = rate_ref_pitch;
+    ctrl_rate_ref_yaw_ = rate_ref_yaw;
+    xSemaphoreGive(mutex_);
+}
+
+void StampFlyState::getControlRef(float& angle_ref_roll, float& angle_ref_pitch,
+                                  float& rate_ref_roll, float& rate_ref_pitch, float& rate_ref_yaw) const
+{
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    angle_ref_roll = ctrl_angle_ref_roll_;
+    angle_ref_pitch = ctrl_angle_ref_pitch_;
+    rate_ref_roll = ctrl_rate_ref_roll_;
+    rate_ref_pitch = ctrl_rate_ref_pitch_;
+    rate_ref_yaw = ctrl_rate_ref_yaw_;
+    xSemaphoreGive(mutex_);
+}
+
 // =============================================================================
 // Sensor Diagnostics
 // センサ診断

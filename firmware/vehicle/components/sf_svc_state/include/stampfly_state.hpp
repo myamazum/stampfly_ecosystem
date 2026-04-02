@@ -181,6 +181,13 @@ public:
     void updateControlFlags(uint8_t flags);
     uint8_t getControlFlags() const;
 
+    // Control loop reference values (targets computed in control_task)
+    // 制御ループ目標値（control_taskで計算）
+    void updateControlRef(float angle_ref_roll, float angle_ref_pitch,
+                          float rate_ref_roll, float rate_ref_pitch, float rate_ref_yaw);
+    void getControlRef(float& angle_ref_roll, float& angle_ref_pitch,
+                       float& rate_ref_roll, float& rate_ref_pitch, float& rate_ref_yaw) const;
+
 private:
     StampFlyState() = default;
 
@@ -230,6 +237,14 @@ private:
     uint16_t ctrl_pitch_ = 2048;  // ADC center
     uint16_t ctrl_yaw_ = 2048;    // ADC center
     uint8_t ctrl_flags_ = 0;      // ARM, FLIP, MODE, ALT_MODE, POS_MODE
+
+    // Control loop reference values (from control_task)
+    // 制御ループ目標値（control_taskから）
+    float ctrl_angle_ref_roll_ = 0;   // [rad] outer loop target angle
+    float ctrl_angle_ref_pitch_ = 0;  // [rad]
+    float ctrl_rate_ref_roll_ = 0;    // [rad/s] inner loop target rate
+    float ctrl_rate_ref_pitch_ = 0;   // [rad/s]
+    float ctrl_rate_ref_yaw_ = 0;     // [rad/s]
 
     // Debug mode
     bool debug_mode_ = false;
