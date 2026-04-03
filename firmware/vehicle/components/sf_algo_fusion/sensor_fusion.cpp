@@ -8,7 +8,7 @@
 
 namespace sf {
 
-bool SensorFusion::init(const stampfly::ESKF::Config& config,
+bool SensorFusion::init(const stampfly::ESKF_V2::Config& config,
                         const SensorEnables& enables,
                         float max_position,
                         float max_velocity) {
@@ -16,7 +16,7 @@ bool SensorFusion::init(const stampfly::ESKF::Config& config,
     max_velocity_ = max_velocity;
     enables_ = enables;
 
-    // ESKF初期化（設定は main/config.hpp から構築されて渡される）
+    // ESKF_V2 初期化（設定は main/config.hpp から構築されて渡される）
     if (eskf_.init(config) != ESP_OK) {
         return false;
     }
@@ -202,7 +202,7 @@ void SensorFusion::setAttitudeReference(const stampfly::math::Vector3& level_acc
     eskf_.setAttitudeReference(level_accel, gyro_bias);
 }
 
-bool SensorFusion::checkDivergence(const stampfly::ESKF::State& state) {
+bool SensorFusion::checkDivergence(const stampfly::ESKF_V2::State& state) {
     // 姿勢の有効性チェック
     if (!std::isfinite(state.roll) || !std::isfinite(state.pitch)) {
         return true;

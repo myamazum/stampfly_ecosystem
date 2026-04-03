@@ -30,6 +30,7 @@
 
 // Estimation
 #include "sensor_fusion.hpp"
+#include "eskf.hpp"  // For AttitudeEstimator, AltitudeEstimator
 #include "sensor_health.hpp"
 #include "system_manager.hpp"
 #include "filter.hpp"

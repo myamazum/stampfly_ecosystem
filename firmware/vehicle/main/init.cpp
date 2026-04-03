@@ -333,7 +333,7 @@ esp_err_t estimators()
         auto& state = stampfly::StampFlyState::getInstance();
 
         // コンポーネントのデフォルト設定を取得
-        stampfly::ESKF::Config eskf_config = stampfly::ESKF::Config::defaultConfig();
+        stampfly::ESKF_V2::Config eskf_config = stampfly::ESKF_V2::Config::defaultConfig();
 
         // =================================================================
         // アプリ固有の設定で上書き (main/config.hpp から)
@@ -352,8 +352,12 @@ esp_err_t estimators()
         sensor_enables.tof_distance_min = TOF_DISTANCE_MIN;
         sensor_enables.tof_distance_max = TOF_DISTANCE_MAX;
 
-        // ESKF内部の地磁気有効フラグ（観測更新のみに影響）
-        eskf_config.mag_enabled = config::eskf::USE_MAGNETOMETER;
+        // ESKF_V2 sensor enable flags (unified)
+        // ESKF_V2 センサ有効フラグ (統一)
+        eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_MAG]  = config::eskf::USE_MAGNETOMETER;
+        eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_BARO] = config::eskf::USE_BAROMETER;
+        eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_TOF]  = config::eskf::USE_TOF;
+        eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_FLOW] = config::eskf::USE_OPTICAL_FLOW;
         // ヨー推定有効フラグ（ジャイロZ積分に影響）
         eskf_config.yaw_estimation_enabled = config::eskf::ENABLE_YAW_ESTIMATION;
 
