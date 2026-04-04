@@ -44,8 +44,9 @@ https://github.com/kouhei1970/stampfly_tof
 ## optical flowセンサのドライバ
 https://github.com/kouhei1970/stampfly_opticalflow
 
-## ESKFによる位置姿勢推定機
+## ESKFによる位置姿勢推定（参考元リポジトリ）
 https://github.com/kouhei1970/stampfly-eskf-estimator
+※ 現在は `firmware/vehicle/components/sf_algo_eskf/` に統合実装済み（active_mask, χ²ゲート等を追加）
 
 ## コントローラのコード
 https://github.com/M5Fly-kanazawa/Simple_StampFly_Joy

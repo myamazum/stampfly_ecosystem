@@ -320,14 +320,15 @@ StampFlyは2つの通信モードをサポートしています。
 
 ### 制御モード
 
-| モード | 説明 | 状態 |
-|-------|------|------|
-| ACRO | 角速度制御 | **実装済み** |
-| STABILIZE | 角度制御（自動水平） | **実装済み** |
-| ALTITUDE_HOLD | 高度維持 | **実装済み** |
-| POSITION_HOLD | 位置保持 | **実装済み** |
+| モード | 説明 | 必要センサ | 状態 |
+|-------|------|-----------|------|
+| ACRO | 角速度制御 | IMU | **実装済み** |
+| STABILIZE | 角度制御（自動水平） | IMU | **実装済み** |
+| ALTITUDE_HOLD | 高度維持 | IMU + ToF or Baro | **実装済み** |
+| POSITION_HOLD | 位置保持 | IMU + ToF/Baro + Flow | **実装済み** |
 
 > **Tips:** コントローラの右ボタンで制御モード、左ボタンで高度モードを切り替えられます。
+> 必要なセンサが無効（config.hpp で OFF）の場合、自動的に STABILIZE に降格します。
 
 ## 8. 開発者向け機能
 
@@ -692,14 +693,15 @@ For solo flights or development/debugging. Simple setup.
 
 ### Control Modes
 
-| Mode | Description | Status |
-|------|-------------|--------|
-| ACRO | Rate control | **Implemented** |
-| STABILIZE | Angle control (auto-level) | **Implemented** |
-| ALTITUDE_HOLD | Altitude hold | **Implemented** |
-| POSITION_HOLD | Position hold | **Implemented** |
+| Mode | Description | Required Sensors | Status |
+|------|-------------|-----------------|--------|
+| ACRO | Rate control | IMU | **Implemented** |
+| STABILIZE | Angle control (auto-level) | IMU | **Implemented** |
+| ALTITUDE_HOLD | Altitude hold | IMU + ToF or Baro | **Implemented** |
+| POSITION_HOLD | Position hold | IMU + ToF/Baro + Flow | **Implemented** |
 
 > **Tips:** Use the right button on the controller to switch control modes, and the left button for altitude mode.
+> If required sensors are disabled (OFF in config.hpp), the mode automatically downgrades to STABILIZE.
 
 ## 8. Developer Features
 

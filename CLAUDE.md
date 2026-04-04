@@ -374,14 +374,16 @@ stampfly-ecosystem/
 
 ### Firmware Structure (ESP-IDF)
 
-The `firmware/vehicle/` follows ESP-IDF component structure:
-- `components/sensors/` - IMU, barometric, ToF, optical flow
-- `components/estimation/` - AHRS, EKF, sensor fusion
-- `components/control/` - Attitude, angular rate, position control loops
-- `components/actuators/` - Motor mixing, saturation, failsafe
-- `components/comms/` - Telemetry using protocol spec
-- `components/system/` - State management, parameters, diagnostics, CLI
-- `main/` - Task initialization and dependency management
+The `firmware/vehicle/` follows ESP-IDF component structure with `sf_<layer>_<name>` naming:
+- `components/sf_hal_*` - Sensor/actuator HAL (bmi270, bmp280, vl53l3cx, pmw3901, motor, led, etc.)
+- `components/sf_algo_eskf/` - ESKF state estimation (active_mask P-matrix isolation, χ² outlier rejection)
+- `components/sf_algo_fusion/` - Sensor fusion orchestration (ESKF wrapper, quality thresholds)
+- `components/sf_algo_pid/` - PID controller
+- `components/sf_algo_control/` - Control allocation (mixer), motor model
+- `components/sf_algo_filter/` - LPF, notch filter
+- `components/sf_algo_math/` - Vector, matrix, quaternion (header-only)
+- `components/sf_svc_*` - Services (comm, telemetry, logger, console, state, control_arbiter, etc.)
+- `main/` - Tasks, config.hpp (single source of truth for all parameters), landing_handler
 
 ## Build System
 
