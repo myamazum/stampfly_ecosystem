@@ -395,6 +395,50 @@ R = Rz(ψ) × Ry(θ) × Rx(φ)
 | Genesis | +X | +Z | +Y | -Z |
 | WebGL | -X | +Y | +Z | -Y |
 
+## 9. IMU 軸変換（BMI270 → 機体座標系）
+
+### BMI270 の物理軸配置
+
+BMI270 は StampFly 基板上で以下のように実装されている：
+
+| BMI270 軸 | 基板上の方向 |
+|-----------|------------|
+| +X | 機体右方向 |
+| +Y | 機体前方向 |
+| +Z | 機体上方向 |
+
+### センサー座標系 → NED 機体座標系の変換
+
+ファームウェア（`firmware/vehicle/main/tasks/imu_task.cpp`）で以下の変換を行う：
+
+| NED機体軸 | = | BMI270軸 | 説明 |
+|-----------|---|----------|------|
+| body_x（前方） | = | +sensor_y | BMI270 Y → NED X |
+| body_y（右方） | = | +sensor_x | BMI270 X → NED Y |
+| body_z（下方） | = | -sensor_z | BMI270 Z → NED -Z（符号反転） |
+
+```cpp
+// imu_task.cpp での変換
+// BMI270座標系 → 機体座標系(NED) 変換
+float accel_body_x = accel.y * GRAVITY;   // 前方正 [m/s²]
+float accel_body_y = accel.x * GRAVITY;   // 右正 [m/s²]
+float accel_body_z = -accel.z * GRAVITY;  // 下正 (NED) [m/s²]
+
+float gyro_body_x = gyro.y;     // Roll rate [rad/s]
+float gyro_body_y = gyro.x;     // Pitch rate [rad/s]
+float gyro_body_z = -gyro.z;    // Yaw rate [rad/s]
+```
+
+### 変換行列
+
+```
+              |  0  1  0 |
+T_BMI270→NED = |  1  0  0 |    det(T) = -1 → 座標系の向きが反転するため符号反転が必要
+              |  0  0 -1 |
+```
+
+**注意:** この変換はハードウェア基板設計に依存する。基板リビジョンが変わった場合は実装を確認すること。
+
 ---
 
 <a id="english"></a>
@@ -782,3 +826,47 @@ R = Rz(ψ) × Ry(θ) × Rx(φ)
 | NED | +Y | -Z | +X | +Z |
 | Genesis | +X | +Z | +Y | -Z |
 | WebGL | -X | +Y | +Z | -Y |
+
+## 9. IMU Axis Mapping (BMI270 → Body Frame)
+
+### BMI270 Physical Axis Orientation
+
+The BMI270 is mounted on the StampFly PCB with the following orientation:
+
+| BMI270 Axis | PCB Direction |
+|-------------|--------------|
+| +X | Aircraft right |
+| +Y | Aircraft forward |
+| +Z | Aircraft up |
+
+### Sensor Frame → NED Body Frame Transformation
+
+The firmware (`firmware/vehicle/main/tasks/imu_task.cpp`) applies this transformation:
+
+| NED Body Axis | = | BMI270 Axis | Description |
+|---------------|---|-------------|-------------|
+| body_x (forward) | = | +sensor_y | BMI270 Y → NED X |
+| body_y (right) | = | +sensor_x | BMI270 X → NED Y |
+| body_z (down) | = | -sensor_z | BMI270 Z → NED -Z (sign inverted) |
+
+```cpp
+// Transformation in imu_task.cpp
+// BMI270 coordinate system → Body coordinate system (NED)
+float accel_body_x = accel.y * GRAVITY;   // Forward positive [m/s²]
+float accel_body_y = accel.x * GRAVITY;   // Right positive [m/s²]
+float accel_body_z = -accel.z * GRAVITY;  // Down positive (NED) [m/s²]
+
+float gyro_body_x = gyro.y;     // Roll rate [rad/s]
+float gyro_body_y = gyro.x;     // Pitch rate [rad/s]
+float gyro_body_z = -gyro.z;    // Yaw rate [rad/s]
+```
+
+### Transformation Matrix
+
+```
+              |  0  1  0 |
+T_BMI270→NED = |  1  0  0 |    det(T) = -1 → handedness changes, hence sign inversion needed
+              |  0  0 -1 |
+```
+
+**Note:** This transformation depends on the hardware PCB layout. Verify the implementation if the board revision changes.
