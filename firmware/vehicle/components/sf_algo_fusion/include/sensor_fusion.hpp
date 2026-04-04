@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "eskf_v2.hpp"
+#include "eskf.hpp"
 #include "stampfly_math.hpp"
 
 namespace sf {
@@ -28,7 +28,7 @@ namespace sf {
  * 使用例:
  * @code
  * sf::SensorFusion fusion;
- * stampfly::ESKF_V2::Config config;
+ * stampfly::ESKF::Config config;
  * // config を main/config.hpp の値で初期化
  * fusion.init(config);
  *
@@ -65,7 +65,7 @@ public:
     /**
      * @brief センサー品質閾値
      *
-     * センサーの ON/OFF は ESKF_V2::Config::sensor_enabled[] で一元管理。
+     * センサーの ON/OFF は ESKF::Config::sensor_enabled[] で一元管理。
      * ここには品質・距離の閾値のみを定義する。
      */
     struct SensorThresholds {
@@ -86,7 +86,7 @@ public:
      * @param max_position 発散検出用の最大位置 [m]
      * @param max_velocity 発散検出用の最大速度 [m/s]
      */
-    bool init(const stampfly::ESKF_V2::Config& config,
+    bool init(const stampfly::ESKF::Config& config,
               const SensorThresholds& thresholds,
               float max_position = 100.0f,
               float max_velocity = 50.0f);
@@ -268,15 +268,15 @@ public:
     /**
      * @brief センサグループの有効/無効を動的に切替
      */
-    void setSensorEnabled(stampfly::ESKF_V2::SensorGroup group, bool enabled) {
+    void setSensorEnabled(stampfly::ESKF::SensorGroup group, bool enabled) {
         eskf_.setSensorEnabled(group, enabled);
     }
 
     /**
      * @brief 内部ESKFへの直接アクセス（上級者向け）
      */
-    stampfly::ESKF_V2& getESKF() { return eskf_; }
-    const stampfly::ESKF_V2& getESKF() const { return eskf_; }
+    stampfly::ESKF& getESKF() { return eskf_; }
+    const stampfly::ESKF& getESKF() const { return eskf_; }
 
 private:
     bool initialized_ = false;
@@ -284,9 +284,9 @@ private:
     float max_position_ = 100.0f;
     float max_velocity_ = 50.0f;
     SensorThresholds thresholds_;
-    stampfly::ESKF_V2 eskf_;
+    stampfly::ESKF eskf_;
 
-    bool checkDivergence(const stampfly::ESKF_V2::State& state);
+    bool checkDivergence(const stampfly::ESKF::State& state);
 };
 
 } // namespace sf

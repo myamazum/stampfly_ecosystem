@@ -1,20 +1,19 @@
 /**
- * @file eskf_v2.cpp
- * @brief ESKF V2 Implementation - Proper P-matrix isolation
+ * @file eskf.cpp
+ * @brief ESKF Implementation - active_mask based P-matrix isolation
  *
- * Key changes from V1:
+ * Key features:
  * - active_mask based Q gating in predict()
  * - Unified dx masking in applyMaskedErrorState()
  * - enforceCovarianceConstraints() after every predict/update
- * - applyBiasUpdate() abolished, replaced by mask
  */
 
-#include "eskf_v2.hpp"
+#include "eskf.hpp"
 #include "esp_log.h"
 #include <cmath>
 #include <algorithm>
 
-static const char* TAG = "ESKF_V2";
+static const char* TAG = "ESKF";
 
 namespace stampfly {
 
@@ -22,13 +21,13 @@ namespace stampfly {
 // Init / Reset
 // ============================================================================
 
-esp_err_t ESKF_V2::init(const Config& config)
+esp_err_t ESKF::init(const Config& config)
 {
     if (initialized_) {
         return ESP_ERR_INVALID_STATE;
     }
 
-    ESP_LOGI(TAG, "Initializing ESKF_V2 (15-state, active_mask)");
+    ESP_LOGI(TAG, "Initializing ESKF (15-state, active_mask)");
     config_ = config;
 
     // Cache initial P diagonal values
@@ -47,12 +46,12 @@ esp_err_t ESKF_V2::init(const Config& config)
 
     reset();
     initialized_ = true;
-    ESP_LOGI(TAG, "ESKF_V2 initialized (active_mask=0x%04X)", active_mask_);
+    ESP_LOGI(TAG, "ESKF initialized (active_mask=0x%04X)", active_mask_);
 
     return ESP_OK;
 }
 
-void ESKF_V2::reset()
+void ESKF::reset()
 {
     state_.position = Vector3::zero();
     state_.velocity = Vector3::zero();
@@ -77,7 +76,7 @@ void ESKF_V2::reset()
     enforceCovarianceConstraints();
 }
 
-void ESKF_V2::resetPositionVelocity()
+void ESKF::resetPositionVelocity()
 {
     state_.position = Vector3::zero();
     state_.velocity = Vector3::zero();
@@ -100,13 +99,13 @@ void ESKF_V2::resetPositionVelocity()
     enforceCovarianceConstraints();
 }
 
-void ESKF_V2::holdPositionVelocity()
+void ESKF::holdPositionVelocity()
 {
     state_.position = Vector3::zero();
     state_.velocity = Vector3::zero();
 }
 
-void ESKF_V2::resetForLanding()
+void ESKF::resetForLanding()
 {
     state_.position = Vector3::zero();
     state_.velocity = Vector3::zero();
@@ -157,7 +156,7 @@ void ESKF_V2::resetForLanding()
 // Sensor enable/disable
 // ============================================================================
 
-void ESKF_V2::setSensorEnabled(SensorGroup group, bool enabled)
+void ESKF::setSensorEnabled(SensorGroup group, bool enabled)
 {
     if (group >= SENSOR_COUNT) return;
     config_.sensor_enabled[group] = enabled;
@@ -165,7 +164,7 @@ void ESKF_V2::setSensorEnabled(SensorGroup group, bool enabled)
     enforceCovarianceConstraints();
 }
 
-void ESKF_V2::recomputeActiveMask()
+void ESKF::recomputeActiveMask()
 {
     // Start with all states active
     // 全状態をアクティブで開始
@@ -199,7 +198,7 @@ void ESKF_V2::recomputeActiveMask()
 // Covariance enforcement
 // ============================================================================
 
-void ESKF_V2::enforceCovarianceConstraints()
+void ESKF::enforceCovarianceConstraints()
 {
     // For each frozen state: reset diagonal to initial, zero cross-covariance
     // 凍結状態: 対角を初期値に、クロス共分散をゼロに
@@ -238,7 +237,7 @@ void ESKF_V2::enforceCovarianceConstraints()
 // Masked error state injection
 // ============================================================================
 
-void ESKF_V2::applyMaskedErrorState(float dx[N_STATES])
+void ESKF::applyMaskedErrorState(float dx[N_STATES])
 {
     // Mask frozen states
     // 凍結状態をマスク
@@ -298,28 +297,28 @@ void ESKF_V2::applyMaskedErrorState(float dx[N_STATES])
 // Bias / Attitude setters
 // ============================================================================
 
-void ESKF_V2::setGyroBias(const Vector3& bias)
+void ESKF::setGyroBias(const Vector3& bias)
 {
     state_.gyro_bias = bias;
 }
 
-void ESKF_V2::setAccelBias(const Vector3& bias)
+void ESKF::setAccelBias(const Vector3& bias)
 {
     state_.accel_bias = bias;
 }
 
-void ESKF_V2::setMagReference(const Vector3& mag_ref)
+void ESKF::setMagReference(const Vector3& mag_ref)
 {
     config_.mag_ref = mag_ref;
 }
 
-void ESKF_V2::setYaw(float yaw)
+void ESKF::setYaw(float yaw)
 {
     state_.yaw = yaw;
     state_.orientation = Quaternion::fromEuler(state_.roll, state_.pitch, yaw);
 }
 
-void ESKF_V2::initializeAttitude(const Vector3& accel, const Vector3& mag)
+void ESKF::initializeAttitude(const Vector3& accel, const Vector3& mag)
 {
     float accel_norm = std::sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z);
     if (accel_norm < 1.0f) {
@@ -357,7 +356,7 @@ void ESKF_V2::initializeAttitude(const Vector3& accel, const Vector3& mag)
              config_.mag_ref.x, config_.mag_ref.y, config_.mag_ref.z);
 }
 
-void ESKF_V2::setAttitudeReference(const Vector3& level_accel, const Vector3& gyro_bias)
+void ESKF::setAttitudeReference(const Vector3& level_accel, const Vector3& gyro_bias)
 {
     state_.gyro_bias = gyro_bias;
     float current_yaw = state_.yaw;
@@ -410,7 +409,7 @@ void ESKF_V2::setAttitudeReference(const Vector3& level_accel, const Vector3& gy
 // Predict
 // ============================================================================
 
-void ESKF_V2::predict(const Vector3& accel, const Vector3& gyro, float dt, bool skip_position)
+void ESKF::predict(const Vector3& accel, const Vector3& gyro, float dt, bool skip_position)
 {
     if (!initialized_ || dt <= 0) return;
 
@@ -834,7 +833,7 @@ static void josephUpdateScalar(Matrix<15, 15>& P, Matrix<15, 15>& temp,
     }
 }
 
-void ESKF_V2::updateBaro(float altitude)
+void ESKF::updateBaro(float altitude)
 {
     if (!initialized_) return;
 
@@ -865,7 +864,7 @@ void ESKF_V2::updateBaro(float altitude)
     enforceCovarianceConstraints();
 }
 
-void ESKF_V2::updateToF(float distance)
+void ESKF::updateToF(float distance)
 {
     if (!initialized_) return;
 
@@ -910,7 +909,7 @@ void ESKF_V2::updateToF(float distance)
     enforceCovarianceConstraints();
 }
 
-void ESKF_V2::updateMag(const Vector3& mag)
+void ESKF::updateMag(const Vector3& mag)
 {
     if (!initialized_) return;
 
@@ -1040,7 +1039,7 @@ void ESKF_V2::updateMag(const Vector3& mag)
     enforceCovarianceConstraints();
 }
 
-void ESKF_V2::updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
+void ESKF::updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
                               float dt, float gyro_x, float gyro_y)
 {
     if (!initialized_ || distance < config_.flow_min_height || dt <= 0) return;
@@ -1130,7 +1129,7 @@ void ESKF_V2::updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
     enforceCovarianceConstraints();
 }
 
-void ESKF_V2::updateAccelAttitude(const Vector3& accel)
+void ESKF::updateAccelAttitude(const Vector3& accel)
 {
     if (!initialized_) return;
 

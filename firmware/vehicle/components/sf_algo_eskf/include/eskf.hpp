@@ -1,20 +1,18 @@
 /**
- * @file eskf_v2.hpp
- * @brief Error-State Kalman Filter V2 - Proper P-matrix isolation for sensor ON/OFF
+ * @file eskf.hpp
+ * @brief Error-State Kalman Filter with active_mask based P-matrix isolation
  *
- * ESKF V2: active_mask based state management
- * ESKF V2: active_mask に基づく状態管理
+ * active_mask に基づく状態管理を持つ ESKF
  *
- * Key improvements over V1:
- * V1 からの改善点:
+ * Features / 主要機能:
  * - Unified sensor enable/disable via SensorGroup + active_mask
  *   SensorGroup + active_mask による統一的なセンサ有効/無効制御
  * - P-matrix isolation: frozen states have zero cross-covariance
  *   P行列隔離: 凍結状態のクロス共分散をゼロに
  * - Q gating: no process noise added to frozen states
  *   Qゲーティング: 凍結状態にプロセスノイズを加算しない
- * - dx masking: unified masking replaces per-flag bias update logic
- *   dxマスキング: フラグ別バイアス更新ロジックを統一マスクで置換
+ * - dx masking: unified masking for bias update control
+ *   dxマスキング: 統一マスクによるバイアス更新制御
  *
  * 15-state ESKF:
  * [0-2]  POS_X/Y/Z    Position [m] NED / 位置
@@ -37,7 +35,7 @@ using namespace math;
 /**
  * @brief ESKF V2 - active_mask based state management
  */
-class ESKF_V2 {
+class ESKF {
 public:
     // ========================================================================
     // Sensor groups and state masks
@@ -260,7 +258,7 @@ public:
         float yaw;                  // [rad]
     };
 
-    ESKF_V2() = default;
+    ESKF() = default;
 
     // ========================================================================
     // Initialization / Reset

@@ -2,9 +2,9 @@
  * @file sensor_fusion.cpp
  * @brief Sensor fusion implementation
  *
- * Sensor ON/OFF is controlled solely by ESKF_V2::Config::sensor_enabled[].
+ * Sensor ON/OFF is controlled solely by ESKF::Config::sensor_enabled[].
  * SensorThresholds contains only quality/distance thresholds.
- * センサ ON/OFF は ESKF_V2::Config::sensor_enabled[] で一元管理。
+ * センサ ON/OFF は ESKF::Config::sensor_enabled[] で一元管理。
  * SensorThresholds は品質/距離閾値のみ。
  */
 
@@ -13,7 +13,7 @@
 
 namespace sf {
 
-bool SensorFusion::init(const stampfly::ESKF_V2::Config& config,
+bool SensorFusion::init(const stampfly::ESKF::Config& config,
                         const SensorThresholds& thresholds,
                         float max_position,
                         float max_velocity) {
@@ -53,7 +53,7 @@ void SensorFusion::updateOpticalFlow(int16_t dx, int16_t dy, uint8_t squal,
                                       float distance, float dt,
                                       float gyro_x, float gyro_y) {
     if (!initialized_ || diverged_) return;
-    if (!eskf_.isSensorEnabled(stampfly::ESKF_V2::SENSOR_FLOW)) return;
+    if (!eskf_.isSensorEnabled(stampfly::ESKF::SENSOR_FLOW)) return;
 
     if (squal < thresholds_.flow_squal_min) return;
     if (distance < thresholds_.flow_distance_min ||
@@ -64,14 +64,14 @@ void SensorFusion::updateOpticalFlow(int16_t dx, int16_t dy, uint8_t squal,
 
 void SensorFusion::updateBarometer(float relative_altitude) {
     if (!initialized_ || diverged_) return;
-    if (!eskf_.isSensorEnabled(stampfly::ESKF_V2::SENSOR_BARO)) return;
+    if (!eskf_.isSensorEnabled(stampfly::ESKF::SENSOR_BARO)) return;
 
     eskf_.updateBaro(relative_altitude);
 }
 
 void SensorFusion::updateToF(float distance) {
     if (!initialized_ || diverged_) return;
-    if (!eskf_.isSensorEnabled(stampfly::ESKF_V2::SENSOR_TOF)) return;
+    if (!eskf_.isSensorEnabled(stampfly::ESKF::SENSOR_TOF)) return;
 
     if (distance < thresholds_.tof_distance_min ||
         distance > thresholds_.tof_distance_max) return;
@@ -81,7 +81,7 @@ void SensorFusion::updateToF(float distance) {
 
 void SensorFusion::updateMagnetometer(const stampfly::math::Vector3& mag_body) {
     if (!initialized_ || diverged_) return;
-    if (!eskf_.isSensorEnabled(stampfly::ESKF_V2::SENSOR_MAG)) return;
+    if (!eskf_.isSensorEnabled(stampfly::ESKF::SENSOR_MAG)) return;
 
     eskf_.updateMag(mag_body);
 }
@@ -151,7 +151,7 @@ void SensorFusion::setAttitudeReference(const stampfly::math::Vector3& level_acc
     eskf_.setAttitudeReference(level_accel, gyro_bias);
 }
 
-bool SensorFusion::checkDivergence(const stampfly::ESKF_V2::State& state) {
+bool SensorFusion::checkDivergence(const stampfly::ESKF::State& state) {
     if (!std::isfinite(state.roll) || !std::isfinite(state.pitch)) return true;
 
     if (std::abs(state.position.x) > max_position_ ||

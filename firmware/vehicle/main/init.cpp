@@ -333,7 +333,7 @@ esp_err_t estimators()
         auto& state = stampfly::StampFlyState::getInstance();
 
         // コンポーネントのデフォルト設定を取得
-        stampfly::ESKF_V2::Config eskf_config = stampfly::ESKF_V2::Config::defaultConfig();
+        stampfly::ESKF::Config eskf_config = stampfly::ESKF::Config::defaultConfig();
 
         // =================================================================
         // アプリ固有の設定で上書き (main/config.hpp から)
@@ -349,12 +349,12 @@ esp_err_t estimators()
         sensor_thresholds.tof_distance_min = TOF_DISTANCE_MIN;
         sensor_thresholds.tof_distance_max = TOF_DISTANCE_MAX;
 
-        // センサ有効フラグ — ESKF_V2::Config が唯一の制御元
-        // Sensor enable flags — ESKF_V2::Config is the single source of truth
-        eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_MAG]  = config::eskf::USE_MAGNETOMETER;
-        eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_BARO] = config::eskf::USE_BAROMETER;
-        eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_TOF]  = config::eskf::USE_TOF;
-        eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_FLOW] = config::eskf::USE_OPTICAL_FLOW;
+        // センサ有効フラグ — ESKF::Config が唯一の制御元
+        // Sensor enable flags — ESKF::Config is the single source of truth
+        eskf_config.sensor_enabled[stampfly::ESKF::SENSOR_MAG]  = config::eskf::USE_MAGNETOMETER;
+        eskf_config.sensor_enabled[stampfly::ESKF::SENSOR_BARO] = config::eskf::USE_BAROMETER;
+        eskf_config.sensor_enabled[stampfly::ESKF::SENSOR_TOF]  = config::eskf::USE_TOF;
+        eskf_config.sensor_enabled[stampfly::ESKF::SENSOR_FLOW] = config::eskf::USE_OPTICAL_FLOW;
         eskf_config.yaw_estimation_enabled = config::eskf::ENABLE_YAW_ESTIMATION;
 
         // プロセスノイズ (Q行列)

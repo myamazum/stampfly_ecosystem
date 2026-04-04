@@ -328,7 +328,7 @@ void IMUTask(void* pvParameters)
                             g_baro_data_ready = false;
                             if (g_baro_task_healthy && g_baro_buf.count() > 0) {
                                 // Baro ON/OFF is controlled by config::eskf::USE_BAROMETER
-                                // via ESKF_V2::Config::sensor_enabled[SENSOR_BARO]
+                                // via ESKF::Config::sensor_enabled[SENSOR_BARO]
                                 // 気圧計の有効/無効は config で一元管理
                                 g_fusion.updateBarometer(g_baro_buf.latest());
                             }
@@ -510,8 +510,8 @@ void IMUTask(void* pvParameters)
                         eskf_error_counter++;
                     }
                 }
-                // ESKF_V2 is the sole estimator — no fallback
-                // ESKF_V2 が唯一の推定器 — フォールバックなし
+                // ESKF is the sole estimator — no fallback
+                // ESKF が唯一の推定器 — フォールバックなし
 
                 g_imu_checkpoint = 30;  // ControlTask起動前
 

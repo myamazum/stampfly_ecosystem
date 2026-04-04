@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "eskf_v2.cpp"
+    SRCS "eskf.cpp"
     INCLUDE_DIRS "include"
     REQUIRES sf_algo_math
 )
