@@ -114,9 +114,9 @@ namespace eskf {
 // センサー有効/無効スイッチ
 // デフォルト: 全センサーON。デバッグ時に個別無効化可能
 // -----------------------------------------------------------------------------
-inline constexpr bool USE_OPTICAL_FLOW = true;     // オプティカルフロー（姿勢保護追加済み）
-inline constexpr bool USE_BAROMETER = true;        // 気圧センサー（姿勢保護追加済み）
-inline constexpr bool USE_TOF = true;              // ToFセンサー（姿勢保護追加済み）
+inline constexpr bool USE_OPTICAL_FLOW = false;    // 初期テスト: OFF（IMUのみで姿勢推定）
+inline constexpr bool USE_BAROMETER = false;       // 初期テスト: OFF
+inline constexpr bool USE_TOF = false;             // 初期テスト: OFF
 inline constexpr bool USE_MAGNETOMETER = false;    // 地磁気無効（モータ磁気干渉が大きいため）
 inline constexpr bool ENABLE_YAW_ESTIMATION = true; // ヨー推定（ジャイロ積分）※falseで0固定
 
