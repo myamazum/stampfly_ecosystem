@@ -435,7 +435,10 @@ void ESKF::predict(const Vector3& accel, const Vector3& gyro, float dt, bool ski
 
     // Nominal state update
     // 名目状態の更新
-    if (!skip_position) {
+    // Skip if: skip_position requested (grounded) OR position states frozen (active_mask)
+    // 位置・速度の更新をスキップ: 接地中 または active_mask で凍結中
+    bool pos_active = (active_mask_ >> POS_X) & 1;  // Any POS/VEL active
+    if (!skip_position && pos_active) {
         float accel_world_x = R00*ax + R01*ay + R02*az;
         float accel_world_y = R10*ax + R11*ay + R12*az;
         float accel_world_z = R20*ax + R21*ay + R22*az + config_.gravity;
