@@ -70,10 +70,9 @@ void IMUTask(void* pvParameters)
                 //   加速度: g → m/s² (×9.81)
                 //   ジャイロ: rad/s (変換不要)
                 // ============================================================
-                constexpr float GRAVITY = 9.81f;
-                float accel_body_x = accel.y * GRAVITY;   // 前方正 [m/s²]
-                float accel_body_y = accel.x * GRAVITY;   // 右正 [m/s²]
-                float accel_body_z = -accel.z * GRAVITY;  // 下正 (NED) [m/s²]
+                float accel_body_x = accel.y * config::eskf::GRAVITY;   // 前方正 [m/s²]
+                float accel_body_y = accel.x * config::eskf::GRAVITY;   // 右正 [m/s²]
+                float accel_body_z = -accel.z * config::eskf::GRAVITY;  // 下正 (NED) [m/s²]
 
                 float gyro_body_x = gyro.y;     // Roll rate [rad/s]
                 float gyro_body_y = gyro.x;     // Pitch rate [rad/s]
@@ -328,8 +327,10 @@ void IMUTask(void* pvParameters)
                         if (g_baro_data_ready) {
                             g_baro_data_ready = false;
                             if (g_baro_task_healthy && g_baro_buf.count() > 0) {
-                                // TODO: 気圧センサの値が確認できたら有効化
-                                // g_fusion.updateBarometer(g_baro_buf.latest());
+                                // Baro ON/OFF is controlled by config::eskf::USE_BAROMETER
+                                // via ESKF_V2::Config::sensor_enabled[SENSOR_BARO]
+                                // 気圧計の有効/無効は config で一元管理
+                                g_fusion.updateBarometer(g_baro_buf.latest());
                             }
                         }
 
@@ -509,12 +510,8 @@ void IMUTask(void* pvParameters)
                         eskf_error_counter++;
                     }
                 }
-                // Fallback to simple attitude estimator if ESKF not available
-                else if (g_attitude_est.isInitialized()) {
-                    g_attitude_est.update(a, g, 0.0025f);
-                    auto att_state = g_attitude_est.getState();
-                    state.updateAttitude(att_state.roll, att_state.pitch, att_state.yaw);
-                }
+                // ESKF_V2 is the sole estimator — no fallback
+                // ESKF_V2 が唯一の推定器 — フォールバックなし
 
                 g_imu_checkpoint = 30;  // ControlTask起動前
 

@@ -195,14 +195,24 @@ inline constexpr float FLOW_OFFSET_X = 0.0f;
 inline constexpr float FLOW_OFFSET_Y = 0.0f;
 
 // -----------------------------------------------------------------------------
-// 姿勢補正: 適応的Rスケーリング
+// 姿勢補正
+// -----------------------------------------------------------------------------
+
+// 適応的Rスケーリング係数
 // R = R_base × (1 + K_ADAPTIVE × |accel_norm - g|²)
 // 動的加速度が大きいほど加速度計の補正を弱める（ゼロにはしない）
 // K=0: 常に同じ重みで補正、K=10: 1m/s²偏差で補正が約1/11に低減
-// -----------------------------------------------------------------------------
-inline constexpr int ATT_UPDATE_MODE = 0;
 inline constexpr float K_ADAPTIVE = 10.0f;
-inline constexpr float GYRO_ATT_THRESHOLD = 0.5f;      // [rad/s]
+
+// 姿勢補正クランプ [rad]
+// クロス共分散経由の姿勢ジャンプを防止する上限値
+// ±0.05 rad ≈ ±2.9°
+inline constexpr float ATT_CORRECTION_CLAMP = 0.05f;
+
+// 地磁気ノルム有効範囲 [uT]
+// この範囲外の読み取りはアウトライアとして棄却
+inline constexpr float MAG_NORM_MIN = 10.0f;
+inline constexpr float MAG_NORM_MAX = 100.0f;
 
 // -----------------------------------------------------------------------------
 // 着陸検出・位置リセット設定

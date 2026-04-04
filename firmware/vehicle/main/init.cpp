@@ -340,25 +340,21 @@ esp_err_t estimators()
         // 全設定をここで適用。学習者はconfig.hppを見れば全設定を把握できる
         // =================================================================
 
-        // センサー有効/無効と閾値（SensorFusion用）
-        sf::SensorFusion::SensorEnables sensor_enables;
-        sensor_enables.optical_flow = config::eskf::USE_OPTICAL_FLOW;
-        sensor_enables.barometer = config::eskf::USE_BAROMETER;
-        sensor_enables.tof = config::eskf::USE_TOF;
-        sensor_enables.magnetometer = config::eskf::USE_MAGNETOMETER;
-        sensor_enables.flow_squal_min = FLOW_SQUAL_MIN;
-        sensor_enables.flow_distance_min = FLOW_DISTANCE_MIN;
-        sensor_enables.flow_distance_max = FLOW_DISTANCE_MAX;
-        sensor_enables.tof_distance_min = TOF_DISTANCE_MIN;
-        sensor_enables.tof_distance_max = TOF_DISTANCE_MAX;
+        // センサー品質閾値（SensorFusion用）
+        // Sensor quality thresholds (for SensorFusion)
+        sf::SensorFusion::SensorThresholds sensor_thresholds;
+        sensor_thresholds.flow_squal_min = FLOW_SQUAL_MIN;
+        sensor_thresholds.flow_distance_min = FLOW_DISTANCE_MIN;
+        sensor_thresholds.flow_distance_max = FLOW_DISTANCE_MAX;
+        sensor_thresholds.tof_distance_min = TOF_DISTANCE_MIN;
+        sensor_thresholds.tof_distance_max = TOF_DISTANCE_MAX;
 
-        // ESKF_V2 sensor enable flags (unified)
-        // ESKF_V2 センサ有効フラグ (統一)
+        // センサ有効フラグ — ESKF_V2::Config が唯一の制御元
+        // Sensor enable flags — ESKF_V2::Config is the single source of truth
         eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_MAG]  = config::eskf::USE_MAGNETOMETER;
         eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_BARO] = config::eskf::USE_BAROMETER;
         eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_TOF]  = config::eskf::USE_TOF;
         eskf_config.sensor_enabled[stampfly::ESKF_V2::SENSOR_FLOW] = config::eskf::USE_OPTICAL_FLOW;
-        // ヨー推定有効フラグ（ジャイロZ積分に影響）
         eskf_config.yaw_estimation_enabled = config::eskf::ENABLE_YAW_ESTIMATION;
 
         // プロセスノイズ (Q行列)
@@ -407,14 +403,15 @@ esp_err_t estimators()
         eskf_config.flow_offset[0] = config::eskf::FLOW_OFFSET_X;
         eskf_config.flow_offset[1] = config::eskf::FLOW_OFFSET_Y;
 
-        // 姿勢補正モード
-        eskf_config.att_update_mode = config::eskf::ATT_UPDATE_MODE;
+        // 姿勢補正
         eskf_config.k_adaptive = config::eskf::K_ADAPTIVE;
-        eskf_config.gyro_att_threshold = config::eskf::GYRO_ATT_THRESHOLD;
+        eskf_config.att_correction_clamp = config::eskf::ATT_CORRECTION_CLAMP;
+        eskf_config.mag_norm_min = config::eskf::MAG_NORM_MIN;
+        eskf_config.mag_norm_max = config::eskf::MAG_NORM_MAX;
 
         // SensorFusion初期化
         bool ok = g_fusion.init(eskf_config,
-                                sensor_enables,
+                                sensor_thresholds,
                                 config::eskf::MAX_POSITION,
                                 config::eskf::MAX_VELOCITY);
         if (!ok) {
@@ -423,8 +420,8 @@ esp_err_t estimators()
         } else {
             ESP_LOGI(TAG, "Sensor fusion initialized (predict at 400Hz)");
             ESP_LOGI(TAG, "  Sensors: flow=%d, baro=%d, tof=%d, mag=%d",
-                     sensor_enables.optical_flow, sensor_enables.barometer,
-                     sensor_enables.tof, sensor_enables.magnetometer);
+                     config::eskf::USE_OPTICAL_FLOW, config::eskf::USE_BAROMETER,
+                     config::eskf::USE_TOF, config::eskf::USE_MAGNETOMETER);
             state.setESKFInitialized(true);
             g_fusion_ptr = &g_fusion;  // Set pointer for CLI access
 
@@ -444,34 +441,6 @@ esp_err_t estimators()
         g_landing_handler.init(landing_cfg);
         ESP_LOGI(TAG, "Landing handler initialized (alt threshold=%.2fm)",
                  landing_cfg.landing_altitude_threshold);
-    }
-
-    // Simple Attitude Estimator (backup/complementary)
-    {
-        stampfly::AttitudeEstimator::Config cfg;
-        cfg.gyro_weight = attitude_estimator::GYRO_WEIGHT;
-        cfg.mag_declination = attitude_estimator::MAG_DECLINATION;
-        esp_err_t ret = g_attitude_est.init(cfg);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "AttitudeEstimator init failed: %s", esp_err_to_name(ret));
-        } else {
-            ESP_LOGI(TAG, "AttitudeEstimator initialized");
-        }
-    }
-
-    // Simple Altitude Estimator
-    {
-        stampfly::AltitudeEstimator::Config cfg;
-        cfg.process_noise_alt = altitude_estimator::PROCESS_NOISE_ALT;
-        cfg.process_noise_vel = altitude_estimator::PROCESS_NOISE_VEL;
-        cfg.measurement_noise_baro = altitude_estimator::MEASUREMENT_NOISE_BARO;
-        cfg.measurement_noise_tof = altitude_estimator::MEASUREMENT_NOISE_TOF;
-        esp_err_t ret = g_altitude_est.init(cfg);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "AltitudeEstimator init failed: %s", esp_err_to_name(ret));
-        } else {
-            ESP_LOGI(TAG, "AltitudeEstimator initialized");
-        }
     }
 
     return ESP_OK;

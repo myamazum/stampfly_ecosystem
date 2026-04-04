@@ -162,11 +162,18 @@ public:
         // ヨー推定有効フラグ
         bool yaw_estimation_enabled;
 
-        // Attitude correction mode
-        // 姿勢補正モード
-        int att_update_mode;
+        // Adaptive R scaling coefficient for accel attitude correction
+        // 適応的Rスケーリング係数 (加速度計姿勢補正)
         float k_adaptive;
-        float gyro_att_threshold;
+
+        // Attitude correction clamp [rad]
+        // クロス共分散経由の姿勢ジャンプ防止クランプ
+        float att_correction_clamp;
+
+        // Magnetometer norm valid range [uT]
+        // 地磁気ノルム有効範囲
+        float mag_norm_min;
+        float mag_norm_max;
 
         /**
          * @brief Default configuration
@@ -225,10 +232,13 @@ public:
 
             cfg.yaw_estimation_enabled = true;
 
-            // Attitude correction mode
-            cfg.att_update_mode = 0;
+            // Attitude correction
             cfg.k_adaptive = 0.0f;
-            cfg.gyro_att_threshold = 0.5f;
+            cfg.att_correction_clamp = 0.05f;  // ±0.05 rad (~2.9 deg)
+
+            // Magnetometer norm range
+            cfg.mag_norm_min = 10.0f;   // [uT]
+            cfg.mag_norm_max = 100.0f;  // [uT]
 
             return cfg;
         }
@@ -281,6 +291,14 @@ public:
     void setSensorEnabled(SensorGroup group, bool enabled);
 
     /**
+     * @brief Check if a sensor group is enabled
+     * センサグループが有効かチェック
+     */
+    bool isSensorEnabled(SensorGroup group) const {
+        return (group < SENSOR_COUNT) && config_.sensor_enabled[group];
+    }
+
+    /**
      * @brief Get current active mask
      * 現在のactive_maskを取得
      */
@@ -302,9 +320,6 @@ public:
     void updateBaro(float altitude);
     void updateToF(float distance);
     void updateMag(const Vector3& mag);
-    void updateFlow(float flow_x, float flow_y, float distance);
-    void updateFlowWithGyro(float flow_x, float flow_y, float distance,
-                            float gyro_x, float gyro_y);
     void updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
                        float dt, float gyro_x, float gyro_y);
 

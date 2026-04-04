@@ -128,11 +128,6 @@ void ToFTask(void* pvParameters)
                             // リングバッファに追加（ESKFフュージョン用）
                             g_tof_bottom_buf.push(distance_m);
 
-                            // Fallback to simple altitude estimator (センサーフュージョン未使用時)
-                            if (!g_fusion.isInitialized() && g_altitude_est.isInitialized() && g_attitude_est.isInitialized()) {
-                                auto att = g_attitude_est.getState();
-                                g_altitude_est.updateToF(distance_m, att.pitch, att.roll);
-                            }
                         } else {
                             // 距離ジャンプ検出 - 無効として扱う
                             g_health.tof.recordFailure();

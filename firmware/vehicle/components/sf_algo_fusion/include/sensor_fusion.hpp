@@ -63,16 +63,12 @@ public:
     SensorFusion& operator=(const SensorFusion&) = delete;
 
     /**
-     * @brief センサー有効/無効設定と閾値
-     * 全てのセンサースイッチと閾値を一箇所で管理
+     * @brief センサー品質閾値
+     *
+     * センサーの ON/OFF は ESKF_V2::Config::sensor_enabled[] で一元管理。
+     * ここには品質・距離の閾値のみを定義する。
      */
-    struct SensorEnables {
-        // 有効/無効スイッチ
-        bool optical_flow = true;   // オプティカルフロー
-        bool barometer = true;      // 気圧センサー
-        bool tof = true;            // ToFセンサー
-        bool magnetometer = true;   // 地磁気センサー
-
+    struct SensorThresholds {
         // オプティカルフロー閾値
         uint8_t flow_squal_min = 0x19;    // 最小品質閾値
         float flow_distance_min = 0.02f;  // [m]
@@ -86,12 +82,12 @@ public:
     /**
      * @brief 初期化
      * @param config ESKF設定（main/config.hpp で構築）
-     * @param enables センサー有効/無効設定
+     * @param thresholds センサー品質閾値
      * @param max_position 発散検出用の最大位置 [m]
      * @param max_velocity 発散検出用の最大速度 [m/s]
      */
     bool init(const stampfly::ESKF_V2::Config& config,
-              const SensorEnables& enables,
+              const SensorThresholds& thresholds,
               float max_position = 100.0f,
               float max_velocity = 50.0f);
 
@@ -287,7 +283,7 @@ private:
     bool diverged_ = false;
     float max_position_ = 100.0f;
     float max_velocity_ = 50.0f;
-    SensorEnables enables_;
+    SensorThresholds thresholds_;
     stampfly::ESKF_V2 eskf_;
 
     bool checkDivergence(const stampfly::ESKF_V2::State& state);

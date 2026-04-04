@@ -50,10 +50,6 @@ void BaroTask(void* pvParameters)
                 g_baro_buf.push(relative_alt);
                 g_baro_data_ready = true;
 
-                // Fallback to simple altitude estimator (センサーフュージョン未使用時)
-                if (!g_fusion.isInitialized() && g_altitude_est.isInitialized()) {
-                    g_altitude_est.updateBaro(baro.altitude_m);
-                }
             } else {
                 g_health.baro.recordFailure();
                 g_baro_task_healthy = g_health.baro.isHealthy();

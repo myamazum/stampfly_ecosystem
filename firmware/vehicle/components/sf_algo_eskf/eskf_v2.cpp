@@ -250,9 +250,9 @@ void ESKF_V2::applyMaskedErrorState(float dx[N_STATES])
 
     // Attitude protection: clamp corrections, disable yaw from non-mag observations
     // 姿勢保護: 補正をクランプ、非磁気観測からのヨー更新を無効化
-    constexpr float ATT_CLAMP = 0.05f;  // +/-0.05 rad (~2.9 deg)
-    dx[ATT_X] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_X]));
-    dx[ATT_Y] = std::max(-ATT_CLAMP, std::min(ATT_CLAMP, dx[ATT_Y]));
+    float clamp = config_.att_correction_clamp;
+    dx[ATT_X] = std::max(-clamp, std::min(clamp, dx[ATT_X]));
+    dx[ATT_Y] = std::max(-clamp, std::min(clamp, dx[ATT_Y]));
     // Note: ATT_Z clamping is caller-specific (mag allows it, others zero it)
     // ATT_Z のクランプは呼び出し元固有 (magは許可、他はゼロ化)
 
@@ -917,7 +917,7 @@ void ESKF_V2::updateMag(const Vector3& mag)
     // Magnitude check
     // ノルムチェック
     float mag_norm = std::sqrt(mag.x*mag.x + mag.y*mag.y + mag.z*mag.z);
-    if (mag_norm < 10.0f || mag_norm > 100.0f) return;
+    if (mag_norm < config_.mag_norm_min || mag_norm > config_.mag_norm_max) return;
 
     // H: columns 6,7,8 (ATT_X, ATT_Y, ATT_Z) — skew(h) form
     const Quaternion& q = state_.orientation;
@@ -1033,113 +1033,6 @@ void ESKF_V2::updateMag(const Vector3& mag)
                        + temp1_i8*(Kj0*H08 + Kj1*H18 + Kj2*H28);
             float val = temp1_(i, j) - corr;
             val += R_val * (Ki0*Kj0 + Ki1*Kj1 + Ki2*Kj2);
-            P_(i, j) = val;
-        }
-    }
-
-    enforceCovarianceConstraints();
-}
-
-void ESKF_V2::updateFlow(float flow_x, float flow_y, float distance)
-{
-    updateFlowWithGyro(flow_x, flow_y, distance, 0.0f, 0.0f);
-}
-
-void ESKF_V2::updateFlowWithGyro(float flow_x, float flow_y, float distance,
-                                  float gyro_x, float gyro_y)
-{
-    if (!initialized_ || distance < config_.flow_min_height) return;
-
-    const Quaternion& q = state_.orientation;
-    float R22 = 1.0f - 2.0f * (q.x*q.x + q.y*q.y);
-    if (R22 < config_.flow_tilt_cos_threshold) return;
-
-    float gyro_x_corrected = gyro_x - state_.gyro_bias.x;
-    float gyro_y_corrected = gyro_y - state_.gyro_bias.y;
-
-    constexpr float flow_scale = 0.23f;
-    constexpr float k_xx = 1.35f * flow_scale;
-    constexpr float k_xy = 9.30f * flow_scale;
-    constexpr float k_yx = -2.65f * flow_scale;
-    constexpr float k_yy = 0.0f * flow_scale;
-
-    float flow_x_comp = flow_x - k_xx * gyro_x_corrected - k_xy * gyro_y_corrected;
-    float flow_y_comp = flow_y - k_yx * gyro_x_corrected - k_yy * gyro_y_corrected;
-
-    float vx_body_obs = flow_x_comp * distance;
-    float vy_body_obs = flow_y_comp * distance;
-
-    float R00 = 1.0f - 2.0f*(q.y*q.y + q.z*q.z);
-    float R01 = 2.0f*(q.x*q.y - q.w*q.z);
-    float R10 = 2.0f*(q.x*q.y + q.w*q.z);
-    float R11 = 1.0f - 2.0f*(q.x*q.x + q.z*q.z);
-    float R20 = 2.0f*(q.x*q.z - q.w*q.y);
-    float R21 = 2.0f*(q.y*q.z + q.w*q.x);
-
-    float vn = state_.velocity.x, ve = state_.velocity.y, vd = state_.velocity.z;
-    float vx_body_exp = R00*vn + R10*ve + R20*vd;
-    float vy_body_exp = R01*vn + R11*ve + R21*vd;
-
-    float y0 = vx_body_obs - vx_body_exp;
-    float y1 = vy_body_obs - vy_body_exp;
-    float R_val = config_.flow_noise * config_.flow_noise;
-
-    // H: H[0][3]=R00, H[0][4]=R10, H[0][5]=R20
-    //    H[1][3]=R01, H[1][4]=R11, H[1][5]=R21
-    float H03 = R00, H04 = R10, H05 = R20;
-    float H13 = R01, H14 = R11, H15 = R21;
-
-    float PHT_arr[15][2];
-    for (int i = 0; i < 15; i++) {
-        PHT_arr[i][0] = P_(i,3)*H03 + P_(i,4)*H04 + P_(i,5)*H05;
-        PHT_arr[i][1] = P_(i,3)*H13 + P_(i,4)*H14 + P_(i,5)*H15;
-    }
-
-    float S00 = H03*PHT_arr[3][0] + H04*PHT_arr[4][0] + H05*PHT_arr[5][0] + R_val;
-    float S01 = H03*PHT_arr[3][1] + H04*PHT_arr[4][1] + H05*PHT_arr[5][1];
-    float S11 = H13*PHT_arr[3][1] + H14*PHT_arr[4][1] + H15*PHT_arr[5][1] + R_val;
-
-    float det = S00 * S11 - S01 * S01;
-    if (std::abs(det) < 1e-10f) return;
-    float inv_det = 1.0f / det;
-    float Si00 = S11 * inv_det;
-    float Si01 = -S01 * inv_det;
-    float Si11 = S00 * inv_det;
-
-    float K[15][2];
-    for (int i = 0; i < 15; i++) {
-        K[i][0] = PHT_arr[i][0]*Si00 + PHT_arr[i][1]*Si01;
-        K[i][1] = PHT_arr[i][0]*Si01 + PHT_arr[i][1]*Si11;
-    }
-
-    float dx[N_STATES];
-    for (int i = 0; i < N_STATES; i++) {
-        dx[i] = K[i][0] * y0 + K[i][1] * y1;
-    }
-
-    dx[ATT_Z] = 0.0f;  // Yaw not observable from flow / ヨーはフローから不可観測
-
-    applyMaskedErrorState(dx);
-
-    // Joseph-form P update (2x15 H, columns 3,4,5)
-    for (int i = 0; i < 15; i++) {
-        float IKH_i3 = -K[i][0]*H03 - K[i][1]*H13;
-        float IKH_i4 = -K[i][0]*H04 - K[i][1]*H14;
-        float IKH_i5 = -K[i][0]*H05 - K[i][1]*H15;
-        for (int j = 0; j < 15; j++) {
-            temp1_(i, j) = P_(i, j) + IKH_i3*P_(3, j) + IKH_i4*P_(4, j) + IKH_i5*P_(5, j);
-        }
-    }
-
-    for (int i = 0; i < 15; i++) {
-        float temp1_i3 = temp1_(i, 3), temp1_i4 = temp1_(i, 4), temp1_i5 = temp1_(i, 5);
-        float Ki0 = K[i][0], Ki1 = K[i][1];
-        for (int j = 0; j < 15; j++) {
-            float IKH_j3 = -K[j][0]*H03 - K[j][1]*H13;
-            float IKH_j4 = -K[j][0]*H04 - K[j][1]*H14;
-            float IKH_j5 = -K[j][0]*H05 - K[j][1]*H15;
-            float val = temp1_(i, j) + temp1_i3*IKH_j3 + temp1_i4*IKH_j4 + temp1_i5*IKH_j5;
-            val += R_val * (Ki0 * K[j][0] + Ki1 * K[j][1]);
             P_(i, j) = val;
         }
     }
