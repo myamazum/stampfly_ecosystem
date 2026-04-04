@@ -38,7 +38,6 @@
 #include "stampfly_state.hpp"
 #include "system_state.hpp"
 #include "system_manager.hpp"
-#include "eskf.hpp"
 #include "sensor_fusion.hpp"
 #include "filter.hpp"
 #include "sensor_health.hpp"
