@@ -1520,6 +1520,93 @@ rigidbody.euler2quat()   # オイラー角→クォータニオン
 rigidbody.quat2euler()   # クォータニオン→オイラー角
 ```
 
+## 9. ファームウェア制御アーキテクチャ
+
+### カスケード制御構造
+
+ファームウェアは以下の4段カスケード制御を実装している：
+
+```
+コントローラ入力
+    │
+    ├─ ACRO モード ─────────────────────────────┐
+    │                                           │
+    ├─ STABILIZE モード ──► AttitudeController ─┤
+    │   角度 → 角速度              (外ループ)    │
+    │                                           │
+    ├─ ALTITUDE_HOLD モード                     │
+    │   高度PID → 速度PID → 推力補正            │
+    │                                           │
+    └─ POSITION_HOLD モード                     │
+        位置PID → 速度PID → 角度補正            │
+                                                │
+                                    RateController ◄┘
+                                      (内ループ)
+                                         │
+                                    ControlAllocator
+                                         │
+                                    MotorDriver
+```
+
+### 実装ファイル
+
+| コンポーネント | ファイル |
+|--------------|---------|
+| レート制御（内ループ） | `firmware/vehicle/main/rate_controller.hpp` |
+| 姿勢制御（外ループ） | `firmware/vehicle/main/attitude_controller.hpp` |
+| 高度制御 | `firmware/vehicle/main/altitude_controller.hpp` |
+| 位置制御 | `firmware/vehicle/main/position_controller.hpp` |
+| PIDコントローラ | `firmware/vehicle/components/sf_algo_pid/include/pid.hpp` |
+| 制御割当 | `firmware/vehicle/components/sf_algo_control/include/control_allocation.hpp` |
+| モーターモデル | `firmware/vehicle/components/sf_algo_control/include/motor_model.hpp` |
+| 全パラメータ | `firmware/vehicle/main/config.hpp` |
+| 制御タスク | `firmware/vehicle/main/tasks/control_task.cpp` |
+
+### PID実装の特徴
+
+ファームウェアのPIDコントローラ (`sf_algo_pid`) は以下の機能を持つ：
+
+| 機能 | 説明 |
+|------|------|
+| 時定数形式 | C(s) = Kp(1 + 1/(Ti·s) + Td·s/(η·Td·s + 1)) |
+| アンチワインドアップ | バックキャリキュレーション方式（トラッキング時定数 Tt） |
+| Derivative-on-measurement | エラーではなく測定値の微分を選択可能 |
+| 台形積分 | 積分項に台形公式を使用 |
+| 双一次変換 | 微分フィルタにTustin近似を使用 |
+
+**Kp/Ki/Kd 形式との関係:**
+```
+Ki = Kp / Ti
+Kd = Kp × Td
+```
+
+### レート制御パラメータ（現在値）
+
+物理単位モード（デフォルト）での値。出力はトルク [Nm]。
+
+| 軸 | Kp [Nm/(rad/s)] | Ti [s] | Td [s] | η |
+|----|-----------------|--------|--------|---|
+| Roll | 9.1×10⁻⁴ | 0.7 | 0.01 | 0.125 |
+| Pitch | 1.33×10⁻³ | 0.7 | 0.01 | 0.125 |
+| Yaw | 1.77×10⁻³ | 0.8 | 0.01 | 0.125 |
+
+### モーターパラメータ（ファームウェア実装値）
+
+`motor_model.hpp` の `DEFAULT_MOTOR_PARAMS`:
+
+| パラメータ | 記号 | 値 | 単位 |
+|-----------|------|-----|------|
+| 推力係数 | Ct | 1.0×10⁻⁸ | N/(rad/s)² |
+| トルク係数 | Cq | 9.71×10⁻¹¹ | N·m/(rad/s)² |
+| 巻線抵抗 | Rm | 0.34 | Ω |
+| 逆起電力定数 | Km | 6.125×10⁻⁴ | V/(rad/s) |
+| 粘性摩擦係数 | Dm | 3.69×10⁻⁸ | N·m/(rad/s) |
+| 静止摩擦トルク | Qf | 2.76×10⁻⁵ | N·m |
+| 回転子慣性 | Jm | 1.0×10⁻⁹ | kg·m² |
+| バッテリー電圧 | Vbat | 3.7 | V |
+
+> **注意:** 本セクション（8章）の理論式で使用するモーター抵抗 Rm=0.5Ω、慣性 Jm=1.0×10⁻⁷ はシミュレータの初期値であり、ファームウェアの実装値とは異なる。ファームウェアではチューニング済みの上記値を使用する。
+
 ---
 
 <a id="english"></a>
@@ -2786,3 +2873,90 @@ rigidbody.quat_dcm()     # Quaternion to DCM
 rigidbody.euler2quat()   # Euler to Quaternion
 rigidbody.quat2euler()   # Quaternion to Euler
 ```
+
+## 9. Firmware Control Architecture
+
+### Cascaded Control Structure
+
+The firmware implements a 4-level cascaded control system:
+
+```
+Controller Input
+    │
+    ├─ ACRO mode ──────────────────────────────┐
+    │                                          │
+    ├─ STABILIZE mode ──► AttitudeController ──┤
+    │   angle → rate              (outer loop)  │
+    │                                          │
+    ├─ ALTITUDE_HOLD mode                      │
+    │   alt PID → vel PID → thrust correction  │
+    │                                          │
+    └─ POSITION_HOLD mode                      │
+        pos PID → vel PID → angle correction   │
+                                               │
+                                   RateController ◄┘
+                                     (inner loop)
+                                        │
+                                   ControlAllocator
+                                        │
+                                   MotorDriver
+```
+
+### Implementation Files
+
+| Component | File |
+|-----------|------|
+| Rate control (inner loop) | `firmware/vehicle/main/rate_controller.hpp` |
+| Attitude control (outer loop) | `firmware/vehicle/main/attitude_controller.hpp` |
+| Altitude control | `firmware/vehicle/main/altitude_controller.hpp` |
+| Position control | `firmware/vehicle/main/position_controller.hpp` |
+| PID controller | `firmware/vehicle/components/sf_algo_pid/include/pid.hpp` |
+| Control allocation | `firmware/vehicle/components/sf_algo_control/include/control_allocation.hpp` |
+| Motor model | `firmware/vehicle/components/sf_algo_control/include/motor_model.hpp` |
+| All parameters | `firmware/vehicle/main/config.hpp` |
+| Control task | `firmware/vehicle/main/tasks/control_task.cpp` |
+
+### PID Implementation Features
+
+The firmware PID controller (`sf_algo_pid`) includes:
+
+| Feature | Description |
+|---------|-------------|
+| Time constant form | C(s) = Kp(1 + 1/(Ti·s) + Td·s/(η·Td·s + 1)) |
+| Anti-windup | Back-calculation with tracking time constant Tt |
+| Derivative-on-measurement | Optional: differentiate measurement instead of error |
+| Trapezoidal integration | Uses trapezoidal rule for integral term |
+| Bilinear transform | Tustin approximation for derivative filter |
+
+**Relationship to Kp/Ki/Kd form:**
+```
+Ki = Kp / Ti
+Kd = Kp × Td
+```
+
+### Rate Control Parameters (Current Values)
+
+Physical units mode (default). Output is torque [Nm].
+
+| Axis | Kp [Nm/(rad/s)] | Ti [s] | Td [s] | η |
+|------|-----------------|--------|--------|---|
+| Roll | 9.1×10⁻⁴ | 0.7 | 0.01 | 0.125 |
+| Pitch | 1.33×10⁻³ | 0.7 | 0.01 | 0.125 |
+| Yaw | 1.77×10⁻³ | 0.8 | 0.01 | 0.125 |
+
+### Motor Parameters (Firmware Implementation)
+
+From `motor_model.hpp` `DEFAULT_MOTOR_PARAMS`:
+
+| Parameter | Symbol | Value | Unit |
+|-----------|--------|-------|------|
+| Thrust coefficient | Ct | 1.0×10⁻⁸ | N/(rad/s)² |
+| Torque coefficient | Cq | 9.71×10⁻¹¹ | N·m/(rad/s)² |
+| Winding resistance | Rm | 0.34 | Ω |
+| Back-EMF constant | Km | 6.125×10⁻⁴ | V/(rad/s) |
+| Viscous friction | Dm | 3.69×10⁻⁸ | N·m/(rad/s) |
+| Static friction torque | Qf | 2.76×10⁻⁵ | N·m |
+| Rotor inertia | Jm | 1.0×10⁻⁹ | kg·m² |
+| Battery voltage | Vbat | 3.7 | V |
+
+> **Note:** The motor resistance Rm=0.5Ω and inertia Jm=1.0×10⁻⁷ used in Section 8 are simulator initial values and differ from the firmware implementation. The firmware uses the tuned values above.
