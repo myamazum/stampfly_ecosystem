@@ -300,11 +300,11 @@ TDMA Slave initialized (ID=1)
 ### タイムアウトエラーが発生する
 
 TDMA送信タスクはセマフォで待機しており、タイムアウトは発生しません（portMAX_DELAYで無限待機）。
-ただし、ビーコンロストの場合は50ms（5フレーム）でタイムアウト警告が表示されます。
+ただし、ビーコンロストの場合は200ms（10フレーム）でタイムアウト警告が表示されます。
 
 [src/main.cpp:127](src/main.cpp#L127)
 ```cpp
-static const uint32_t BEACON_TIMEOUT_US = 50000;    // 50ms = 5 frames
+static const uint32_t BEACON_TIMEOUT_US = 200000;   // 200ms = 10 frames
 ```
 
 ---

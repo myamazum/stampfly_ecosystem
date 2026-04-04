@@ -62,17 +62,18 @@ WiFi CLI タスクのスタック 4096B に対して SendItem (342B) + ws_batch_
 
 ## 3. 最終解決: 統合パケット方式
 
-8 IMU サイクル分のデータを 1 パケット (~950B) にまとめて 50Hz で送信。
+8 IMU サイクル分のデータを 1 パケット (~1000B) にまとめて 50Hz で送信。
 
 ```
 パケット構造:
   [Header 4B]
   [IMU+ESKF × 8]   640B (固定)
   [PosVel × 8]     224B (固定)
+  [RateRef × 8]     48B (固定)
   [entry_count 1B]
   [SensorEntries]   可変 (Control, Flow, ToF, Baro, Mag)
   [Checksum 1B]
-  合計: ~870-950B
+  合計: ~920-1000B
 ```
 
 ### 結果
@@ -152,7 +153,7 @@ Large structures on 4KB task stacks caused reboots.
 
 ## 3. Final Solution: Unified Packet
 
-8 IMU cycles packed into one ~950B packet at 50Hz.
+8 IMU cycles packed into one ~1000B packet at 50Hz.
 
 | Metric | TCP | UDP-A | UDP Unified |
 |--------|-----|-------|-------------|
