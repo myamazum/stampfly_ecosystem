@@ -839,6 +839,13 @@ void ESKF::updateBaro(float altitude)
     if (S < 1e-10f) return;
     float S_inv = 1.0f / S;
 
+    // Chi-squared outlier rejection (1 DOF)
+    // χ²外れ値棄却
+    if (config_.baro_chi2_gate > 0.0f) {
+        float d2 = (y * y) * S_inv;
+        if (d2 > config_.baro_chi2_gate) return;
+    }
+
     float K[N_STATES];
     for (int i = 0; i < N_STATES; i++) {
         K[i] = P_(i, 2) * S_inv;
@@ -981,6 +988,15 @@ void ESKF::updateMag(const Vector3& mag)
     Si[2][1] = Si[1][2];
     Si[2][2] = (S[0][0]*S[1][1] - S[0][1]*S[1][0]) * inv_det;
 
+    // Chi-squared outlier rejection (3 DOF): d² = y^T * S^-1 * y
+    // χ²外れ値棄却
+    if (config_.mag_chi2_gate > 0.0f) {
+        float d2 = y0*(Si[0][0]*y0 + Si[0][1]*y1 + Si[0][2]*y2)
+                 + y1*(Si[1][0]*y0 + Si[1][1]*y1 + Si[1][2]*y2)
+                 + y2*(Si[2][0]*y0 + Si[2][1]*y1 + Si[2][2]*y2);
+        if (d2 > config_.mag_chi2_gate) return;
+    }
+
     // PHT = P * H^T (15x3)
     float PHT[15][3];
     for (int i = 0; i < 15; i++) {
@@ -1085,6 +1101,13 @@ void ESKF::updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
     float Si00 = S11 * inv_det;
     float Si01 = -S01 * inv_det;
     float Si11 = S00 * inv_det;
+
+    // Chi-squared outlier rejection (2 DOF): d² = y^T * S^-1 * y
+    // χ²外れ値棄却
+    if (config_.flow_chi2_gate > 0.0f) {
+        float d2 = y0*(Si00*y0 + Si01*y1) + y1*(Si01*y0 + Si11*y1);
+        if (d2 > config_.flow_chi2_gate) return;
+    }
 
     float K[15][2];
     for (int i = 0; i < 15; i++) {
@@ -1203,6 +1226,15 @@ void ESKF::updateAccelAttitude(const Vector3& accel)
     Si[2][0] = (S[1][0]*S[2][1] - S[1][1]*S[2][0]) * inv_det;
     Si[2][1] = (S[0][1]*S[2][0] - S[0][0]*S[2][1]) * inv_det;
     Si[2][2] = (S[0][0]*S[1][1] - S[0][1]*S[1][0]) * inv_det;
+
+    // Chi-squared outlier rejection (3 DOF): d² = y^T * S^-1 * y
+    // χ²外れ値棄却
+    if (config_.accel_att_chi2_gate > 0.0f) {
+        float d2 = y0*(Si[0][0]*y0 + Si[0][1]*y1 + Si[0][2]*y2)
+                 + y1*(Si[1][0]*y0 + Si[1][1]*y1 + Si[1][2]*y2)
+                 + y2*(Si[2][0]*y0 + Si[2][1]*y1 + Si[2][2]*y2);
+        if (d2 > config_.accel_att_chi2_gate) return;
+    }
 
     // K = PHT * S^-1 (15x3)
     float K[15][3];

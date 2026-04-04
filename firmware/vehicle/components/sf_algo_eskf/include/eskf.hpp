@@ -128,9 +128,16 @@ public:
         // ToF傾き閾値
         float tof_tilt_threshold;
 
-        // ToF chi-squared gate (1 DOF: 3.84=95%, 6.63=99%, 0=disabled)
-        // ToFカイ二乗ゲート
-        float tof_chi2_gate;
+        // Chi-squared gates for outlier rejection (0=disabled)
+        // 外れ値棄却用カイ二乗ゲート (0=無効)
+        // 1 DOF: 3.84=95%, 6.63=99%
+        // 2 DOF: 5.99=95%, 9.21=99%
+        // 3 DOF: 7.81=95%, 11.34=99%
+        float baro_chi2_gate;       // Baro (1 DOF)
+        float tof_chi2_gate;        // ToF (1 DOF)
+        float mag_chi2_gate;        // Mag (3 DOF)
+        float flow_chi2_gate;       // Flow (2 DOF)
+        float accel_att_chi2_gate;  // Accel attitude (3 DOF)
 
         // Accel attitude correction motion threshold [m/s²]
         // 加速度計姿勢補正のモーション閾値
@@ -206,8 +213,14 @@ public:
             // Thresholds
             cfg.mahalanobis_threshold = 15.0f;
             cfg.tof_tilt_threshold = 0.70f;
-            cfg.tof_chi2_gate = 3.84f;
             cfg.accel_motion_threshold = 1.0f;
+
+            // Chi-squared gates (0 = disabled)
+            cfg.baro_chi2_gate = 3.84f;       // 1 DOF, 95%
+            cfg.tof_chi2_gate = 3.84f;        // 1 DOF, 95%
+            cfg.mag_chi2_gate = 7.81f;        // 3 DOF, 95%
+            cfg.flow_chi2_gate = 5.99f;       // 2 DOF, 95%
+            cfg.accel_att_chi2_gate = 7.81f;  // 3 DOF, 95%
             cfg.flow_min_height = 0.02f;
             cfg.flow_max_height = 4.0f;
             cfg.flow_tilt_cos_threshold = 0.866f;

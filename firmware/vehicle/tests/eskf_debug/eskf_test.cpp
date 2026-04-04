@@ -210,13 +210,19 @@ void test_accel_attitude_update() {
 
     ESKF eskf;
     auto config = allSensorsOnConfig();
+    config.accel_att_chi2_gate = 0.0f;  // Disable gate for large-angle test
     eskf.init(config);
 
     float g = config.gravity;
     float roll_rad = 30.0f * M_PI / 180.0f;
     Vector3 accel_rolled(0.0f, g * std::sin(roll_rad), -g * std::cos(roll_rad));
+    Vector3 gyro_zero(0.0f, 0.0f, 0.0f);
+    float dt = 0.0025f;
 
-    for (int i = 0; i < 50; i++) {
+    // Predict + update cycles to converge gradually (chi2 gate requires gradual approach)
+    // predict + update サイクルで段階的に収束（χ²ゲートは段階的なアプローチが必要）
+    for (int i = 0; i < 200; i++) {
+        eskf.predict(accel_rolled, gyro_zero, dt);
         eskf.updateAccelAttitude(accel_rolled);
     }
     auto state = eskf.getState();

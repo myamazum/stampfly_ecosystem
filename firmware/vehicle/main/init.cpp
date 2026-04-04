@@ -387,8 +387,14 @@ esp_err_t estimators()
         // 閾値
         eskf_config.mahalanobis_threshold = config::eskf::MAHALANOBIS_THRESHOLD;
         eskf_config.tof_tilt_threshold = config::eskf::TOF_TILT_THRESHOLD;
-        eskf_config.tof_chi2_gate = config::eskf::TOF_CHI2_GATE;
         eskf_config.accel_motion_threshold = config::eskf::ACCEL_MOTION_THRESHOLD;
+
+        // χ²ゲート（外れ値棄却）
+        eskf_config.baro_chi2_gate = config::eskf::BARO_CHI2_GATE;
+        eskf_config.tof_chi2_gate = config::eskf::TOF_CHI2_GATE;
+        eskf_config.mag_chi2_gate = config::eskf::MAG_CHI2_GATE;
+        eskf_config.flow_chi2_gate = config::eskf::FLOW_CHI2_GATE;
+        eskf_config.accel_att_chi2_gate = config::eskf::ACCEL_ATT_CHI2_GATE;
 
         // オプティカルフロー設定
         eskf_config.flow_min_height = config::eskf::FLOW_MIN_HEIGHT;

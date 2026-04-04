@@ -164,8 +164,16 @@ inline constexpr float MAG_REF_Z = 40.0f;              // 下成分 [uT]
 // -----------------------------------------------------------------------------
 inline constexpr float MAHALANOBIS_THRESHOLD = 15.0f;  // アウトライア棄却閾値
 inline constexpr float TOF_TILT_THRESHOLD = 0.70f;     // ToF傾き閾値 [rad] (~40度)
-inline constexpr float TOF_CHI2_GATE = 3.84f;          // ToFχ²ゲート閾値 [χ²(1,0.95)=3.84, 0=無効]
 inline constexpr float ACCEL_MOTION_THRESHOLD = 1.0f;  // 加速度モーション閾値 [m/s²]
+
+// χ²ゲート閾値（外れ値棄却）
+// 0 = 無効。自由度に応じた95%信頼区間の値を使用
+// Chi-squared gate thresholds for outlier rejection (0=disabled)
+inline constexpr float BARO_CHI2_GATE = 3.84f;         // 気圧計 [χ²(1,0.95)]
+inline constexpr float TOF_CHI2_GATE = 3.84f;          // ToF [χ²(1,0.95)]
+inline constexpr float MAG_CHI2_GATE = 7.81f;          // 地磁気 [χ²(3,0.95)]
+inline constexpr float FLOW_CHI2_GATE = 5.99f;         // フロー [χ²(2,0.95)]
+inline constexpr float ACCEL_ATT_CHI2_GATE = 7.81f;    // 加速度姿勢 [χ²(3,0.95)]
 
 // 発散検出閾値
 inline constexpr float MAX_POSITION = 100.0f;          // [m]
