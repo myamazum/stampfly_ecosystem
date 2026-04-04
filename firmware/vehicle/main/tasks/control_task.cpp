@@ -384,6 +384,24 @@ void ControlTask(void* pvParameters)
                 requested_mode = stampfly::FlightMode::STABILIZE;
             }
 
+            // Sensor availability guard: downgrade to STABILIZE if required
+            // sensors are disabled in ESKF_V2 config.
+            // センサ可用性ガード: 必要なセンサが無効なら STABILIZE に降格
+            {
+                const auto& eskf = g_fusion.getESKF();
+                bool has_altitude = eskf.isSensorEnabled(stampfly::ESKF_V2::SENSOR_TOF) ||
+                                    eskf.isSensorEnabled(stampfly::ESKF_V2::SENSOR_BARO);
+                bool has_position = eskf.isSensorEnabled(stampfly::ESKF_V2::SENSOR_FLOW);
+
+                if (requested_mode == stampfly::FlightMode::POSITION_HOLD &&
+                    (!has_altitude || !has_position)) {
+                    requested_mode = stampfly::FlightMode::STABILIZE;
+                } else if (requested_mode == stampfly::FlightMode::ALTITUDE_HOLD &&
+                           !has_altitude) {
+                    requested_mode = stampfly::FlightMode::STABILIZE;
+                }
+            }
+
             // デバウンス処理：連続N回同じモードを検出したら切替
             if (requested_mode == g_pending_mode) {
                 if (g_mode_switch_counter < MODE_SWITCH_DEBOUNCE_COUNT) {
