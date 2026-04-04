@@ -213,8 +213,6 @@ void IMUTask(void* pvParameters)
                 // Update sensor fusion predict step (400Hz)
                 // g_eskf_ready: センサー安定・キャリブレーション完了後にtrue
                 if (g_fusion.isInitialized() && g_eskf_ready) {
-                    static uint32_t eskf_error_counter = 0;
-
                     g_imu_checkpoint = 11;  // ESKF入力チェック
 
                     // 入力値の事前チェック
@@ -348,22 +346,26 @@ void IMUTask(void* pvParameters)
 
                         g_imu_checkpoint = 21;  // getState後、検証前
 
-                        // 出力値の検証（NaNチェック + 発散検出）
+                        // NaN チェック（フィルタ実装バグの検出用、リセットはしない）
+                        // NaN detection (filter bug indicator — log only, no reset)
                         bool eskf_valid = std::isfinite(eskf_state.roll) && std::isfinite(eskf_state.pitch);
 
-                        // 発散検出: 位置/速度が異常に大きい場合
-                        constexpr float MAX_POS = 100.0f;   // 100m以上は異常
-                        constexpr float MAX_VEL = 50.0f;    // 50m/s以上は異常
-                        bool pos_diverged = std::abs(eskf_state.position.x) > MAX_POS ||
-                                           std::abs(eskf_state.position.y) > MAX_POS ||
-                                           std::abs(eskf_state.position.z) > MAX_POS;
-                        bool vel_diverged = std::abs(eskf_state.velocity.x) > MAX_VEL ||
-                                           std::abs(eskf_state.velocity.y) > MAX_VEL ||
-                                           std::abs(eskf_state.velocity.z) > MAX_VEL;
+                        if (!eskf_valid) {
+                            static uint32_t nan_count = 0;
+                            nan_count++;
+                            if (nan_count <= 10 || nan_count % 400 == 0) {
+                                ESP_LOGE(TAG, "ESKF output NaN detected (count=%lu) — filter bug, no reset",
+                                         nan_count);
+                            }
+                        }
 
-                        if (eskf_valid && !pos_diverged && !vel_diverged) {
+                        {
                             g_imu_checkpoint = 22;  // state更新前
-                            state.updateAttitude(eskf_state.roll, eskf_state.pitch, eskf_state.yaw);
+
+                            // NaN 時は前回値を維持（updateAttitude を呼ばない）
+                            if (eskf_valid) {
+                                state.updateAttitude(eskf_state.roll, eskf_state.pitch, eskf_state.yaw);
+                            }
 
                             // 接地中は位置・速度を確実にゼロで更新（HTMLView等への表示用）
                             if (skip_position) {
@@ -453,30 +455,7 @@ void IMUTask(void* pvParameters)
                                 g_logger.pushData(pkt);
                             }
                             g_imu_checkpoint = 24;  // ロギング完了
-                        } else {
-                            eskf_error_counter++;
-
-                            // 発散時は常にリセット（binlog onと同じ処理）
-                            if (pos_diverged || vel_diverged) {
-                                g_fusion.reset();
-                                g_fusion.setGyroBias(g_initial_gyro_bias);
-                                g_fusion.setAccelBias(g_initial_accel_bias);
-                                initializeAttitudeFromBuffers();
-                            }
-
-                            // ログ出力は100回に1回（スパム防止）
-                            if (eskf_error_counter % 100 == 1) {
-                                if (!eskf_valid) {
-                                    ESP_LOGW(TAG, "ESKF output NaN, errors=%lu", eskf_error_counter);
-                                } else {
-                                    ESP_LOGW(TAG, "ESKF diverged: pos=[%.1f,%.1f,%.1f] vel=[%.1f,%.1f,%.1f]",
-                                             eskf_state.position.x, eskf_state.position.y, eskf_state.position.z,
-                                             eskf_state.velocity.x, eskf_state.velocity.y, eskf_state.velocity.z);
-                                }
-                            }
                         }
-                    } else {
-                        eskf_error_counter++;
                     }
                 }
                 // ESKF is the sole estimator — no fallback
