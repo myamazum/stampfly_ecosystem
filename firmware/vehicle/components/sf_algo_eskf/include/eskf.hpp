@@ -33,7 +33,7 @@ namespace stampfly {
 using namespace math;
 
 /**
- * @brief ESKF V2 - active_mask based state management
+ * @brief ESKF - active_mask based state management
  */
 class ESKF {
 public:
@@ -242,8 +242,8 @@ public:
         }
     };
 
-    // State structure (same as V1)
-    // 状態構造体 (V1と同一)
+    // State structure
+    // 状態構造体
     struct State {
         Vector3 position;           // [m] NED
         Vector3 velocity;           // [m/s]
@@ -352,7 +352,6 @@ public:
     void setMagReference(const Vector3& mag_ref);
     void initializeAttitude(const Vector3& accel, const Vector3& mag);
     void setAttitudeReference(const Vector3& level_accel, const Vector3& gyro_bias);
-    void setYaw(float yaw);
 
     void setFreezeAccelBias(bool freeze) { freeze_accel_bias_ = freeze; }
     bool isAccelBiasFrozen() const { return freeze_accel_bias_; }

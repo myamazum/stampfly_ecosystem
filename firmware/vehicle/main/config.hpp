@@ -266,22 +266,6 @@ inline constexpr int MIN_OPTFLOW_SAMPLES = 50;   // 100Hz × 50 = 500ms
 } // namespace stability
 
 // =============================================================================
-// Simple Estimators (ESKF不要時のバックアップ推定器)
-// =============================================================================
-
-namespace attitude_estimator {
-inline constexpr float GYRO_WEIGHT = 0.98f;        // 相補フィルタのジャイロ重み
-inline constexpr float MAG_DECLINATION = 0.0f;     // 地磁気偏角 [rad]
-} // namespace attitude_estimator
-
-namespace altitude_estimator {
-inline constexpr float PROCESS_NOISE_ALT = 0.01f;       // 高度プロセスノイズ
-inline constexpr float PROCESS_NOISE_VEL = 0.1f;        // 速度プロセスノイズ
-inline constexpr float MEASUREMENT_NOISE_BARO = 1.0f;   // 気圧観測ノイズ
-inline constexpr float MEASUREMENT_NOISE_TOF = 0.05f;   // ToF観測ノイズ
-} // namespace altitude_estimator
-
-// =============================================================================
 // LPF (Low Pass Filter) Settings
 // =============================================================================
 

@@ -169,13 +169,6 @@ public:
     }
 
     /**
-     * @brief 速度の共分散（対角成分の和）を取得
-     */
-    float getVelocityVariance() const {
-        return eskf_.getVelocityVariance();
-    }
-
-    /**
      * @brief ESKFリセット
      */
     void reset();
@@ -246,10 +239,6 @@ public:
      * @brief 地磁気参照ベクトル取得 (デバッグ用)
      * @return mag_ref [uT] (NED座標系)
      */
-    stampfly::math::Vector3 getMagReference() const {
-        return eskf_.getMagReference();
-    }
-
     /**
      * @brief 加速度バイアス推定のフリーズ設定
      * @param freeze true: バイアス推定を停止
@@ -259,18 +248,6 @@ public:
      * 離陸時にfalseに戻す必要がある。
      */
     void setFreezeAccelBias(bool freeze) { eskf_.setFreezeAccelBias(freeze); }
-
-    /**
-     * @brief 加速度バイアス推定がフリーズ中か
-     */
-    bool isAccelBiasFrozen() const { return eskf_.isAccelBiasFrozen(); }
-
-    /**
-     * @brief センサグループの有効/無効を動的に切替
-     */
-    void setSensorEnabled(stampfly::ESKF::SensorGroup group, bool enabled) {
-        eskf_.setSensorEnabled(group, enabled);
-    }
 
     /**
      * @brief 内部ESKFへの直接アクセス（上級者向け）

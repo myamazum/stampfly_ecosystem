@@ -3,7 +3,7 @@
  * @brief ESKF Unit Tests
  *
  * Test categories:
- * A. Regression tests — V2 produces same results as V1 with all sensors ON
+ * A. Regression tests — basic ESKF functionality with all sensors ON
  * B. P-matrix isolation tests — frozen states have correct covariance
  * C. Dynamic ON/OFF — P transitions correctly when sensors toggle
  *
@@ -665,7 +665,7 @@ int main() {
     printf("ESKF Unit Tests\n");
     printf("==================\n");
 
-    // A: Regression tests (same behavior as V1 with all sensors ON)
+    // A: Regression tests (basic ESKF with all sensors ON)
     test_initialization();
     test_predict_attitude();
     test_predict_velocity_position();

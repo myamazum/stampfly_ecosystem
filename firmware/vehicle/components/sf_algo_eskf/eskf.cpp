@@ -312,12 +312,6 @@ void ESKF::setMagReference(const Vector3& mag_ref)
     config_.mag_ref = mag_ref;
 }
 
-void ESKF::setYaw(float yaw)
-{
-    state_.yaw = yaw;
-    state_.orientation = Quaternion::fromEuler(state_.roll, state_.pitch, yaw);
-}
-
 void ESKF::initializeAttitude(const Vector3& accel, const Vector3& mag)
 {
     float accel_norm = std::sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z);
@@ -510,7 +504,7 @@ void ESKF::predict(const Vector3& accel, const Vector3& gyro, float dt, bool ski
         q_vel[i] = ((active_mask_ >> (VEL_X + i)) & 1) ? accel_var_base : 0.0f;
     }
 
-    // ---- Sparse P' = F*P*F^T + Q (same block structure as V1) ----
+    // ---- Sparse P' = F*P*F^T + Q ----
 
     float dt2 = dt * dt;
 

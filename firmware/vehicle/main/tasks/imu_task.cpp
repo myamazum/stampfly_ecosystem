@@ -323,7 +323,6 @@ void IMUTask(void* pvParameters)
 
                         // Baro更新（data_readyフラグで制御、50Hz）
                         // ヘルスチェック: Baro healthy必要
-                        // TODO: 気圧センサの値が確認できたら有効化
                         if (g_baro_data_ready) {
                             g_baro_data_ready = false;
                             if (g_baro_task_healthy && g_baro_buf.count() > 0) {
