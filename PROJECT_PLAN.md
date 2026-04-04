@@ -120,31 +120,55 @@ vehicle/
 - 再現性のあるビルド環境を確保する
 
 #### vehicle/components/
-ESP-IDF component 単位での機能分割。
+ESP-IDF component 単位での機能分割。命名規則: `sf_<layer>_<name>`
 
-- sensors/
-  - IMU・気圧・ToF・光学フロー等のセンサ取得
-  - 非同期取得、バス管理、キャリブレーション
+- sf_hal_* （センサ・アクチュエータ HAL）
+  - sf_hal_bmi270: IMU（加速度・ジャイロ）
+  - sf_hal_bmm150: 地磁気
+  - sf_hal_bmp280: 気圧
+  - sf_hal_vl53l3cx: ToF 距離
+  - sf_hal_pmw3901: 光学フロー
+  - sf_hal_motor: モータドライバ
+  - sf_hal_led, sf_hal_buzzer, sf_hal_button, sf_hal_power: 周辺機器
 
-- estimation/
-  - 姿勢推定・状態推定（AHRS, EKF 等）
-  - センサ融合、バイアス推定
+- sf_algo_* （アルゴリズム、FreeRTOS 非依存）
+  - sf_algo_eskf: ESKF 状態推定（active_mask による P 行列隔離、χ²ゲート外れ値棄却）
+  - sf_algo_fusion: センサフュージョン管理（ESKF ラッパー、品質閾値ゲート）
+  - sf_algo_math: ベクトル・行列・クォータニオン演算（ヘッダオンリー）
+  - sf_algo_pid: PID 制御器
+  - sf_algo_control: 制御配分（ミキサ）・モータモデル
+  - sf_algo_filter: LPF・ノッチフィルタ
 
-- control/
-  - 角速度・姿勢・位置制御ループ
-  - control/ ディレクトリで設計された結果の反映点
+- sf_svc_* （サービス層、FreeRTOS 依存可）
+  - sf_svc_comm: ESP-NOW 通信
+  - sf_svc_telemetry: バイナリテレメトリ
+  - sf_svc_udp: UDP テレメトリ・コマンド
+  - sf_svc_logger: SD カードロギング
+  - sf_svc_console: シリアル CLI
+  - sf_svc_state: システム状態管理
+  - sf_svc_control_arbiter: 制御ソース調停
+  - sf_svc_flight_command: 高レベル飛行コマンド
+  - sf_svc_health: センサヘルスモニタ
+  - sf_svc_led: LED パターン管理
+  - sf_svc_wifi_cli: WiFi CLI
 
-- actuators/
-  - ミキサ、モータ出力、飽和処理
-  - フェイルセーフ・停止処理
+- vehicle/main/
+  - タスク定義（imu_task, control_task, baro_task, tof_task 等）
+  - config.hpp: 全パラメータの一元管理
+  - landing_handler.hpp: 着陸検出・キャリブレーション統合管理
+  - 各種コントローラ（rate, attitude, altitude, position）
 
-- comms/
-  - テレメトリ送受信
-  - protocol に基づくパケット処理
+#### ESKF 設計
+- 15 状態 Error-State Kalman Filter（位置・速度・姿勢・ジャイロバイアス・加速度バイアス）
+- active_mask: センサ ON/OFF に連動した状態凍結（P 行列隔離・Q ゲーティング・dx マスキング・名目状態スキップ）
+- χ²ゲート: 全観測更新で外れ値棄却（Baro, ToF, Mag, Flow, AccelAttitude）
+- config.hpp の sensor_enabled[] が唯一のセンサ ON/OFF 制御元
+- 飛行モードガード: 必要なセンサが無効な場合 ALT_HOLD/POS_HOLD を STABILIZE に自動降格
 
-- system/
-  - 状態管理、パラメータ管理、診断
-  - CLI、ログ、共通基盤
+#### 着陸検出
+- LandingHandler が唯一の着陸状態管理者
+- armed 中は isLanded()=false を保証（飛行中のリセット・キャリブレーション誤発火を防止）
+- Disarm 後に ToF 高度 + 静止検出で着陸判定 → 自動キャリブレーション
 
 ---
 

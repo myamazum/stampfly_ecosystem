@@ -29,7 +29,7 @@ esp_err_t actuators();
 
 /**
  * @brief 推定器の初期化
- * LPF, MagCalibrator, SensorFusion, AttitudeEstimator, AltitudeEstimator
+ * LPF, MagCalibrator, SensorFusion (ESKF), LandingHandler
  */
 esp_err_t estimators();
 
