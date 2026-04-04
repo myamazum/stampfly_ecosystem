@@ -443,10 +443,14 @@ esp_err_t estimators()
     {
         stampfly::LandingHandler::Config landing_cfg;
         landing_cfg.landing_altitude_threshold = config::eskf::LANDING_ALT_THRESHOLD;
-        landing_cfg.landing_hold_samples = 80;  // 200ms @ 400Hz
+        landing_cfg.takeoff_altitude_threshold = config::eskf::LANDING_ALT_THRESHOLD * 2.0f;
+        landing_cfg.landing_hold_samples = 80;   // 200ms @ 400Hz
+        landing_cfg.takeoff_hold_samples = 80;   // 200ms @ 400Hz
+        landing_cfg.tof_available = config::eskf::USE_TOF;
         g_landing_handler.init(landing_cfg);
-        ESP_LOGI(TAG, "Landing handler initialized (alt threshold=%.2fm)",
-                 landing_cfg.landing_altitude_threshold);
+        ESP_LOGI(TAG, "Landing handler initialized (alt=%.2fm, tof=%s)",
+                 landing_cfg.landing_altitude_threshold,
+                 landing_cfg.tof_available ? "ON" : "OFF");
     }
 
     return ESP_OK;

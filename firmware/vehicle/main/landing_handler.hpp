@@ -2,12 +2,20 @@
  * @file landing_handler.hpp
  * @brief Landing detection and calibration handler
  *
- * Integrates landing detection, stationary detection, and level calibration.
- * Manages the calibration state machine and provides arm permission control.
+ * Single source of truth for landing state.
+ * imu_task queries isLanded()/hasTakenOff() instead of maintaining its own state.
  *
- * 着陸検出・キャリブレーション統合ハンドラ。
- * 着陸検出、静止検出、姿勢基準キャリブレーションを統合管理。
- * Arm許可制御を提供。
+ * 着陸状態の唯一の管理者。
+ * imu_task は独自判定を持たず、isLanded()/hasTakenOff() を参照する。
+ *
+ * Safety guarantees:
+ * 安全保証:
+ * - isLanded() is NEVER true while armed
+ *   armed 中に isLanded() が true を返すことは決してない
+ * - justCalibrated() is NEVER true while armed
+ *   armed 中に justCalibrated() が true を返すことは決してない
+ * - ToF buffer empty (tof=0) is NOT treated as valid low altitude
+ *   ToF バッファ空は有効な低高度として扱わない
  */
 
 #pragma once
@@ -22,108 +30,119 @@ namespace stampfly {
 
 class LandingHandler {
 public:
-    /**
-     * @brief Calibration state
-     * @note Now uses CalibrationState from system_state.hpp (Single Source of Truth)
-     * @note system_state.hppのCalibrationStateを使用（単一の真実の源）
-     */
-    // CalibrationState enum removed - use stampfly::CalibrationState from system_state.hpp
-
     struct Config {
-        float landing_altitude_threshold;
-        int landing_hold_samples;
-        int tof_timeout_samples;
+        float landing_altitude_threshold;  // [m] altitude below this = landed
+        float takeoff_altitude_threshold;  // [m] altitude above this = taken off
+        int landing_hold_samples;          // Consecutive samples required for landing
+        int takeoff_hold_samples;          // Consecutive samples required for takeoff
+        int tof_timeout_samples;           // ToF timeout for fallback (disarmed only)
+        bool tof_available;                // Whether ToF sensor is enabled
 
         Config()
-            : landing_altitude_threshold(0.05f)  // [m] - altitude below this = landed
+            : landing_altitude_threshold(0.05f)  // [m]
+            , takeoff_altitude_threshold(0.10f)  // [m] hysteresis upper bound
             , landing_hold_samples(80)           // 200ms @ 400Hz
-            , tof_timeout_samples(800)           // 2s @ 400Hz - fallback if ToF unresponsive
+            , takeoff_hold_samples(80)           // 200ms @ 400Hz
+            , tof_timeout_samples(800)           // 2s @ 400Hz
+            , tof_available(true)
         {}
     };
 
-    /**
-     * @brief Initialize handler
-     */
     void init(const Config& config = Config()) {
         config_ = config;
         stationary_detector_.init();
         level_calibrator_.reset();
         reset();
-        // Boot時は着陸・キャリブレーション済みで開始（main.cppのPhase 1-2が担当）
-        // ARM時にreset()でNOT_STARTEDに戻り、着陸後に再キャリブレーションが動作する
-        // Start as landed + calibrated after boot (main.cpp Phase 1-2 handles initial cal)
-        // reset() on ARM reverts to NOT_STARTED, enabling post-flight recalibration
+        // Boot: start as landed + calibrated (main.cpp Phase 1-2 handles initial cal)
+        // 起動時: 着陸・キャリブレーション済みで開始
         is_landed_ = true;
+        has_taken_off_ = false;
         calibration_state_ = CalibrationState::COMPLETED;
         syncToSystemStateManager();
     }
 
     /**
      * @brief Reset to initial state (call on arm)
+     * ARM時に呼び出し — 全状態をリセット
      */
     void reset() {
         calibration_state_ = CalibrationState::NOT_STARTED;
         is_landed_ = false;
+        has_taken_off_ = false;
         landing_count_ = 0;
+        takeoff_count_ = 0;
         tof_high_count_ = 0;
         just_landed_ = false;
         just_calibrated_ = false;
+        just_taken_off_ = false;
         stationary_detector_.reset();
-
-        // Sync to SystemStateManager
-        // SystemStateManagerに同期
         syncToSystemStateManager();
     }
 
     /**
      * @brief Update handler state
+     *
      * @param is_disarmed True if vehicle is disarmed
-     * @param tof_altitude ToF altitude reading [m]
+     * @param tof_altitude ToF altitude reading [m] (negative or NaN = invalid)
+     * @param tof_valid True if ToF buffer has valid data
      * @param gyro Gyroscope reading [rad/s]
      * @param accel Accelerometer reading [m/s²]
      */
-    void update(bool is_disarmed, float tof_altitude,
+    void update(bool is_disarmed, float tof_altitude, bool tof_valid,
                 const math::Vector3& gyro, const math::Vector3& accel) {
         just_landed_ = false;
         just_calibrated_ = false;
+        just_taken_off_ = false;
 
-        // If armed, reset state and wait for landing
+        // === Armed: landing detection disabled, track takeoff only ===
+        // === Armed: 着陸検出無効、離陸追跡のみ ===
         if (!is_disarmed) {
+            // Clear landing state — armed 中は決して着陸状態にならない
+            // Clear landing state — never landed while armed
+            is_landed_ = false;
+            landing_count_ = 0;
+            tof_high_count_ = 0;
+
             if (calibration_state_ == CalibrationState::COMPLETED ||
                 calibration_state_ == CalibrationState::CALIBRATING) {
                 calibration_state_ = CalibrationState::WAITING_LANDING;
             }
-            is_landed_ = false;
-            landing_count_ = 0;
             stationary_detector_.reset();
+
+            // Takeoff detection (armed only)
+            // 離陸検出 (armed 時のみ)
+            if (!has_taken_off_ && tof_valid && config_.tof_available) {
+                if (tof_altitude > config_.takeoff_altitude_threshold) {
+                    takeoff_count_++;
+                    if (takeoff_count_ >= config_.takeoff_hold_samples) {
+                        has_taken_off_ = true;
+                        just_taken_off_ = true;
+                        ESP_LOGI("LandingHandler", "Takeoff detected (alt=%.3fm)", tof_altitude);
+                    }
+                } else {
+                    takeoff_count_ = 0;
+                }
+            } else if (!has_taken_off_ && !config_.tof_available) {
+                // Without ToF, assume taken off immediately when armed
+                // ToF なしの場合、armed 時点で離陸とみなす
+                has_taken_off_ = true;
+                just_taken_off_ = true;
+            }
+
+            syncToSystemStateManager();
             return;
         }
 
-        // Disarmed - check for landing
-        bool altitude_low = (tof_altitude < config_.landing_altitude_threshold);
+        // === Disarmed: landing detection and calibration ===
+        // === Disarmed: 着陸検出とキャリブレーション ===
 
-        if (altitude_low) {
-            // ToF detects ground nearby - normal landing path
-            // ToFが近い地面を検出 - 通常の着陸パス
-            landing_count_++;
-            tof_high_count_ = 0;
-            if (landing_count_ >= config_.landing_hold_samples && !is_landed_) {
-                is_landed_ = true;
-                just_landed_ = true;
-
-                if (calibration_state_ != CalibrationState::COMPLETED) {
-                    calibration_state_ = CalibrationState::CALIBRATING;
-                    stationary_detector_.reset();
-                }
-            }
-        } else {
-            landing_count_ = 0;
+        // ToF が無効な場合、高度ベースの判定をスキップ
+        // Skip altitude-based detection if ToF is invalid
+        if (!tof_valid || !config_.tof_available) {
+            // Without valid ToF, use timeout fallback (disarmed only)
+            // ToF 無効時はタイムアウトフォールバック (disarmed 時のみ)
             tof_high_count_++;
 
-            // Fallback: if ToF consistently fails (low-reflectivity surface),
-            // assume landed and start calibration using accel/gyro only.
-            // フォールバック: ToFが継続的に失敗する場合（低反射面）、
-            // 着陸と仮定してaccel/gyroのみでキャリブレーション開始
             if (tof_high_count_ >= config_.tof_timeout_samples && !is_landed_) {
                 is_landed_ = true;
                 just_landed_ = true;
@@ -131,27 +150,58 @@ public:
                     calibration_state_ = CalibrationState::CALIBRATING;
                     stationary_detector_.reset();
                     ESP_LOGW("LandingHandler",
-                             "ToF timeout (%d samples) - assuming landed (low-reflectivity surface?)",
-                             config_.tof_timeout_samples);
+                             "No valid ToF data - assuming landed after timeout");
                 }
             }
+        } else {
+            // Valid ToF data available
+            // 有効な ToF データあり
+            bool altitude_low = (tof_altitude < config_.landing_altitude_threshold);
 
-            if (is_landed_ && tof_high_count_ < config_.tof_timeout_samples) {
-                // ToF suddenly reads high but hasn't timed out - might be picked up
-                // ToFが突然高くなったがタイムアウトしていない - 持ち上げられた可能性
-                is_landed_ = false;
-                if (calibration_state_ == CalibrationState::COMPLETED) {
-                    calibration_state_ = CalibrationState::NOT_STARTED;
+            if (altitude_low) {
+                landing_count_++;
+                tof_high_count_ = 0;
+                if (landing_count_ >= config_.landing_hold_samples && !is_landed_) {
+                    is_landed_ = true;
+                    just_landed_ = true;
+                    if (calibration_state_ != CalibrationState::COMPLETED) {
+                        calibration_state_ = CalibrationState::CALIBRATING;
+                        stationary_detector_.reset();
+                    }
+                }
+            } else {
+                landing_count_ = 0;
+                tof_high_count_++;
+
+                if (tof_high_count_ >= config_.tof_timeout_samples && !is_landed_) {
+                    is_landed_ = true;
+                    just_landed_ = true;
+                    if (calibration_state_ != CalibrationState::COMPLETED) {
+                        calibration_state_ = CalibrationState::CALIBRATING;
+                        stationary_detector_.reset();
+                        ESP_LOGW("LandingHandler",
+                                 "ToF timeout (%d samples) - assuming landed",
+                                 config_.tof_timeout_samples);
+                    }
+                }
+
+                if (is_landed_ && tof_high_count_ < config_.tof_timeout_samples) {
+                    // Picked up after landing
+                    // 着陸後に持ち上げられた
+                    is_landed_ = false;
+                    if (calibration_state_ == CalibrationState::COMPLETED) {
+                        calibration_state_ = CalibrationState::NOT_STARTED;
+                    }
                 }
             }
         }
 
-        // If landed and calibrating, run stationary detection
+        // Stationary detection for calibration (disarmed + landed)
+        // 静止検出 (disarmed + 着陸中)
         if (is_landed_ && calibration_state_ == CalibrationState::CALIBRATING) {
             stationary_detector_.update(gyro, accel);
 
             if (stationary_detector_.isStationary()) {
-                // Calibration complete
                 gyro_bias_ = stationary_detector_.getGyroAverage();
                 accel_reference_ = stationary_detector_.getAccelAverage();
                 level_calibrator_.setReference(accel_reference_);
@@ -161,80 +211,50 @@ public:
             }
         }
 
-        // Sync to SystemStateManager
-        // SystemStateManagerに同期
         syncToSystemStateManager();
     }
 
     // === State queries ===
 
-    /**
-     * @brief Check if arm is allowed
-     */
     bool canArm() const {
         return calibration_state_ == CalibrationState::COMPLETED;
     }
 
-    /**
-     * @brief Check if calibration is in progress
-     */
     bool isCalibrating() const {
         return calibration_state_ == CalibrationState::CALIBRATING;
     }
 
     /**
-     * @brief Check if vehicle is landed
+     * @brief Check if vehicle is on the ground
+     * Guaranteed false while armed.
+     * armed 中は必ず false。
      */
     bool isLanded() const { return is_landed_; }
 
     /**
-     * @brief Get calibration state
+     * @brief Check if vehicle has taken off at least once since arm
+     * 直近の arm 以降に一度でも離陸したか
      */
+    bool hasTakenOff() const { return has_taken_off_; }
+
     CalibrationState getCalibrationState() const { return calibration_state_; }
 
     // === Event flags (single-shot, cleared each update) ===
 
-    /**
-     * @brief Check if just landed this frame
-     */
     bool justLanded() const { return just_landed_; }
-
-    /**
-     * @brief Check if calibration just completed this frame
-     */
     bool justCalibrated() const { return just_calibrated_; }
+    bool justTakenOff() const { return just_taken_off_; }
 
     // === Calibration results ===
 
-    /**
-     * @brief Get gyro bias from calibration
-     */
     math::Vector3 getGyroBias() const { return gyro_bias_; }
-
-    /**
-     * @brief Get acceleration reference from calibration
-     */
     math::Vector3 getAccelReference() const { return accel_reference_; }
-
-    /**
-     * @brief Get level calibrator (for attitude offset computation)
-     */
     const LevelCalibrator& getLevelCalibrator() const { return level_calibrator_; }
 
 private:
-    /**
-     * @brief Sync local state to SystemStateManager
-     * @brief ローカル状態をSystemStateManagerに同期
-     */
     void syncToSystemStateManager() {
         auto& sys_state_mgr = SystemStateManager::getInstance();
-
-        // Update calibration state
-        // キャリブレーション状態を更新
         sys_state_mgr.updateCalibrationState(calibration_state_);
-
-        // Update readiness flags
-        // 準備フラグを更新
         sys_state_mgr.setReady(ReadinessFlags::CALIBRATED,
                                calibration_state_ == CalibrationState::COMPLETED);
         sys_state_mgr.setReady(ReadinessFlags::LANDED, is_landed_);
@@ -246,13 +266,15 @@ private:
 
     CalibrationState calibration_state_ = CalibrationState::NOT_STARTED;
     bool is_landed_ = false;
+    bool has_taken_off_ = false;
     int landing_count_ = 0;
-    int tof_high_count_ = 0;  // Counts consecutive ToF > threshold (for fallback)
-                               // ToFが閾値超の連続カウント（フォールバック用）
+    int takeoff_count_ = 0;
+    int tof_high_count_ = 0;
 
-    // Event flags
+    // Event flags (single-shot)
     bool just_landed_ = false;
     bool just_calibrated_ = false;
+    bool just_taken_off_ = false;
 
     // Calibration results
     math::Vector3 gyro_bias_;

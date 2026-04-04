@@ -142,7 +142,9 @@ void IMUTask(void* pvParameters)
                     }
 
                     // Update landing handler with current sensor data
-                    g_landing_handler.update(is_disarmed, tof_bottom_now, g, a);
+                    // ToF バッファ空は有効なデータとして扱わない
+                    bool tof_valid = (g_tof_bottom_buf.count() > 0);
+                    g_landing_handler.update(is_disarmed, tof_bottom_now, tof_valid, g, a);
 
                     // Check for calibration complete
                     if (g_landing_handler.justCalibrated()) {
@@ -222,70 +224,38 @@ void IMUTask(void* pvParameters)
                     if (eskf_ok) {
                         g_imu_checkpoint = 12;  // predict前
 
-                        // 接地判定（ToF高度ベース、リングバッファから取得）
-                        float tof_bottom_now = 0.0f;
-                        if (g_tof_bottom_buf.count() > 0) {
-                            tof_bottom_now = g_tof_bottom_buf.latest();
-                        }
-                        static bool is_grounded = true;        // 起動時は接地状態
-                        static bool has_taken_off = false;     // 一度でも離陸したか
-                        static int takeoff_counter = 0;        // 離陸判定用カウンタ
-                        static int landing_counter = 0;        // 着陸判定用カウンタ
-                        constexpr int GROUNDED_TRANSITION_COUNT = 20;  // 50ms @ 400Hz
-
-                        // 接地状態の更新（連続条件付きヒステリシス）
-                        // Ground state update with hysteresis (0.05m-0.10m deadband)
-                        // 接地状態更新（ヒステリシス：0.05m～0.10mの不感帯）
-                        bool prev_grounded = is_grounded;
-
-                        // WiFiコマンド実行中は即座に離陸遷移（チャタリング防止不要）
-                        // During WiFi command execution, skip counter delay for immediate takeoff
-                        bool wifi_command_active = stampfly::FlightCommandService::getInstance().isRunning();
-
-                        if (tof_bottom_now < eskf::LANDING_ALT_THRESHOLD) {
-                            landing_counter++;
-                            takeoff_counter = 0;
-                            if (landing_counter >= GROUNDED_TRANSITION_COUNT) {
-                                is_grounded = true;
-                            }
-                        } else if (tof_bottom_now > eskf::LANDING_ALT_THRESHOLD * 2.0f) {
-                            takeoff_counter++;
-                            landing_counter = 0;
-                            // WiFiコマンド実行中は即座に遷移、通常飛行は連続20回で遷移
-                            int required_count = wifi_command_active ? 1 : GROUNDED_TRANSITION_COUNT;
-                            if (takeoff_counter >= required_count) {
-                                is_grounded = false;
-                            }
-                        }
-                        // ヒステリシス: 閾値〜2倍の間は状態維持、カウンタもリセットしない
-
                         // バッファの最新値を取得
                         const auto& accel_latest = g_accel_buf.latest();
                         const auto& gyro_latest = g_gyro_buf.latest();
 
-                        // 接地中かどうかを判定してskip_positionフラグを設定
-                        bool skip_position = is_grounded && eskf::ENABLE_LANDING_RESET;
+                        // 接地判定: LandingHandler が唯一の管理者
+                        // Ground state: LandingHandler is the single source of truth
+                        bool is_landed = g_landing_handler.isLanded();
+                        bool skip_position = is_landed && eskf::ENABLE_LANDING_RESET;
 
                         // IMU予測 + 加速度計姿勢補正（predictIMUが両方を実行）
                         // 接地中はskip_position=trueで位置更新をスキップ（ドリフト防止）
                         g_fusion.predictIMU(accel_latest, gyro_latest, 0.0025f, skip_position);
 
-                        // 接地中の処理
-                        if (skip_position) {
-                            // 着陸遷移時: 位置・速度・加速度バイアスをリセット（姿勢は維持）
-                            // resetForLanding()内で加速度バイアス推定もフリーズされる
-                            if (!prev_grounded && has_taken_off) {
-                                g_fusion.resetForLanding();
-                                ESP_LOGI(TAG, "Landed - reset for landing, accel bias frozen (alt=%.3fm)", tof_bottom_now);
-                            }
-                            // 接地中: 位置・速度を0に保持
+                        // 着陸イベント: 位置・速度リセット（LandingHandler が armed 中は発火しない）
+                        // Landing event: reset position/velocity (never fires while armed)
+                        if (g_landing_handler.justLanded() && g_landing_handler.hasTakenOff()) {
+                            g_fusion.resetForLanding();
+                            ESP_LOGI(TAG, "Landed - reset for landing, accel bias frozen");
+                        }
+
+                        // 接地中: 位置・速度を0に保持
+                        // Grounded: hold position/velocity at zero
+                        if (is_landed) {
                             g_fusion.holdPositionVelocity();
-                        } else if (!is_grounded && prev_grounded) {
-                            // 離陸遷移時 - 共分散をリセットして安定した推定開始
-                            has_taken_off = true;
-                            g_fusion.resetPositionVelocity();  // 共分散も適切な初期値に
-                            g_fusion.setFreezeAccelBias(false);  // 加速度バイアス推定を再開
-                            ESP_LOGI(TAG, "Takeoff - position estimation enabled, accel bias unfrozen (alt=%.3fm)", tof_bottom_now);
+                        }
+
+                        // 離陸イベント: 共分散リセット（armed 後に初めて高度が上がった時）
+                        // Takeoff event: reset covariance
+                        if (g_landing_handler.justTakenOff()) {
+                            g_fusion.resetPositionVelocity();
+                            g_fusion.setFreezeAccelBias(false);
+                            ESP_LOGI(TAG, "Takeoff - position estimation enabled, accel bias unfrozen");
                         }
 
                         g_imu_checkpoint = 14;  // フロー更新セクション
@@ -295,7 +265,7 @@ void IMUTask(void* pvParameters)
                         // 接地中: 位置・速度更新を停止するため呼ばない
                         // 飛行中: 実センサ値を使用
                         static int optflow_takeoff_skip_counter = 0;  // 離陸後のスキップカウンタ
-                        if (is_grounded) {
+                        if (is_landed) {
                             optflow_takeoff_skip_counter = 20;  // 離陸後20回（0.2秒@100Hz）スキップ
                         }
 
@@ -303,7 +273,7 @@ void IMUTask(void* pvParameters)
                             g_optflow_data_ready = false;
 
                             // 接地中は位置・速度更新を停止（センサー更新を呼ばない）
-                            if (!is_grounded && g_optflow_task_healthy && g_tof_task_healthy) {
+                            if (!is_landed && g_optflow_task_healthy && g_tof_task_healthy) {
                                 if (optflow_takeoff_skip_counter > 0) {
                                     optflow_takeoff_skip_counter--;
                                     // 共分散リセット直後は過剰補正防止のためスキップ
@@ -339,7 +309,7 @@ void IMUTask(void* pvParameters)
                         // 接地中: 位置更新を停止するため呼ばない
                         // 飛行中: 実センサ値を使用
                         static int tof_takeoff_skip_counter = 0;
-                        if (is_grounded) {
+                        if (is_landed) {
                             tof_takeoff_skip_counter = 10;  // 離陸後10回（~0.3秒@30Hz）スキップ
                         }
                         if (g_tof_bottom_data_ready) {
@@ -413,7 +383,7 @@ void IMUTask(void* pvParameters)
                                 ESP_LOGI(TAG, "Att: R=%.2f P=%.2f Y=%.2f | BA=[%.4f,%.4f,%.4f] %s",
                                          eskf_state.roll * 57.3f, eskf_state.pitch * 57.3f, eskf_state.yaw * 57.3f,
                                          eskf_state.accel_bias.x, eskf_state.accel_bias.y, eskf_state.accel_bias.z,
-                                         is_grounded ? "(grounded)" : "(flying)");
+                                         is_landed ? "(grounded)" : "(flying)");
                             }
 
                             g_imu_checkpoint = 23;  // state更新後、ロギング前
