@@ -366,7 +366,11 @@ public:
     void initializeAttitude(const Vector3& accel, const Vector3& mag);
     void setAttitudeReference(const Vector3& level_accel, const Vector3& gyro_bias);
 
-    void setFreezeAccelBias(bool freeze) { freeze_accel_bias_ = freeze; }
+    void setFreezeAccelBias(bool freeze) {
+        freeze_accel_bias_ = freeze;
+        recomputeActiveMask();
+        enforceCovarianceConstraints();
+    }
     bool isAccelBiasFrozen() const { return freeze_accel_bias_; }
 
 private:
