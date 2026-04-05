@@ -182,6 +182,9 @@ SIGNAL_CATEGORIES = {
         ('mag_y', 'Mag Y [uT]'),
         ('mag_z', 'Mag Z [uT]'),
     ],
+    'Battery': [
+        ('battery_voltage', 'Voltage [V]'),
+    ],
     'Timing - Internal Timestamps': [
         ('imu_timestamp_us', 'IMU Timestamp [μs]'),
         ('baro_timestamp_us', 'Baro Timestamp [μs]'),
@@ -287,6 +290,9 @@ def load_jsonl(filepath: str) -> dict:
         'rate_ref': [
             ('rate_ref', ['rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw'], True),
         ],
+        'status': [
+            ('voltage', ['battery_voltage'], False),
+        ],
     }
 
     # Collect per-sensor time and data arrays
@@ -350,6 +356,7 @@ def load_jsonl(filepath: str) -> dict:
         'mag': '_time_mag',
         'ctrl_ref': '_time_ctrl_ref',
         'rate_ref': '_time_rate_ref',
+        'status': '_time_status',
     }
 
     for sid, times in sensor_times.items():
@@ -626,6 +633,7 @@ def load_csv(filepath: str) -> dict:
         'tof_f': ('tof_timestamp_us', ['tof_front', 'tof_front_status']),
         'mag': ('mag_timestamp_us', ['mag_x', 'mag_y', 'mag_z']),
         'flow': ('flow_timestamp_us', ['flow_x', 'flow_y', 'flow_quality']),
+        'status': ('status_timestamp_us', ['battery_voltage']),
     }
 
     for sensor_name, (ts_key, signal_keys) in sensor_ts_map.items():
