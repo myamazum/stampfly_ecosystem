@@ -419,7 +419,7 @@ inline constexpr float PITCH_RATE_TI = 0.7f;       // 積分時間 [s]
 inline constexpr float PITCH_RATE_TD = 0.01f;      // 微分時間 [s]
 
 // Yaw rate PID
-inline constexpr float YAW_RATE_KP = 1.77e-3f;     // [Nm/(rad/s)] = 3.0 × 5.9e-4
+inline constexpr float YAW_RATE_KP = 3.54e-3f;     // [Nm/(rad/s)] = 2x of 1.77e-3 (yaw authority test)
 inline constexpr float YAW_RATE_TI = 0.8f;         // 積分時間 [s]
 inline constexpr float YAW_RATE_TD = 0.01f;        // 微分時間 [s]
 
