@@ -93,10 +93,10 @@ assert struct.calcsize(FMT_BARO) == 12
 FMT_MAG = '<I 3f'
 assert struct.calcsize(FMT_MAG) == 16
 
-# CtrlRefSample: 10 bytes (angle ref + flight mode, 50Hz)
-#   timestamp(I) + flight_mode(B) + reserved(B) + angle_ref(2h)
-FMT_CTRL_REF = '<I 2B 2h'
-assert struct.calcsize(FMT_CTRL_REF) == 10
+# CtrlRefSample: 14 bytes (angle ref + flight mode + total_thrust, 50Hz)
+#   timestamp(I) + flight_mode(B) + reserved(B) + angle_ref(2h) + total_thrust(f)
+FMT_CTRL_REF = '<I 2B 2h f'
+assert struct.calcsize(FMT_CTRL_REF) == 14
 
 # RateRefFixed: 6 bytes (rate ref, 400Hz, fixed part of unified packet)
 #   rate_ref_roll(h) + rate_ref_pitch(h) + rate_ref_yaw(h)
@@ -116,7 +116,7 @@ SAMPLE_INFO = {
     PKT_BARO:      ('Baro',      FMT_BARO,      12),
     PKT_MAG:       ('Mag',       FMT_MAG,       16),
     PKT_TOF_FRONT: ('ToF_Frt',   FMT_TOF,        9),
-    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  10),
+    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  14),
 }
 
 # CSV column names per packet type
@@ -165,6 +165,7 @@ CSV_COLUMNS = {
         'timestamp_us',
         'flight_mode', 'reserved',
         'angle_ref_roll', 'angle_ref_pitch',
+        'total_thrust',
     ],
 }
 
@@ -609,6 +610,7 @@ class UDPTelemetryCapture:
                 'ts': s['timestamp_us'],
                 'mode': s['flight_mode'],
                 'angle_ref': [s['angle_ref_roll'] / 10000.0, s['angle_ref_pitch'] / 10000.0],
+                'total_thrust': round(s.get('total_thrust', 0.0), 4),
             },
             PKT_RATE_REF: lambda s: {
                 'id': 'rate_ref',

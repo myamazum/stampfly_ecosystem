@@ -816,6 +816,7 @@ void ControlTask(void* pvParameters)
         // 制御入力ベクトル: [総推力, ロールトルク, ピッチトルク, ヨートルク]
         // Control input vector: [total_thrust, roll_torque, pitch_torque, yaw_torque]
         float control[4] = {total_thrust, roll_out, pitch_out, yaw_out};
+        state.setTotalThrust(total_thrust);
 
         // Update battery voltage for accurate thrust→duty conversion
         // バッテリー電圧を更新（推力→Duty変換の精度向上）

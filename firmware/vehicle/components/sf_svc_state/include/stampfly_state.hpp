@@ -188,6 +188,11 @@ public:
     void getControlRef(float& angle_ref_roll, float& angle_ref_pitch,
                        float& rate_ref_roll, float& rate_ref_pitch, float& rate_ref_yaw) const;
 
+    /// Set/get actual total thrust command [N] (for telemetry)
+    /// 実際の総推力指令 [N]（テレメトリ用）
+    void setTotalThrust(float thrust) { total_thrust_ = thrust; }
+    float getTotalThrust() const { return total_thrust_; }
+
 private:
     StampFlyState() = default;
 
@@ -245,6 +250,7 @@ private:
     float ctrl_rate_ref_roll_ = 0;    // [rad/s] inner loop target rate
     float ctrl_rate_ref_pitch_ = 0;   // [rad/s]
     float ctrl_rate_ref_yaw_ = 0;     // [rad/s]
+    float total_thrust_ = 0;          // [N] actual commanded total thrust
 
     // Debug mode
     bool debug_mode_ = false;

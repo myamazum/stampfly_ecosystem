@@ -286,6 +286,7 @@ def load_jsonl(filepath: str) -> dict:
         'ctrl_ref': [
             ('angle_ref', ['angle_ref_roll', 'angle_ref_pitch'], True),
             ('mode', ['flight_mode'], False),
+            ('total_thrust', ['total_thrust'], False),
         ],
         'rate_ref': [
             ('rate_ref', ['rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw'], True),
@@ -560,6 +561,20 @@ def load_jsonl(filepath: str) -> dict:
             duty = voltage / Vbat
             return max(0.0, min(1.0, duty))
 
+        # Resample total_thrust from ctrl_ref (50Hz) to 400Hz if available
+        # total_thrust をテレメトリから取得（50Hz→400Hz リサンプル）
+        # Falls back to throttle × MAX_TOTAL_THRUST for legacy logs
+        import numpy as _np2
+        if 'total_thrust' in data and len(data['total_thrust']) > 0:
+            t_ctrlref = data.get('_time_ctrl_ref', list(range(len(data['total_thrust']))))
+            thrust_400 = _np2.interp(
+                t_imu[:n] if len(t_imu) >= n else list(range(n)),
+                t_ctrlref[:len(data['total_thrust'])],
+                data['total_thrust'][:len(t_ctrlref)]
+            ).tolist()
+        else:
+            thrust_400 = [thr_400[i] * MAX_TOTAL_THRUST for i in range(n)]
+
         # Compute motor thrusts and duties
         # モータ推力とDutyを計算
         motor_names = ['FR', 'RR', 'RL', 'FL']
@@ -569,8 +584,7 @@ def load_jsonl(filepath: str) -> dict:
         data['motor_saturated'] = [0.0] * n
 
         for i in range(n):
-            total_thrust = thr_400[i] * MAX_TOTAL_THRUST
-            u = [total_thrust, pid_out[0][i], pid_out[1][i], pid_out[2][i]]
+            u = [thrust_400[i], pid_out[0][i], pid_out[1][i], pid_out[2][i]]
 
             saturated = 0
             for m in range(4):
