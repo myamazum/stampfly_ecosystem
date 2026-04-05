@@ -533,8 +533,8 @@ inline constexpr float HOVER_THRUST_CORRECTION = 1.12f;  // From flight log thro
 
 // 高度PID（外ループ）: 高度誤差 [m] → 垂直速度目標 [m/s]
 // Altitude PID (outer loop): altitude error [m] -> vertical velocity target [m/s]
-inline constexpr float ALT_KP = 0.6f;
-inline constexpr float ALT_TI = 7.0f;           // 1.5×Tu (振動周期4.9s)
+inline constexpr float ALT_KP = 0.8f;           // 外乱応答改善 (0.6→0.8, 限界1.0の80%)
+inline constexpr float ALT_TI = 5.0f;           // ドリフト補正高速化 (7.0→5.0)
 inline constexpr float ALT_TD = 0.0f;
 inline constexpr float ALT_OUTPUT_MAX = 0.5f;   // Max climb/descent rate [m/s]
 
