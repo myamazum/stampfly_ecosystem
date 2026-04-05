@@ -257,9 +257,20 @@ def parse_packet(data: bytes) -> list:
         return results
 
     if pkt_id not in SAMPLE_INFO:
-        # Status packet (0x4F) — handle separately
-        if pkt_id == PKT_STATUS:
-            return [(PKT_STATUS, {'raw': data})]
+        # Status packet (0x4F) — parse fields
+        # StatusPacket: [header 4B][uptime_ms 4B][voltage 4B][flight_state 1B]
+        #               [sensor_health 1B][eskf_status 1B][padding 1B][checksum 1B]
+        if pkt_id == PKT_STATUS and len(data) == 17:
+            uptime_ms, voltage, flight_state, sensor_health, eskf_status = \
+                struct.unpack_from('<IfBBB', data, 4)
+            return [(PKT_STATUS, {
+                'timestamp_us': uptime_ms * 1000,
+                'uptime_ms': uptime_ms,
+                'voltage': voltage,
+                'flight_state': flight_state,
+                'sensor_health': sensor_health,
+                'eskf_status': eskf_status,
+            })]
         return []
 
     name, fmt, sample_size = SAMPLE_INFO[pkt_id]
@@ -379,9 +390,6 @@ class UDPTelemetryCapture:
                     continue
 
                 for pkt_id, sample in results:
-                    if pkt_id == PKT_STATUS:
-                        continue  # Skip status packets for CSV
-
                     self.sample_count[pkt_id] += 1
                     self.samples[pkt_id].append(sample)
 
@@ -590,6 +598,14 @@ class UDPTelemetryCapture:
                 'id': 'rate_ref',
                 'ts': s['timestamp_us'],
                 'rate_ref': [s['rate_ref_roll'] / 1000.0, s['rate_ref_pitch'] / 1000.0, s['rate_ref_yaw'] / 1000.0],
+            },
+            PKT_STATUS: lambda s: {
+                'id': 'status',
+                'ts': s['timestamp_us'],
+                'uptime_ms': s['uptime_ms'],
+                'voltage': round(s['voltage'], 3),
+                'flight_state': s['flight_state'],
+                'eskf_status': s['eskf_status'],
             },
         }
 
