@@ -116,7 +116,7 @@ namespace eskf {
 // -----------------------------------------------------------------------------
 inline constexpr bool USE_OPTICAL_FLOW = false;    // 初期テスト: OFF（IMUのみで姿勢推定）
 inline constexpr bool USE_BAROMETER = false;       // 初期テスト: OFF
-inline constexpr bool USE_TOF = false;             // 初期テスト: OFF
+inline constexpr bool USE_TOF = true;              // STABILIZE影響検証
 inline constexpr bool USE_MAGNETOMETER = false;    // 地磁気無効（モータ磁気干渉が大きいため）
 inline constexpr bool ENABLE_YAW_ESTIMATION = true; // ヨー推定（ジャイロ積分）※falseで0固定
 
