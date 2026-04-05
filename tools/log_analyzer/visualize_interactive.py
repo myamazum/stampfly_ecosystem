@@ -417,11 +417,13 @@ def load_jsonl(filepath: str) -> dict:
             b = data[f'accel_bias_{axis}']
             data[f'accel_corrected_{axis}'] = [a[i] - b[i] for i in range(n)]
 
-    # Total duty: total_thrust / MAX_TOTAL_THRUST
-    # トータルDuty: 全モータ推力合計の割合
-    if 'total_thrust' in data:
-        MAX_TOTAL_THRUST = 4 * 0.168  # 0.672N
-        data['total_duty'] = [t / MAX_TOTAL_THRUST for t in data['total_thrust']]
+    # Average actual motor duty (from telemetry, includes Vbat effect)
+    # 実測モータDuty平均（テレメトリから、電圧補正済み）
+    if all(k in data for k in ['actual_duty_FR', 'actual_duty_RR', 'actual_duty_RL', 'actual_duty_FL']):
+        n = len(data['actual_duty_FR'])
+        data['total_duty'] = [(data['actual_duty_FR'][i] + data['actual_duty_RR'][i] +
+                               data['actual_duty_RL'][i] + data['actual_duty_FL'][i]) / 4.0
+                              for i in range(n)]
 
     # Compute derived signals from quaternion (same as load_csv)
     # クォータニオンから派生信号を計算（load_csv と同じ）
