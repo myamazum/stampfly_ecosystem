@@ -24,9 +24,8 @@ enum class LEDIndex : uint8_t {
  * @brief LEDチャンネル（各LEDの担当カテゴリ）
  */
 enum class LEDChannel : uint8_t {
-    SYSTEM = 0,    // MCU LED: システム状態（起動/エラー/ペアリング）
-    FLIGHT,        // BODY_TOP: 飛行状態
-    STATUS,        // BODY_BOTTOM: センサー/バッテリー状態
+    SYSTEM = 0,    // MCU LED: モード + キャリブレーション（地上確認用）
+    BODY,          // BODY_TOP + BODY_BOTTOM: フライト状態 + 警告（同一表示）
     NUM_CHANNELS
 };
 

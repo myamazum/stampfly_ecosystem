@@ -151,7 +151,6 @@ private:
      */
     struct ChannelState {
         DisplayRequest requests[static_cast<int>(LEDPriority::NUM_PRIORITIES)];
-        LEDIndex target_led;
     };
 
     /**
@@ -184,7 +183,7 @@ private:
         LEDPattern pattern = LEDPattern::OFF;
         uint32_t color = 0;
     };
-    CurrentState current_state_[3];  // MCU, BODY_TOP, BODY_BOTTOM
+    CurrentState current_state_[2];  // [0]=SYSTEM(MCU), [1]=BODY(TOP+BOTTOM)
 };
 
 }  // namespace stampfly

@@ -711,7 +711,7 @@ void ControlTask(void* pvParameters)
                 g_motor.disarm();
                 g_buzzer.errorTone();
                 stampfly::LEDManager::getInstance().requestChannel(
-                    stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::CRITICAL_ERROR,
+                    stampfly::LEDChannel::BODY, stampfly::LEDPriority::CRITICAL_ERROR,
                     stampfly::LEDPattern::BLINK_FAST, 0xFF0000, 5000);  // 赤点滅5秒
                 ESP_LOGE(TAG, "Motors DISARMED due to crash");
             }
@@ -740,14 +740,14 @@ void ControlTask(void* pvParameters)
         auto& led_mgr = stampfly::LEDManager::getInstance();
         if (yaw_cmd_diff > 0.3f) {
             // 指令が急変 → 黄色点滅（1秒間）- DEBUG_ALERT優先度、タイムアウト付き
-            led_mgr.requestChannel(stampfly::LEDChannel::STATUS,
+            led_mgr.requestChannel(stampfly::LEDChannel::BODY,
                 stampfly::LEDPriority::DEBUG_ALERT,
                 stampfly::LEDPattern::BLINK_FAST, 0xFFFF00, 1000);
             g_yaw_alert_counter = 400;
         }
         if (yaw_gyro_diff > 1.0f) {
             // ジャイロが急変 → 黄色点灯（1秒間）- DEBUG_ALERT優先度、タイムアウト付き
-            led_mgr.requestChannel(stampfly::LEDChannel::STATUS,
+            led_mgr.requestChannel(stampfly::LEDChannel::BODY,
                 stampfly::LEDPriority::DEBUG_ALERT,
                 stampfly::LEDPattern::SOLID, 0xFFFF00, 1000);
             g_yaw_alert_counter = 400;

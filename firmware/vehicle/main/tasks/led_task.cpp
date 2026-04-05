@@ -2,10 +2,9 @@
  * @file led_task.cpp
  * @brief LEDタスク (30Hz) - LEDManager経由でLED状態更新
  *
- * LEDManagerが優先度ベースで3つのLEDを管理：
- * - MCU LED (GPIO21): システム状態
- * - BODY_TOP (GPIO39-0): 飛行状態
- * - BODY_BOTTOM (GPIO39-1): センサー/バッテリー
+ * LED役割分担:
+ *   SYSTEM (StampS3 GPIO21): モード + キャリブレーション（地上確認用）
+ *   BODY (上面+下面 GPIO39):  フライト状態 + 警告（飛行中に見える情報）
  */
 
 #include "tasks_common.hpp"
@@ -26,7 +25,6 @@ void LEDTask(void* pvParameters)
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t period = pdMS_TO_TICKS(32);  // ~30Hz
 
-    // Low battery threshold for battery replace warning
     constexpr float LOW_BATTERY_THRESHOLD = 3.4f;
 
     stampfly::FlightState prev_flight_state = stampfly::FlightState::INIT;
@@ -34,30 +32,32 @@ void LEDTask(void* pvParameters)
     bool prev_low_battery = false;
 
     while (true) {
-        // バッテリー状態のチェックと通知
+        // Battery state → BODY channel
+        // バッテリー状態 → BODYチャンネル
         float voltage = state.getVoltage();
         bool low_battery = (voltage > 0.5f) && (voltage < LOW_BATTERY_THRESHOLD);
-
         if (low_battery != prev_low_battery) {
             led_mgr.onBatteryStateChanged(voltage, low_battery);
             prev_low_battery = low_battery;
         }
 
-        // 飛行状態のチェックと通知
+        // Flight state → BODY channel
+        // フライト状態 → BODYチャンネル
         stampfly::FlightState flight_state = state.getFlightState();
         if (flight_state != prev_flight_state) {
             led_mgr.onFlightStateChanged(flight_state);
             prev_flight_state = flight_state;
         }
 
-        // フライトモードのチェックと通知（Disarm中も監視）
-        // Monitor flight mode (also when disarmed)
+        // Flight mode → SYSTEM channel
+        // フライトモード → SYSTEMチャンネル
         stampfly::FlightMode flight_mode = state.getFlightMode();
         if (flight_mode != prev_flight_mode) {
             led_mgr.onFlightModeChanged(flight_mode);
             prev_flight_mode = flight_mode;
         }
 
+        // Update LED animations and timeouts
         // LEDアニメーション更新（タイムアウト処理含む）
         led_mgr.update();
 

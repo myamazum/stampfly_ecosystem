@@ -1,6 +1,12 @@
 /**
  * @file led_manager.cpp
  * @brief LED管理システム実装
+ *
+ * LED役割分担:
+ *   SYSTEM (StampS3内蔵 GPIO21): モード + キャリブレーション（地上確認用）
+ *   BODY (上面+下面 GPIO39):     フライト状態 + 警告（飛行中に見える情報）
+ *
+ * BODY チャンネルは上面・下面の両LEDに同一パターン・色を出力する。
  */
 
 #include "led_manager.hpp"
@@ -25,7 +31,8 @@ esp_err_t LEDManager::init()
 
     ESP_LOGI(TAG, "Initializing LED Manager");
 
-    // MCU LED初期化 (GPIO21, 1個)
+    // MCU LED init (GPIO21, 1 LED) — SYSTEM channel
+    // MCU LED初期化 (GPIO21, 1個) — SYSTEMチャンネル
     LED::Config mcu_cfg;
     mcu_cfg.gpio = 21;
     mcu_cfg.num_leds = 1;
@@ -34,9 +41,9 @@ esp_err_t LEDManager::init()
         ESP_LOGE(TAG, "Failed to init MCU LED: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "MCU LED initialized (GPIO21)");
 
-    // Body LED初期化 (GPIO39, 2個)
+    // Body LED init (GPIO39, 2 LEDs) — BODY channel (top + bottom, same display)
+    // Body LED初期化 (GPIO39, 2個) — BODYチャンネル（上面+下面、同一表示）
     LED::Config body_cfg;
     body_cfg.gpio = 39;
     body_cfg.num_leds = 2;
@@ -45,23 +52,18 @@ esp_err_t LEDManager::init()
         ESP_LOGE(TAG, "Failed to init Body LED: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "Body LED initialized (GPIO39, 2 LEDs)");
 
-    // チャンネルとLEDのマッピング設定
-    channels_[static_cast<int>(LEDChannel::SYSTEM)].target_led = LEDIndex::MCU;
-    channels_[static_cast<int>(LEDChannel::FLIGHT)].target_led = LEDIndex::BODY_TOP;
-    channels_[static_cast<int>(LEDChannel::STATUS)].target_led = LEDIndex::BODY_BOTTOM;
-
-    // 初期状態：全LED緑点灯（DEFAULT優先度）
+    // Default state: green solid on all channels
+    // デフォルト: 全チャンネル緑点灯
     for (int ch = 0; ch < static_cast<int>(LEDChannel::NUM_CHANNELS); ch++) {
         channels_[ch].requests[static_cast<int>(LEDPriority::DEFAULT)].active = true;
         channels_[ch].requests[static_cast<int>(LEDPriority::DEFAULT)].pattern = LEDPattern::SOLID;
-        channels_[ch].requests[static_cast<int>(LEDPriority::DEFAULT)].color = 0x00FF00;  // Green
+        channels_[ch].requests[static_cast<int>(LEDPriority::DEFAULT)].color = 0x00FF00;
         channels_[ch].requests[static_cast<int>(LEDPriority::DEFAULT)].expire_time_ms = 0;
     }
 
     initialized_ = true;
-    ESP_LOGI(TAG, "LED Manager initialized successfully");
+    ESP_LOGI(TAG, "LED Manager initialized (SYSTEM=MCU, BODY=TOP+BOTTOM)");
 
     return ESP_OK;
 }
@@ -86,7 +88,7 @@ void LEDManager::requestChannel(LEDChannel channel, LEDPriority priority,
     if (timeout_ms > 0) {
         req.expire_time_ms = (esp_timer_get_time() / 1000) + timeout_ms;
     } else {
-        req.expire_time_ms = 0;  // 永続
+        req.expire_time_ms = 0;
     }
 }
 
@@ -113,8 +115,6 @@ void LEDManager::setSystemEventsEnabled(bool enabled)
 {
     system_events_enabled_ = enabled;
     if (!enabled) {
-        // Release all system event priorities on all channels
-        // 全チャンネルのシステムイベント優先度を解放
         for (int ch = 0; ch < static_cast<int>(LEDChannel::NUM_CHANNELS); ch++) {
             auto channel = static_cast<LEDChannel>(ch);
             releaseChannel(channel, LEDPriority::FLIGHT_STATE);
@@ -125,73 +125,58 @@ void LEDManager::setSystemEventsEnabled(bool enabled)
     }
 }
 
+// =========================================================================
+// Event handlers — map system events to LED channels
+// イベントハンドラ — システムイベントをLEDチャンネルにマッピング
+// =========================================================================
+
 void LEDManager::onFlightStateChanged(FlightState state)
 {
-    if (!initialized_) return;
-    if (!system_events_enabled_) return;
+    if (!initialized_ || !system_events_enabled_) return;
 
-    LEDPattern pattern = LEDPattern::SOLID;
-    uint32_t color = 0x00FF00;  // Default green
+    // BODY channel: flight state (visible during flight)
+    // BODYチャンネル: フライト状態（飛行中に見える）
+    LEDPattern body_pattern = LEDPattern::SOLID;
+    uint32_t body_color = 0x00FF00;
 
     switch (state) {
-        case FlightState::INIT:
-            pattern = LEDPattern::BREATHE;
-            color = 0x0000FF;  // Blue
-            break;
-        case FlightState::CALIBRATING:
-            pattern = LEDPattern::SOLID;
-            color = 0xFFFFFF;  // White - calibration in progress, arm blocked
-            break;
         case FlightState::IDLE:
-            pattern = LEDPattern::SOLID;
-            color = 0x00FF00;  // Green
+            body_pattern = LEDPattern::SOLID;
+            body_color = 0x00FF00;  // Green: ready to ARM
             break;
         case FlightState::ARMED:
-            pattern = LEDPattern::BLINK_SLOW;
-            color = 0x00FF00;  // Green blink
+            body_pattern = LEDPattern::BLINK_SLOW;
+            body_color = 0x00FF00;  // Green blink: armed
             break;
         case FlightState::FLYING:
-            pattern = LEDPattern::SOLID;
-            color = 0xFFFF00;  // Yellow
-            break;
-        case FlightState::LANDING:
-            pattern = LEDPattern::BLINK_FAST;
-            color = 0x00FF00;  // Green fast blink
+            body_pattern = LEDPattern::SOLID;
+            body_color = 0xFFFF00;  // Yellow: flying
             break;
         case FlightState::ERROR:
-            pattern = LEDPattern::BLINK_FAST;
-            color = 0xFF0000;  // Red
+            body_pattern = LEDPattern::BLINK_FAST;
+            body_color = 0xFF0000;  // Red: error
             break;
+        default:
+            // INIT, CALIBRATING, LANDING — no change to BODY
+            return;
     }
 
-    requestChannel(LEDChannel::FLIGHT, LEDPriority::FLIGHT_STATE, pattern, color);
+    requestChannel(LEDChannel::BODY, LEDPriority::FLIGHT_STATE, body_pattern, body_color);
 }
 
 void LEDManager::onFlightModeChanged(FlightMode mode)
 {
-    if (!initialized_) return;
-    if (!system_events_enabled_) return;
+    if (!initialized_ || !system_events_enabled_) return;
 
-    // SYSTEMチャンネル（MCU LED）でフライトモードを表示
-    // ACRO: 青（角速度制御 - アクロバティック）
-    // STABILIZE: 緑（角度制御 - 安定）
-    // ALTITUDE_HOLD: オレンジ（高度維持）
-    // POSITION_HOLD: マゼンタ（位置保持）
+    // SYSTEM channel (StampS3 LED): flight mode
+    // SYSTEMチャンネル（StampS3 LED）: フライトモード
     uint32_t color;
     switch (mode) {
-        case FlightMode::STABILIZE:
-            color = 0x00FF00;  // Green
-            break;
-        case FlightMode::ALTITUDE_HOLD:
-            color = 0xFF8000;  // Orange
-            break;
-        case FlightMode::POSITION_HOLD:
-            color = 0xFF00FF;  // Magenta
-            break;
+        case FlightMode::STABILIZE:     color = 0x00FF00; break;  // Green
+        case FlightMode::ALTITUDE_HOLD: color = 0xFF8000; break;  // Orange
+        case FlightMode::POSITION_HOLD: color = 0xFF00FF; break;  // Magenta
         case FlightMode::ACRO:
-        default:
-            color = 0x0000FF;  // Blue
-            break;
+        default:                        color = 0x0000FF; break;  // Blue
     }
     requestChannel(LEDChannel::SYSTEM, LEDPriority::FLIGHT_STATE,
                    LEDPattern::SOLID, color);
@@ -199,16 +184,15 @@ void LEDManager::onFlightModeChanged(FlightMode mode)
 
 void LEDManager::onBatteryStateChanged(float voltage, bool low_battery)
 {
-    if (!initialized_) return;
-    if (!system_events_enabled_) return;
+    if (!initialized_ || !system_events_enabled_) return;
 
+    // BODY channel: low battery warning (cyan blink overlays flight state)
+    // BODYチャンネル: 低電圧警告（シアン点滅がフライト状態に重畳）
     if (low_battery) {
-        // 低電圧警告（シアン点滅）
-        requestChannel(LEDChannel::STATUS, LEDPriority::LOW_BATTERY,
+        requestChannel(LEDChannel::BODY, LEDPriority::LOW_BATTERY,
                        LEDPattern::BLINK_SLOW, 0x00FFFF);
     } else {
-        // 正常（緑点灯）
-        releaseChannel(LEDChannel::STATUS, LEDPriority::LOW_BATTERY);
+        releaseChannel(LEDChannel::BODY, LEDPriority::LOW_BATTERY);
     }
 }
 
@@ -216,14 +200,20 @@ void LEDManager::onSensorHealthChanged(bool all_healthy)
 {
     if (!initialized_) return;
 
+    // BODY channel: sensor error (red blink, highest priority)
+    // BODYチャンネル: センサ異常（赤点滅、最高優先度）
     if (!all_healthy) {
-        // センサー異常（赤点滅）
-        requestChannel(LEDChannel::STATUS, LEDPriority::CRITICAL_ERROR,
+        requestChannel(LEDChannel::BODY, LEDPriority::CRITICAL_ERROR,
                        LEDPattern::BLINK_FAST, 0xFF0000);
     } else {
-        releaseChannel(LEDChannel::STATUS, LEDPriority::CRITICAL_ERROR);
+        releaseChannel(LEDChannel::BODY, LEDPriority::CRITICAL_ERROR);
     }
 }
+
+// =========================================================================
+// Update — process timeouts and apply to physical LEDs
+// 更新 — タイムアウト処理と物理LEDへの適用
+// =========================================================================
 
 void LEDManager::update()
 {
@@ -231,6 +221,7 @@ void LEDManager::update()
 
     uint32_t now_ms = esp_timer_get_time() / 1000;
 
+    // Process timeouts
     // タイムアウト処理
     for (int ch = 0; ch < static_cast<int>(LEDChannel::NUM_CHANNELS); ch++) {
         for (int pri = 0; pri < static_cast<int>(LEDPriority::NUM_PRIORITIES); pri++) {
@@ -241,34 +232,48 @@ void LEDManager::update()
         }
     }
 
-    // 各チャンネルの最優先要求を適用
-    for (int ch = 0; ch < static_cast<int>(LEDChannel::NUM_CHANNELS); ch++) {
-        const DisplayRequest* req = getActiveRequest(static_cast<LEDChannel>(ch));
-        LEDIndex target = channels_[ch].target_led;
-
-        if (req != nullptr) {
-            // 変更があった場合のみ適用
-            int led_idx = (target == LEDIndex::MCU) ? 0 :
-                          (target == LEDIndex::BODY_TOP) ? 1 : 2;
-            if (current_state_[led_idx].pattern != req->pattern ||
-                current_state_[led_idx].color != req->color) {
-                applyToLED(target, req->pattern, req->color);
-                current_state_[led_idx].pattern = req->pattern;
-                current_state_[led_idx].color = req->color;
-            }
+    // SYSTEM channel → MCU LED
+    // SYSTEMチャンネル → MCU LED
+    {
+        const DisplayRequest* req = getActiveRequest(LEDChannel::SYSTEM);
+        if (req && (current_state_[0].pattern != req->pattern ||
+                    current_state_[0].color != req->color)) {
+            applyToLED(LEDIndex::MCU, req->pattern, req->color);
+            current_state_[0].pattern = req->pattern;
+            current_state_[0].color = req->color;
         }
     }
 
+    // BODY channel → BODY_TOP + BODY_BOTTOM (same display)
+    // BODYチャンネル → 上面 + 下面（同一表示）
+    {
+        const DisplayRequest* req = getActiveRequest(LEDChannel::BODY);
+        if (req && (current_state_[1].pattern != req->pattern ||
+                    current_state_[1].color != req->color)) {
+            // Apply to both body LEDs
+            // 両方のボディLEDに適用
+            applyToLED(LEDIndex::BODY_TOP, req->pattern, req->color);
+            applyToLED(LEDIndex::BODY_BOTTOM, req->pattern, req->color);
+            current_state_[1].pattern = req->pattern;
+            current_state_[1].color = req->color;
+        }
+    }
+
+    // Update LED animations
     // LEDアニメーション更新
     mcu_led_.update();
     body_led_.update();
 }
 
+// =========================================================================
+// Utility
+// =========================================================================
+
 void LEDManager::setBrightness(uint8_t brightness, bool save_to_nvs)
 {
     if (!initialized_) return;
     mcu_led_.setBrightness(brightness, save_to_nvs);
-    body_led_.setBrightness(brightness, false);  // NVSには1回だけ保存
+    body_led_.setBrightness(brightness, false);
 }
 
 uint8_t LEDManager::getBrightness() const
@@ -282,7 +287,6 @@ const LEDManager::DisplayRequest* LEDManager::getActiveRequest(LEDChannel channe
     int ch_idx = static_cast<int>(channel);
     if (ch_idx >= static_cast<int>(LEDChannel::NUM_CHANNELS)) return nullptr;
 
-    // 優先度の高い順（低い数値から）にチェック
     for (int pri = 0; pri < static_cast<int>(LEDPriority::NUM_PRIORITIES); pri++) {
         const DisplayRequest& req = channels_[ch_idx].requests[pri];
         if (req.active) {
@@ -301,14 +305,9 @@ void LEDManager::applyToLED(LEDIndex led, LEDPattern pattern, uint32_t color)
             mcu_led_.setPattern(hal_pattern, color);
             break;
         case LEDIndex::BODY_TOP:
-            // GPIO39の最初のLED
-            body_led_.setPattern(hal_pattern, color);
-            // TODO: 個別LED制御が必要な場合はLED HALを拡張
-            break;
         case LEDIndex::BODY_BOTTOM:
-            // GPIO39の2番目のLED
-            // 現在のHALは全LEDを同じパターンにするため、
-            // 個別制御が必要な場合はHALを拡張する必要がある
+            // Both body LEDs share the same driver (GPIO39)
+            // 両ボディLEDは同一ドライバ（GPIO39）を共有
             body_led_.setPattern(hal_pattern, color);
             break;
         case LEDIndex::ALL:
