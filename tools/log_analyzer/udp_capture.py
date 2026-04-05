@@ -93,10 +93,15 @@ assert struct.calcsize(FMT_BARO) == 12
 FMT_MAG = '<I 3f'
 assert struct.calcsize(FMT_MAG) == 16
 
-# CtrlRefSample: 30 bytes (angle ref + flight mode + total_thrust + motor_duty, 50Hz)
-#   timestamp(I) + flight_mode(B) + reserved(B) + angle_ref(2h) + total_thrust(f) + motor_duty(4f)
-FMT_CTRL_REF = '<I 2B 2h 5f'
-assert struct.calcsize(FMT_CTRL_REF) == 30
+# CtrlRefSample: 30 bytes (v3) or 14 bytes (v2) or 10 bytes (v1)
+# v1: timestamp(I) + flight_mode(B) + reserved(B) + angle_ref(2h) = 10B
+# v2: v1 + total_thrust(f) = 14B
+# v3: v2 + motor_duty(4f) = 30B
+FMT_CTRL_REF_V1 = '<I 2B 2h'
+FMT_CTRL_REF_V2 = '<I 2B 2h f'
+FMT_CTRL_REF_V3 = '<I 2B 2h 5f'
+FMT_CTRL_REF = FMT_CTRL_REF_V3  # default for new logs
+assert struct.calcsize(FMT_CTRL_REF_V3) == 30
 
 # RateRefFixed: 6 bytes (rate ref, 400Hz, fixed part of unified packet)
 #   rate_ref_roll(h) + rate_ref_pitch(h) + rate_ref_yaw(h)
@@ -254,6 +259,17 @@ def parse_packet(data: bytes) -> list:
                     values = struct.unpack_from(fmt, data, offset)
                     sample = dict(zip(columns, values))
                     results.append((sensor_id, sample))
+                elif sensor_id == PKT_CTRL_REF:
+                    # Backward compatible: accept v1(10B), v2(14B), v3(30B)
+                    # 後方互換: v1(10B), v2(14B), v3(30B) を受け入れ
+                    if data_size == 10:
+                        cols = CSV_COLUMNS[PKT_CTRL_REF][:5]
+                        vals = struct.unpack_from(FMT_CTRL_REF_V1, data, offset)
+                        results.append((sensor_id, dict(zip(cols, vals))))
+                    elif data_size == 14:
+                        cols = CSV_COLUMNS[PKT_CTRL_REF][:6]
+                        vals = struct.unpack_from(FMT_CTRL_REF_V2, data, offset)
+                        results.append((sensor_id, dict(zip(cols, vals))))
             offset += data_size
 
         return results
