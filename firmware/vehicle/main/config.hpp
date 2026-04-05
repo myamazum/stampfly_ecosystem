@@ -409,12 +409,12 @@ inline constexpr float YAW_RATE_MAX = 5.0f;        // ヨー最大角速度 [rad
 // ==========================================================================
 
 // Roll rate PID
-inline constexpr float ROLL_RATE_KP = 1.82e-3f;    // [Nm/(rad/s)] = 2x of 9.1e-4
+inline constexpr float ROLL_RATE_KP = 1.365e-3f;   // [Nm/(rad/s)] = 1.5x of 9.1e-4
 inline constexpr float ROLL_RATE_TI = 0.7f;        // 積分時間 [s]
 inline constexpr float ROLL_RATE_TD = 0.01f;       // 微分時間 [s]
 
 // Pitch rate PID
-inline constexpr float PITCH_RATE_KP = 2.66e-3f;   // [Nm/(rad/s)] = 2x of 1.33e-3
+inline constexpr float PITCH_RATE_KP = 1.995e-3f;  // [Nm/(rad/s)] = 1.5x of 1.33e-3
 inline constexpr float PITCH_RATE_TI = 0.7f;       // 積分時間 [s]
 inline constexpr float PITCH_RATE_TD = 0.01f;      // 微分時間 [s]
 
