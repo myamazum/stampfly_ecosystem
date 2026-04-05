@@ -74,6 +74,7 @@ struct AltitudeController {
     float altitude_setpoint = 0.0f; // Target altitude [m]
     bool altitude_captured = false;  // Altitude captured flag
     bool initialized = false;
+    bool stick_unlocked_ = false;   // True after stick returns to center deadzone
 
     // Hover thrust estimation (swappable)
     // ホバー推力推定（交換可能）
@@ -123,6 +124,7 @@ struct AltitudeController {
         velocity_pid.reset();
         altitude_captured = false;
         altitude_setpoint = 0.0f;
+        stick_unlocked_ = false;
     }
 
     /**
@@ -134,6 +136,7 @@ struct AltitudeController {
         using namespace config::altitude_control;
         altitude_setpoint = std::clamp(alt, MIN_ALTITUDE, MAX_ALTITUDE);
         altitude_captured = true;
+        stick_unlocked_ = false;
     }
 
     /// Swap the hover thrust estimation formula
@@ -200,15 +203,29 @@ struct AltitudeController {
      * @brief Convert throttle stick to climb/descent rate
      * スロットルスティックを上昇/下降速度に変換
      *
+     * Stick center (2048) = hold altitude.
+     * モード遷移直後はスティックがホバー位置（~60%）にあるため、
+     * スティックがセンター付近のデッドゾーンに戻るまでコマンドをロック。
+     * バネ復帰式スティックなら離すだけでロック解除される。
+     *
      * @param raw_throttle Raw ADC value (0-4095, center=2048)
      * @return Climb rate [m/s] (positive=up, negative=down, 0=hold)
      */
-    static float stickToClimbRate(uint16_t raw_throttle) {
+    float stickToClimbRate(uint16_t raw_throttle) {
         using namespace config::altitude_control;
 
         // Normalize to [-1, 1] around center (2048)
         // 中央(2048)を基準に [-1, 1] に正規化
         float normalized = (static_cast<float>(raw_throttle) - 2048.0f) / 2048.0f;
+
+        // After mode entry, require stick to return to deadzone before accepting commands
+        // モード遷移後、スティックがデッドゾーンに戻るまでコマンドをロック
+        if (!stick_unlocked_) {
+            if (normalized > -STICK_DEADZONE && normalized < STICK_DEADZONE) {
+                stick_unlocked_ = true;
+            }
+            return 0.0f;  // Hold altitude until stick returns to center
+        }
 
         // Apply deadzone
         // デッドゾーン適用

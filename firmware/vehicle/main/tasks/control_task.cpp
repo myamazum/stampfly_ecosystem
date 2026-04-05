@@ -793,7 +793,7 @@ void ControlTask(void* pvParameters)
 
             uint16_t raw_throttle, raw_r, raw_p, raw_y;
             state.getRawControlInput(raw_throttle, raw_r, raw_p, raw_y);
-            float climb_cmd = AltitudeController::stickToClimbRate(raw_throttle);
+            float climb_cmd = g_altitude_controller.stickToClimbRate(raw_throttle);
 
             float vbat = state.getVoltage();
             total_thrust = g_altitude_controller.update(climb_cmd, alt, vel_z, vbat, dt);
