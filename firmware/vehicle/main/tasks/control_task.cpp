@@ -332,8 +332,11 @@ void ControlTask(void* pvParameters)
                 ESP_LOGI(TAG, "MotorDriver auto-armed (WiFi command or controller)");
             }
         }
-        // DISARM に遷移したら MotorDriver も DISARM + コントローラリセット
-        // Reset controllers on DISARM to clear stale setpoints
+        // DISARM に遷移したら MotorDriver も DISARM + 全状態リセット
+        // On DISARM: stop motors, reset controllers AND ESKF position/velocity
+        // This prevents stale pos_z from being captured on immediate re-ARM.
+        // Without this, DISARM at height → fall → re-ARM captures drifted pos_z
+        // as altitude setpoint → drone shoots up to wrong altitude.
         else if ((prev_flight_state == stampfly::FlightState::ARMED ||
                   prev_flight_state == stampfly::FlightState::FLYING) &&
                  flight_state != stampfly::FlightState::ARMED &&
@@ -344,6 +347,8 @@ void ControlTask(void* pvParameters)
             }
             g_altitude_controller.reset();
             g_position_controller.reset();
+            g_fusion.resetPositionVelocity();  // pos/vel=0 immediately (don't wait for landing detection)
+            ESP_LOGI(TAG, "ESKF position/velocity reset on DISARM");
         }
 
         prev_flight_state = flight_state;
