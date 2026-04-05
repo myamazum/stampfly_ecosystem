@@ -132,9 +132,12 @@ void IMUTask(void* pvParameters)
                 // 着陸キャリブレーション（Disarm時のみ動作）
                 // ============================================================
                 {
-                    bool is_disarmed = (state.getFlightState() == stampfly::FlightState::IDLE ||
-                                        state.getFlightState() == stampfly::FlightState::CALIBRATING ||
-                                        state.getFlightState() == stampfly::FlightState::INIT);
+                    // Snapshot flight state once to avoid race condition
+                    // フライト状態を1回だけ取得（レースコンディション防止）
+                    auto current_fs = state.getFlightState();
+                    bool is_disarmed = (current_fs == stampfly::FlightState::IDLE ||
+                                        current_fs == stampfly::FlightState::CALIBRATING ||
+                                        current_fs == stampfly::FlightState::INIT);
 
                     float tof_bottom_now = 0.0f;
                     if (g_tof_bottom_buf.count() > 0) {
@@ -163,7 +166,9 @@ void IMUTask(void* pvParameters)
                             g_landing_handler.getAccelReference(),
                             eskf_state.gyro_bias  // Keep ESKF's current gyro bias
                         );
-                        g_fusion.resetForLanding();
+                        // resetForLanding() は justLanded() イベント（行241）で実行済み
+                        // ここで再度呼ぶと setAttitudeReference() の freeze_accel_bias=false が
+                        // 即座に true に戻される矛盾が発生する
                         ESP_LOGI(TAG, "Level calibration complete - attitude reference set (gyro bias preserved)");
                     }
 

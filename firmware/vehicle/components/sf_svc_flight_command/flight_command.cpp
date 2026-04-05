@@ -99,6 +99,8 @@ bool FlightCommandService::executeCommand(FlightCommandType type, const FlightCo
             return false;
         }
 
+        globals::g_landing_handler.reset();  // キャリブレーション状態をリセット
+
         // Also ARM in SystemStateManager
         // SystemStateManagerでもARM
         sys_state_mgr.requestArm();

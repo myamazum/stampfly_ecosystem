@@ -222,9 +222,9 @@ void onButtonEvent(stampfly::Button::Event event)
                     break;
                 }
                 if (state.requestArm()) {
-                    // ARM時に姿勢を初期化（現在の向き=Yaw 0°）
+                    g_landing_handler.reset();  // キャリブレーション状態をリセット
                     initializeAttitudeFromBuffers();
-                    g_motor.resetStats();  // モーター統計リセット
+                    g_motor.resetStats();
                     g_buzzer.armTone();
                     ESP_LOGI(TAG, "Motors ARMED");
                 }
@@ -309,9 +309,10 @@ void handleControlInput(uint16_t throttle, uint16_t roll, uint16_t pitch,
                 g_buzzer.errorTone();
             } else if (state.requestArm()) {
                 // IDLE/ERROR → ARM
-                g_motor.arm();  // Enable motor driver
+                g_landing_handler.reset();  // キャリブレーション状態をリセット
+                g_motor.arm();
                 initializeAttitudeFromBuffers();
-                g_motor.resetStats();  // モーター統計リセット
+                g_motor.resetStats();
                 g_buzzer.armTone();
                 ESP_LOGI(TAG, "Motors ARMED (from controller)");
             }
