@@ -118,6 +118,7 @@ void LEDManager::setSystemEventsEnabled(bool enabled)
         for (int ch = 0; ch < static_cast<int>(LEDChannel::NUM_CHANNELS); ch++) {
             auto channel = static_cast<LEDChannel>(ch);
             releaseChannel(channel, LEDPriority::FLIGHT_STATE);
+            releaseChannel(channel, LEDPriority::CALIBRATION);
             releaseChannel(channel, LEDPriority::LOW_BATTERY);
             releaseChannel(channel, LEDPriority::PAIRING);
             releaseChannel(channel, LEDPriority::DEBUG_ALERT);

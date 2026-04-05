@@ -38,8 +38,9 @@ enum class LEDPriority : uint8_t {
     LOW_BATTERY = 2,    // 低電圧警告
     DEBUG_ALERT = 3,    // デバッグ表示（yaw_alert等）
     PAIRING = 4,        // ペアリングモード
-    FLIGHT_STATE = 5,   // 通常の飛行状態表示
-    DEFAULT = 6,        // 最低: デフォルト表示
+    CALIBRATION = 5,    // キャリブレーション状態（モード色より高優先）
+    FLIGHT_STATE = 6,   // 通常の飛行状態/モード表示
+    DEFAULT = 7,        // 最低: デフォルト表示
     NUM_PRIORITIES
 };
 
