@@ -258,19 +258,35 @@ def parse_packet(data: bytes) -> list:
 
     if pkt_id not in SAMPLE_INFO:
         # Status packet (0x4F) — parse fields
-        # StatusPacket: [header 4B][uptime_ms 4B][voltage 4B][flight_state 1B]
-        #               [sensor_health 1B][eskf_status 1B][padding 1B][checksum 1B]
-        if pkt_id == PKT_STATUS and len(data) == 17:
+        # StatusPacket v2: [header 4B][uptime_ms 4B][voltage 4B][flight_state 1B]
+        #   [sensor_health 1B][eskf_status 1B][padding 1B]
+        #   [pid_roll Kp/Ti/Td 12B][pid_pitch Kp/Ti/Td 12B][pid_yaw Kp/Ti/Td 12B]
+        #   [checksum 1B] = 53B
+        # Legacy (17B) also supported for backward compatibility
+        if pkt_id == PKT_STATUS and len(data) in (17, 53):
             uptime_ms, voltage, flight_state, sensor_health, eskf_status = \
                 struct.unpack_from('<IfBBB', data, 4)
-            return [(PKT_STATUS, {
+            sample = {
                 'timestamp_us': uptime_ms * 1000,
                 'uptime_ms': uptime_ms,
                 'voltage': voltage,
                 'flight_state': flight_state,
                 'sensor_health': sensor_health,
                 'eskf_status': eskf_status,
-            })]
+            }
+            # Parse PID gains if present (v2, 53B)
+            if len(data) == 53:
+                pid_vals = struct.unpack_from('<9f', data, 16)
+                sample['pid_roll_kp']  = pid_vals[0]
+                sample['pid_roll_ti']  = pid_vals[1]
+                sample['pid_roll_td']  = pid_vals[2]
+                sample['pid_pitch_kp'] = pid_vals[3]
+                sample['pid_pitch_ti'] = pid_vals[4]
+                sample['pid_pitch_td'] = pid_vals[5]
+                sample['pid_yaw_kp']   = pid_vals[6]
+                sample['pid_yaw_ti']   = pid_vals[7]
+                sample['pid_yaw_td']   = pid_vals[8]
+            return [(PKT_STATUS, sample)]
         return []
 
     name, fmt, sample_size = SAMPLE_INFO[pkt_id]
@@ -606,6 +622,11 @@ class UDPTelemetryCapture:
                 'voltage': round(s['voltage'], 3),
                 'flight_state': s['flight_state'],
                 'eskf_status': s['eskf_status'],
+                **({
+                    'pid_roll':  [s['pid_roll_kp'],  s['pid_roll_ti'],  s['pid_roll_td']],
+                    'pid_pitch': [s['pid_pitch_kp'], s['pid_pitch_ti'], s['pid_pitch_td']],
+                    'pid_yaw':   [s['pid_yaw_kp'],   s['pid_yaw_ti'],  s['pid_yaw_td']],
+                } if 'pid_roll_kp' in s else {}),
             },
         }
 

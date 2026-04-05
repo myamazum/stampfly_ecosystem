@@ -298,10 +298,24 @@ struct StatusPacket {
     uint8_t sensor_health;       // bitmask
     uint8_t eskf_status;
     uint8_t padding;
+
+    // PID gains (rate controller, physical units [Nm])
+    // PIDゲイン（レート制御、物理単位）
+    // Sent at 1Hz so viz can reconstruct motor commands without hardcoded gains
+    float pid_roll_kp;
+    float pid_roll_ti;
+    float pid_roll_td;
+    float pid_pitch_kp;
+    float pid_pitch_ti;
+    float pid_pitch_td;
+    float pid_yaw_kp;
+    float pid_yaw_ti;
+    float pid_yaw_td;
+
     uint8_t checksum;
 };
 
-static_assert(sizeof(StatusPacket) == 17, "StatusPacket size mismatch");
+static_assert(sizeof(StatusPacket) == 53, "StatusPacket size mismatch");
 
 // =============================================================================
 // 0x50: Unified Packet (8 IMU cycles + sensor entries, ~950B max, 50Hz)

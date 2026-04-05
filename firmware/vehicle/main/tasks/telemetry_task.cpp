@@ -24,6 +24,7 @@
 #include "tasks_common.hpp"
 #include "sensor_fusion.hpp"
 #include "udp_telemetry.hpp"
+#include "rate_controller.hpp"
 #include "esp_timer.h"
 
 static const char* TAG = "TelemetryTask";
@@ -428,6 +429,21 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         sp.voltage = state.getVoltage();
         sp.flight_state = (uint8_t)state.getFlightState();
         sp.eskf_status = state.isESKFInitialized() ? 0x01 : 0x00;
+
+        // PID gains from rate controller (may be adjusted at runtime via CLI)
+        // レートコントローラのPIDゲイン（CLI経由でランタイム変更される場合あり）
+        if (g_rate_controller_ptr) {
+            sp.pid_roll_kp  = g_rate_controller_ptr->roll_pid.getKp();
+            sp.pid_roll_ti  = g_rate_controller_ptr->roll_pid.getTi();
+            sp.pid_roll_td  = g_rate_controller_ptr->roll_pid.getTd();
+            sp.pid_pitch_kp = g_rate_controller_ptr->pitch_pid.getKp();
+            sp.pid_pitch_ti = g_rate_controller_ptr->pitch_pid.getTi();
+            sp.pid_pitch_td = g_rate_controller_ptr->pitch_pid.getTd();
+            sp.pid_yaw_kp   = g_rate_controller_ptr->yaw_pid.getKp();
+            sp.pid_yaw_ti   = g_rate_controller_ptr->yaw_pid.getTi();
+            sp.pid_yaw_td   = g_rate_controller_ptr->yaw_pid.getTd();
+        }
+
         sp.checksum = computeChecksum(&sp, sizeof(sp));
         enqueue(&sp, sizeof(sp));
     }

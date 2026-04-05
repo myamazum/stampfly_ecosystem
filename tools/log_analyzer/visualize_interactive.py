@@ -292,6 +292,9 @@ def load_jsonl(filepath: str) -> dict:
         ],
         'status': [
             ('voltage', ['battery_voltage'], False),
+            ('pid_roll', ['pid_roll_kp', 'pid_roll_ti', 'pid_roll_td'], True),
+            ('pid_pitch', ['pid_pitch_kp', 'pid_pitch_ti', 'pid_pitch_td'], True),
+            ('pid_yaw', ['pid_yaw_kp', 'pid_yaw_ti', 'pid_yaw_td'], True),
         ],
     }
 
@@ -449,11 +452,21 @@ def load_jsonl(filepath: str) -> dict:
 
         # PID parameters (physical units mode)
         # PIDパラメータ（物理単位モード）
-        pid_cfg = [
-            {'Kp': 1.365e-3, 'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Roll  (1.5x of 9.1e-4)
-            {'Kp': 1.995e-3, 'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Pitch (1.5x of 1.33e-3)
-            {'Kp': 5.31e-3,  'Ti': 1.6, 'Td': 0.01, 'eta': 0.125, 'lim': 2.2e-3},  # Yaw   (3x of 1.77e-3, Ti 2x)
+        # Use PID gains from log if available (status packet), else fallback to hardcoded
+        # ログにPIDゲインがあれば使用（statusパケット）、なければフォールバック
+        pid_cfg_default = [
+            {'Kp': 1.365e-3, 'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Roll
+            {'Kp': 1.995e-3, 'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Pitch
+            {'Kp': 5.31e-3,  'Ti': 1.6, 'Td': 0.01, 'eta': 0.125, 'lim': 2.2e-3},  # Yaw
         ]
+        pid_cfg = pid_cfg_default
+        if 'pid_roll_kp' in data and data['pid_roll_kp']:
+            # Take first valid PID gains from status packets
+            pid_cfg = [
+                {'Kp': data['pid_roll_kp'][0],  'Ti': data['pid_roll_ti'][0],  'Td': data['pid_roll_td'][0],  'eta': 0.125, 'lim': 5.2e-3},
+                {'Kp': data['pid_pitch_kp'][0], 'Ti': data['pid_pitch_ti'][0], 'Td': data['pid_pitch_td'][0], 'eta': 0.125, 'lim': 5.2e-3},
+                {'Kp': data['pid_yaw_kp'][0],   'Ti': data['pid_yaw_ti'][0],  'Td': data['pid_yaw_td'][0],   'eta': 0.125, 'lim': 2.2e-3},
+            ]
         rate_ref_keys = ['rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw']
         gyro_keys = ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z']
         pid_names = ['pid_out_roll', 'pid_out_pitch', 'pid_out_yaw']
