@@ -332,15 +332,18 @@ void ControlTask(void* pvParameters)
                 ESP_LOGI(TAG, "MotorDriver auto-armed (WiFi command or controller)");
             }
         }
-        // DISARM に遷移したら MotorDriver も DISARM する
+        // DISARM に遷移したら MotorDriver も DISARM + コントローラリセット
+        // Reset controllers on DISARM to clear stale setpoints
         else if ((prev_flight_state == stampfly::FlightState::ARMED ||
                   prev_flight_state == stampfly::FlightState::FLYING) &&
                  flight_state != stampfly::FlightState::ARMED &&
                  flight_state != stampfly::FlightState::FLYING) {
             if (g_motor.isArmed()) {
-                g_motor.disarm();  // Disable motor driver
+                g_motor.disarm();
                 ESP_LOGI(TAG, "MotorDriver auto-disarmed");
             }
+            g_altitude_controller.reset();
+            g_position_controller.reset();
         }
 
         prev_flight_state = flight_state;
