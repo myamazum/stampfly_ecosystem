@@ -239,11 +239,11 @@ void IMUTask(void* pvParameters)
                         // 接地中はskip_position=trueで位置更新をスキップ（ドリフト防止）
                         g_fusion.predictIMU(accel_latest, gyro_latest, 0.0025f, skip_position);
 
-                        // 着陸イベント: 位置・速度リセット（LandingHandler が armed 中は発火しない）
-                        // Landing event: reset position/velocity (never fires while armed)
+                        // 着陸イベント: キャリブレーション開始トリガー
+                        // Landing event: calibration trigger only
+                        // (ESKF reset is done at DISARM time in control_task, not here)
                         if (g_landing_handler.justLanded() && g_landing_handler.hasTakenOff()) {
-                            g_fusion.resetForLanding();
-                            ESP_LOGI(TAG, "Landed - reset for landing, accel bias frozen");
+                            ESP_LOGI(TAG, "Landed - calibration sequence will start");
                         }
 
                         // 接地中: 位置・速度を0に保持

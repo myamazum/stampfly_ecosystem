@@ -347,8 +347,8 @@ void ControlTask(void* pvParameters)
             }
             g_altitude_controller.reset();
             g_position_controller.reset();
-            g_fusion.resetPositionVelocity();  // pos/vel=0 immediately (don't wait for landing detection)
-            ESP_LOGI(TAG, "ESKF position/velocity reset on DISARM");
+            g_fusion.resetForLanding();  // pos/vel=0 + freeze BA + P cleanup
+            ESP_LOGI(TAG, "DISARM: controllers + ESKF reset");
         }
 
         prev_flight_state = flight_state;
