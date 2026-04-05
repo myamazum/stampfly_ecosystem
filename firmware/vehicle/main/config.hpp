@@ -533,17 +533,17 @@ inline constexpr float HOVER_THRUST_CORRECTION = 1.12f;  // From flight log thro
 
 // 高度PID（外ループ）: 高度誤差 [m] → 垂直速度目標 [m/s]
 // Altitude PID (outer loop): altitude error [m] -> vertical velocity target [m/s]
-inline constexpr float ALT_KP = 1.0f;
-inline constexpr float ALT_TI = 0.0f;          // OFF: I項無効で安定確認してから有効化
-inline constexpr float ALT_TD = 0.0f;           // OFF: まずP制御のみ
-inline constexpr float ALT_OUTPUT_MAX = 0.5f;   // Max climb/descent rate [m/s] (制限)
+inline constexpr float ALT_KP = 0.6f;
+inline constexpr float ALT_TI = 7.0f;           // 1.5×Tu (振動周期4.9s)
+inline constexpr float ALT_TD = 0.0f;
+inline constexpr float ALT_OUTPUT_MAX = 0.5f;   // Max climb/descent rate [m/s]
 
 // 速度PID（内ループ）: 速度誤差 [m/s] → 推力補正 [N]
 // Velocity PID (inner loop): velocity error [m/s] -> thrust correction [N]
 inline constexpr float VEL_KP = 0.1f;
-inline constexpr float VEL_TI = 0.0f;           // OFF: まずP制御のみ
-inline constexpr float VEL_TD = 0.0f;            // OFF
-inline constexpr float VEL_OUTPUT_MAX = 0.15f;   // Max thrust correction [N] (制限)
+inline constexpr float VEL_TI = 2.5f;           // 0.5×Tu — 定常偏差除去
+inline constexpr float VEL_TD = 0.0f;
+inline constexpr float VEL_OUTPUT_MAX = 0.15f;   // Max thrust correction [N]
 
 // スティック設定
 // Stick configuration
