@@ -151,6 +151,13 @@ public:
      */
     float thrustToDuty(float thrust) const;
 
+    /**
+     * @brief Update battery voltage for thrust-to-duty conversion
+     * 推力→Duty変換用のバッテリー電圧を更新
+     * @param vbat Measured battery voltage [V]
+     */
+    void setVbat(float vbat) { motor_params_.Vbat = vbat; }
+
     // Getters for debugging and runtime access
     const float* getBMatrix() const { return &B_[0][0]; }
     const float* getBInvMatrix() const { return &B_inv_[0][0]; }

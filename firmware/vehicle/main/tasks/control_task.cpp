@@ -817,6 +817,10 @@ void ControlTask(void* pvParameters)
         // Control input vector: [total_thrust, roll_torque, pitch_torque, yaw_torque]
         float control[4] = {total_thrust, roll_out, pitch_out, yaw_out};
 
+        // Update battery voltage for accurate thrust→duty conversion
+        // バッテリー電圧を更新（推力→Duty変換の精度向上）
+        g_rate_controller.allocator.setVbat(state.getVoltage());
+
         // ミキシング: 制御入力 → モータ推力 [N]
         // Mixing: Control inputs -> Motor thrusts [N]
         float thrusts[4];
