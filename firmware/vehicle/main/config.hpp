@@ -529,7 +529,7 @@ inline constexpr float MAX_TOTAL_THRUST = 4.0f * 0.168f;  // 0.672N (4 motors, d
 
 // ホバー推力推定のデフォルトパラメータ
 // Default hover thrust estimation parameters
-inline constexpr float HOVER_THRUST_CORRECTION = 1.0f;   // Empirical correction factor (1.0 = theoretical)
+inline constexpr float HOVER_THRUST_CORRECTION = 1.12f;  // From flight log throttle measurement (stable 1.11-1.13)
 
 // 高度PID（外ループ）: 高度誤差 [m] → 垂直速度目標 [m/s]
 // Altitude PID (outer loop): altitude error [m] -> vertical velocity target [m/s]
