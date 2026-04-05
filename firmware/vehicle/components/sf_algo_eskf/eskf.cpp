@@ -437,19 +437,28 @@ void ESKF::predict(const Vector3& accel, const Vector3& gyro, float dt, bool ski
     // 名目状態の更新
     // Skip if: skip_position requested (grounded) OR position states frozen (active_mask)
     // 位置・速度の更新をスキップ: 接地中 または active_mask で凍結中
-    bool pos_active = (active_mask_ >> POS_X) & 1;  // Any POS/VEL active
-    if (!skip_position && pos_active) {
+    // Check X/Y and Z independently — Flow controls X/Y, Baro/ToF controls Z
+    // X/Y と Z を独立判定 — Flow が X/Y、Baro/ToF が Z を制御
+    bool pos_xy_active = (active_mask_ >> POS_X) & 1;
+    bool pos_z_active  = (active_mask_ >> POS_Z) & 1;
+
+    if (!skip_position) {
         float accel_world_x = R00*ax + R01*ay + R02*az;
         float accel_world_y = R10*ax + R11*ay + R12*az;
         float accel_world_z = R20*ax + R21*ay + R22*az + config_.gravity;
 
         float half_dt_sq = 0.5f * dt * dt;
-        state_.position.x += state_.velocity.x * dt + accel_world_x * half_dt_sq;
-        state_.position.y += state_.velocity.y * dt + accel_world_y * half_dt_sq;
-        state_.position.z += state_.velocity.z * dt + accel_world_z * half_dt_sq;
-        state_.velocity.x += accel_world_x * dt;
-        state_.velocity.y += accel_world_y * dt;
-        state_.velocity.z += accel_world_z * dt;
+
+        if (pos_xy_active) {
+            state_.position.x += state_.velocity.x * dt + accel_world_x * half_dt_sq;
+            state_.position.y += state_.velocity.y * dt + accel_world_y * half_dt_sq;
+            state_.velocity.x += accel_world_x * dt;
+            state_.velocity.y += accel_world_y * dt;
+        }
+        if (pos_z_active) {
+            state_.position.z += state_.velocity.z * dt + accel_world_z * half_dt_sq;
+            state_.velocity.z += accel_world_z * dt;
+        }
     }
 
     // Attitude update
