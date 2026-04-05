@@ -818,9 +818,23 @@ void ControlTask(void* pvParameters)
         float control[4] = {total_thrust, roll_out, pitch_out, yaw_out};
         state.setTotalThrust(total_thrust);
 
-        // Update battery voltage for accurate thrust→duty conversion
-        // バッテリー電圧を更新（推力→Duty変換の精度向上）
-        g_rate_controller.allocator.setVbat(state.getVoltage());
+        // Update battery voltage for thrust→duty conversion (LPF, τ≈5s)
+        // バッテリー電圧を更新（LPF適用、時定数約5秒）
+        // Slow filter prevents positive feedback: motor current drop → Vbat drop
+        // → duty increase → more current → oscillation
+        {
+            static float vbat_filtered = 3.7f;
+            static bool vbat_initialized = false;
+            float vbat_raw = state.getVoltage();
+            if (!vbat_initialized && vbat_raw > 2.0f) {
+                vbat_filtered = vbat_raw;
+                vbat_initialized = true;
+            }
+            constexpr float VBAT_LPF_TAU = 5.0f;  // [s] time constant
+            float alpha = dt / (VBAT_LPF_TAU + dt);
+            vbat_filtered += alpha * (vbat_raw - vbat_filtered);
+            g_rate_controller.allocator.setVbat(vbat_filtered);
+        }
 
         // ミキシング: 制御入力 → モータ推力 [N]
         // Mixing: Control inputs -> Motor thrusts [N]
