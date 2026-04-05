@@ -172,6 +172,7 @@ SIGNAL_CATEGORIES = {
     ],
     'Thrust Command': [
         ('total_thrust', 'Total Thrust [N]'),
+        ('total_duty', 'Total Duty (thrust/max)'),
     ],
     'Sensors - Height': [
         ('baro_altitude', 'Baro Alt [m]'),
@@ -415,6 +416,12 @@ def load_jsonl(filepath: str) -> dict:
             a = data[f'accel_{axis}']
             b = data[f'accel_bias_{axis}']
             data[f'accel_corrected_{axis}'] = [a[i] - b[i] for i in range(n)]
+
+    # Total duty: total_thrust / MAX_TOTAL_THRUST
+    # トータルDuty: 全モータ推力合計の割合
+    if 'total_thrust' in data:
+        MAX_TOTAL_THRUST = 4 * 0.168  # 0.672N
+        data['total_duty'] = [t / MAX_TOTAL_THRUST for t in data['total_thrust']]
 
     # Compute derived signals from quaternion (same as load_csv)
     # クォータニオンから派生信号を計算（load_csv と同じ）
