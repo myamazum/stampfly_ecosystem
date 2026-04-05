@@ -450,9 +450,9 @@ def load_jsonl(filepath: str) -> dict:
         # PID parameters (physical units mode)
         # PIDパラメータ（物理単位モード）
         pid_cfg = [
-            {'Kp': 9.1e-4,  'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Roll
-            {'Kp': 1.33e-3, 'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Pitch
-            {'Kp': 1.77e-3, 'Ti': 0.8, 'Td': 0.01, 'eta': 0.125, 'lim': 2.2e-3},  # Yaw
+            {'Kp': 1.365e-3, 'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Roll  (1.5x of 9.1e-4)
+            {'Kp': 1.995e-3, 'Ti': 0.7, 'Td': 0.01, 'eta': 0.125, 'lim': 5.2e-3},  # Pitch (1.5x of 1.33e-3)
+            {'Kp': 5.31e-3,  'Ti': 1.6, 'Td': 0.01, 'eta': 0.125, 'lim': 2.2e-3},  # Yaw   (3x of 1.77e-3, Ti 2x)
         ]
         rate_ref_keys = ['rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw']
         gyro_keys = ['gyro_corrected_x', 'gyro_corrected_y', 'gyro_corrected_z']
