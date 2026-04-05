@@ -540,7 +540,7 @@ inline constexpr float ALT_OUTPUT_MAX = 0.5f;   // Max climb/descent rate [m/s]
 
 // 速度PID（内ループ）: 速度誤差 [m/s] → 推力補正 [N]
 // Velocity PID (inner loop): velocity error [m/s] -> thrust correction [N]
-inline constexpr float VEL_KP = 0.15f;          // 内ループ応答改善 (0.1→0.15)
+inline constexpr float VEL_KP = 0.1f;
 inline constexpr float VEL_TI = 2.5f;           // 0.5×Tu — 定常偏差除去
 inline constexpr float VEL_TD = 0.0f;
 inline constexpr float VEL_OUTPUT_MAX = 0.15f;   // Max thrust correction [N]
