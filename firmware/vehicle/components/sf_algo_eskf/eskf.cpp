@@ -845,18 +845,16 @@ void ESKF::updateBaro(float altitude)
 
     // H: H[0][2] = 1 (POS_Z only)
     float y = -altitude - state_.position.z;
+
+    // Innovation gate (absolute threshold)
+    // イノベーションゲート（絶対値閾値）
+    if (config_.baro_innov_gate > 0.0f && std::fabs(y) > config_.baro_innov_gate) return;
+
     float R_val = config_.baro_noise * config_.baro_noise;
 
     float S = P_(2, 2) + R_val;
     if (S < 1e-10f) return;
     float S_inv = 1.0f / S;
-
-    // Chi-squared outlier rejection (1 DOF)
-    // χ²外れ値棄却
-    if (config_.baro_chi2_gate > 0.0f) {
-        float d2 = (y * y) * S_inv;
-        if (d2 > config_.baro_chi2_gate) return;
-    }
 
     float K[N_STATES];
     for (int i = 0; i < N_STATES; i++) {
@@ -892,18 +890,16 @@ void ESKF::updateToF(float distance)
     float height = distance * cos_roll * cos_pitch;
 
     float y = -height - state_.position.z;
+
+    // Innovation gate (absolute threshold)
+    // イノベーションゲート（絶対値閾値）
+    if (config_.tof_innov_gate > 0.0f && std::fabs(y) > config_.tof_innov_gate) return;
+
     float R_val = config_.tof_noise * config_.tof_noise;
 
     float S = P_(2, 2) + R_val;
     if (S < 1e-10f) return;
     float S_inv = 1.0f / S;
-
-    // Chi-squared gate
-    // カイ二乗ゲート
-    if (config_.tof_chi2_gate > 0.0f) {
-        float d2 = (y * y) * S_inv;
-        if (d2 > config_.tof_chi2_gate) return;
-    }
 
     float K[N_STATES];
     for (int i = 0; i < N_STATES; i++) {

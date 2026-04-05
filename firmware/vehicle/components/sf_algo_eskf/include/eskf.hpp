@@ -128,13 +128,17 @@ public:
         // ToF傾き閾値
         float tof_tilt_threshold;
 
-        // Chi-squared gates for outlier rejection (0=disabled)
-        // 外れ値棄却用カイ二乗ゲート (0=無効)
-        // 1 DOF: 3.84=95%, 6.63=99%
+        // Innovation gates for position sensors (absolute, 0=disabled) [m]
+        // 位置センサ用イノベーションゲート（絶対値、0=無効）
+        // P-collapse prevents chi2 gates from working with position sensors
+        // P崩壊によりχ²ゲートは位置センサで機能しないため絶対値ゲートを使用
+        float baro_innov_gate;      // Baro max |innovation| [m]
+        float tof_innov_gate;       // ToF max |innovation| [m]
+
+        // Chi-squared gates for attitude sensors (0=disabled)
+        // 姿勢センサ用カイ二乗ゲート (0=無効)
         // 2 DOF: 5.99=95%, 9.21=99%
         // 3 DOF: 7.81=95%, 11.34=99%
-        float baro_chi2_gate;       // Baro (1 DOF)
-        float tof_chi2_gate;        // ToF (1 DOF)
         float mag_chi2_gate;        // Mag (3 DOF)
         float flow_chi2_gate;       // Flow (2 DOF)
         float accel_att_chi2_gate;  // Accel attitude (3 DOF)
@@ -215,9 +219,11 @@ public:
             cfg.tof_tilt_threshold = 0.70f;
             cfg.accel_motion_threshold = 1.0f;
 
-            // Chi-squared gates (0 = disabled)
-            cfg.baro_chi2_gate = 3.84f;       // 1 DOF, 95%
-            cfg.tof_chi2_gate = 3.84f;        // 1 DOF, 95%
+            // Innovation gates for position sensors [m] (0 = disabled)
+            cfg.baro_innov_gate = 0.5f;       // [m]
+            cfg.tof_innov_gate = 0.5f;        // [m] (normal P99.5 ≈ 10cm)
+
+            // Chi-squared gates for attitude sensors (0 = disabled)
             cfg.mag_chi2_gate = 7.81f;        // 3 DOF, 95%
             cfg.flow_chi2_gate = 5.99f;       // 2 DOF, 95%
             cfg.accel_att_chi2_gate = 7.81f;  // 3 DOF, 95%
