@@ -68,7 +68,7 @@ struct QuadConfig {
 
     // Maximum thrust per motor (N)
     // モータあたりの最大推力
-    float max_thrust_per_motor = 0.15f;
+    float max_thrust_per_motor = 0.168f;  // duty≤0.95 (5% margin for control)
 };
 
 // Note: MotorParams is defined in motor_model.hpp

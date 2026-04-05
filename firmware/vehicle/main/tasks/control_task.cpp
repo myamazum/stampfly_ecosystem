@@ -779,7 +779,7 @@ void ControlTask(void* pvParameters)
 
         // スロットル → 総推力 [N] (4モータ合計)
         // Throttle -> Total thrust [N] (sum of 4 motors)
-        constexpr float MAX_TOTAL_THRUST = 4.0f * 0.15f;  // 4 × max_thrust_per_motor
+        constexpr float MAX_TOTAL_THRUST = 4.0f * 0.168f;  // 4 × max_thrust_per_motor (duty≤0.95)
         float total_thrust;
 
         if ((current_mode == stampfly::FlightMode::ALTITUDE_HOLD ||

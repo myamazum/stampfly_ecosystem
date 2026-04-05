@@ -522,7 +522,7 @@ namespace altitude_control {
 // Vehicle parameters
 inline constexpr float MASS = 0.037f;                    // [kg]
 inline constexpr float GRAVITY = 9.81f;                  // [m/s²]
-inline constexpr float MAX_TOTAL_THRUST = 4.0f * 0.15f;  // 0.60N (4 motors)
+inline constexpr float MAX_TOTAL_THRUST = 4.0f * 0.168f;  // 0.672N (4 motors, duty≤0.95)
 
 // ホバー推力推定のデフォルトパラメータ
 // Default hover thrust estimation parameters

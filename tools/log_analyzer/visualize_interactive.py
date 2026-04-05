@@ -527,7 +527,7 @@ def load_jsonl(filepath: str) -> dict:
         Dm = 3.69e-8
         Qf = 2.76e-5
         Vbat = 3.7
-        max_thrust = 0.15
+        max_thrust = 0.168  # duty≤0.95 (5% margin for control)
         MAX_TOTAL_THRUST = 4 * max_thrust
 
         def thrust_to_duty(thrust):
