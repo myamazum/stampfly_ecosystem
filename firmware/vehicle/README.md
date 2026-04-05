@@ -229,9 +229,9 @@ FreeRTOS のデュアルコア構成を活用しています。
 ```
 app_main()
     │
-    ├─ Phase 1: 機体を地面に置く (白色LED・3秒)
+    ├─ Phase 1: 機体を地面に置く (StampS3: 白色LED・5秒)
     │
-    ├─ Phase 2: センサー初期化 (青色LED)
+    ├─ Phase 2: センサー初期化
     │   ├─ I2C初期化
     │   ├─ アクチュエータ初期化（モーター、LED、ブザー）
     │   ├─ センサー初期化（IMU、Mag、Baro、ToF、OptFlow）
@@ -243,10 +243,10 @@ app_main()
     │
     ├─ タスク開始
     │
-    ├─ Phase 3: センサー安定化待機 (マゼンタ点滅)
+    ├─ Phase 3: センサー安定化待機 (StampS3: マゼンタ点滅)
     │   └─ 全センサーの標準偏差が閾値以下になるまで待機
     │
-    └─ Phase 4: 準備完了 (緑色LED・ビープ音)
+    └─ Phase 4: 準備完了 (BODY: 緑点灯, StampS3: モード色・ビープ音)
         └─ IDLE状態へ遷移
 ```
 
@@ -276,13 +276,22 @@ IDLE ◄────── ARMED
            ERROR
 ```
 
-| 状態 | 説明 | LED色 |
-|------|------|-------|
-| INIT | 初期化中 | 青点滅 |
-| IDLE | 待機中 | 緑点灯 |
-| ARMED | アーム済み（モーター有効） | 橙点灯 |
-| FLYING | 飛行中 | 橙点滅 |
-| ERROR | エラー | 赤点滅 |
+| 状態 | 説明 | BODY LED（上面＋下面） | StampS3 LED |
+|------|------|----------------------|-------------|
+| INIT | 初期化中 | - | 白点灯→マゼンタ点滅 |
+| IDLE | 待機中（ARM可能） | 緑点灯 | モード色 |
+| ARMED | アーム済み（モーター有効） | 緑ゆっくり点滅 | モード色 |
+| FLYING | 飛行中 | 黄点灯 | モード色 |
+| ERROR | エラー | 赤高速点滅 | - |
+
+**StampS3 LED モード色:**
+ACRO=青 / STABILIZE=緑 / ALTITUDE_HOLD=オレンジ / POSITION_HOLD=マゼンタ
+
+**StampS3 LED キャリブレーション表示（DISARM中）:**
+赤ゆっくり点滅=着陸待ち / 黄橙ゆっくり点滅=キャリブ中 / 緑点灯=完了
+
+**BODY LED 警告（重畳）:**
+シアンゆっくり点滅=低電圧 / 赤高速点滅=衝撃検出・センサ異常
 
 ### ARM/DISARM 操作
 
@@ -903,13 +912,22 @@ IDLE ◄────── ARMED
            ERROR
 ```
 
-| State | Description | LED Color |
-|-------|-------------|-----------|
-| INIT | Initializing | Blue blink |
-| IDLE | Standby | Green solid |
-| ARMED | Armed (motors enabled) | Orange solid |
-| FLYING | In flight | Orange blink |
-| ERROR | Error | Red blink |
+| State | Description | BODY LED (top+bottom) | StampS3 LED |
+|-------|-------------|----------------------|-------------|
+| INIT | Initializing | - | White solid → Magenta blink |
+| IDLE | Standby (ARM ready) | Green solid | Mode color |
+| ARMED | Armed (motors enabled) | Green slow blink | Mode color |
+| FLYING | In flight | Yellow solid | Mode color |
+| ERROR | Error | Red fast blink | - |
+
+**StampS3 LED mode colors:**
+ACRO=Blue / STABILIZE=Green / ALTITUDE_HOLD=Orange / POSITION_HOLD=Magenta
+
+**StampS3 LED calibration (disarmed):**
+Red slow blink=waiting for landing / Amber slow blink=calibrating / Green solid=complete
+
+**BODY LED warnings (overlay):**
+Cyan slow blink=low battery / Red fast blink=crash/sensor error
 
 ### ARM/DISARM Operation
 
