@@ -170,6 +170,9 @@ SIGNAL_CATEGORIES = {
         ('actual_duty_RL', 'RL(M3) Actual Duty'),
         ('actual_duty_FL', 'FL(M4) Actual Duty'),
     ],
+    'Thrust Command': [
+        ('total_thrust', 'Total Thrust [N]'),
+    ],
     'Sensors - Height': [
         ('baro_altitude', 'Baro Alt [m]'),
         ('baro_pressure', 'Baro Press [hPa]'),
