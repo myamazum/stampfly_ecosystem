@@ -842,6 +842,7 @@ void ControlTask(void* pvParameters)
 
         // モータ出力設定
         // Set motor outputs
+        state.setMotorDuties(duties);
         g_motor.setMotorDuties(duties);
 
 #else

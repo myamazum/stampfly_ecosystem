@@ -93,10 +93,10 @@ assert struct.calcsize(FMT_BARO) == 12
 FMT_MAG = '<I 3f'
 assert struct.calcsize(FMT_MAG) == 16
 
-# CtrlRefSample: 14 bytes (angle ref + flight mode + total_thrust, 50Hz)
-#   timestamp(I) + flight_mode(B) + reserved(B) + angle_ref(2h) + total_thrust(f)
-FMT_CTRL_REF = '<I 2B 2h f'
-assert struct.calcsize(FMT_CTRL_REF) == 14
+# CtrlRefSample: 30 bytes (angle ref + flight mode + total_thrust + motor_duty, 50Hz)
+#   timestamp(I) + flight_mode(B) + reserved(B) + angle_ref(2h) + total_thrust(f) + motor_duty(4f)
+FMT_CTRL_REF = '<I 2B 2h 5f'
+assert struct.calcsize(FMT_CTRL_REF) == 30
 
 # RateRefFixed: 6 bytes (rate ref, 400Hz, fixed part of unified packet)
 #   rate_ref_roll(h) + rate_ref_pitch(h) + rate_ref_yaw(h)
@@ -116,7 +116,7 @@ SAMPLE_INFO = {
     PKT_BARO:      ('Baro',      FMT_BARO,      12),
     PKT_MAG:       ('Mag',       FMT_MAG,       16),
     PKT_TOF_FRONT: ('ToF_Frt',   FMT_TOF,        9),
-    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  14),
+    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  30),
 }
 
 # CSV column names per packet type
@@ -166,6 +166,7 @@ CSV_COLUMNS = {
         'flight_mode', 'reserved',
         'angle_ref_roll', 'angle_ref_pitch',
         'total_thrust',
+        'motor_duty_FR', 'motor_duty_RR', 'motor_duty_RL', 'motor_duty_FL',
     ],
 }
 
@@ -611,6 +612,7 @@ class UDPTelemetryCapture:
                 'mode': s['flight_mode'],
                 'angle_ref': [s['angle_ref_roll'] / 10000.0, s['angle_ref_pitch'] / 10000.0],
                 'total_thrust': round(s.get('total_thrust', 0.0), 4),
+                'motor_duty': [round(s.get(f'motor_duty_{m}', 0.0), 4) for m in ('FR','RR','RL','FL')],
             },
             PKT_RATE_REF: lambda s: {
                 'id': 'rate_ref',

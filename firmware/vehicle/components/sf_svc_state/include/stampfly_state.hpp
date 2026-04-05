@@ -193,6 +193,15 @@ public:
     void setTotalThrust(float thrust) { total_thrust_ = thrust; }
     float getTotalThrust() const { return total_thrust_; }
 
+    /// Set/get actual motor duties [0-1] (for telemetry)
+    /// 実際のモータDuty [0-1]（テレメトリ用）
+    void setMotorDuties(const float duties[4]) {
+        for (int i = 0; i < 4; i++) motor_duties_[i] = duties[i];
+    }
+    void getMotorDuties(float duties[4]) const {
+        for (int i = 0; i < 4; i++) duties[i] = motor_duties_[i];
+    }
+
 private:
     StampFlyState() = default;
 
@@ -251,6 +260,7 @@ private:
     float ctrl_rate_ref_pitch_ = 0;   // [rad/s]
     float ctrl_rate_ref_yaw_ = 0;     // [rad/s]
     float total_thrust_ = 0;          // [N] actual commanded total thrust
+    float motor_duties_[4] = {};      // [0-1] actual motor duty (FR,RR,RL,FL)
 
     // Debug mode
     bool debug_mode_ = false;

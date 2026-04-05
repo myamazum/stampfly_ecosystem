@@ -164,6 +164,12 @@ SIGNAL_CATEGORIES = {
         ('motor_duty_FL', 'FL(M4) Duty'),
         ('motor_saturated', 'Saturated (any)'),
     ],
+    'Actual Motor Duty': [
+        ('actual_duty_FR', 'FR(M1) Actual Duty'),
+        ('actual_duty_RR', 'RR(M2) Actual Duty'),
+        ('actual_duty_RL', 'RL(M3) Actual Duty'),
+        ('actual_duty_FL', 'FL(M4) Actual Duty'),
+    ],
     'Sensors - Height': [
         ('baro_altitude', 'Baro Alt [m]'),
         ('baro_pressure', 'Baro Press [hPa]'),
@@ -287,6 +293,7 @@ def load_jsonl(filepath: str) -> dict:
             ('angle_ref', ['angle_ref_roll', 'angle_ref_pitch'], True),
             ('mode', ['flight_mode'], False),
             ('total_thrust', ['total_thrust'], False),
+            ('motor_duty', ['actual_duty_FR', 'actual_duty_RR', 'actual_duty_RL', 'actual_duty_FL'], True),
         ],
         'rate_ref': [
             ('rate_ref', ['rate_ref_roll', 'rate_ref_pitch', 'rate_ref_yaw'], True),
