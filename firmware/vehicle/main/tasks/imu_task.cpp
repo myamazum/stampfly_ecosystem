@@ -146,8 +146,9 @@ void IMUTask(void* pvParameters)
                     bool tof_valid = (g_tof_bottom_buf.count() > 0);
                     g_landing_handler.update(is_disarmed, tof_bottom_now, tof_valid, g, a);
 
-                    // Check for calibration complete
-                    if (g_landing_handler.justCalibrated()) {
+                    // Check for calibration complete (only apply if disarmed)
+                    // キャリブレーション完了チェック（DISARM中のみ適用）
+                    if (g_landing_handler.justCalibrated() && is_disarmed) {
                         // Set attitude reference from level calibration
                         // Use accel reference for level (roll=0, pitch=0) but keep
                         // current ESKF gyro bias instead of StationaryDetector's value.
