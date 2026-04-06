@@ -318,6 +318,15 @@ class ESKF:
         self.initialized = False
         self.freeze_accel_bias = True  # Start with frozen accel bias
 
+        # Innovation diagnostics (for NIS evaluation)
+        # イノベーション診断（NIS 評価用）
+        self.diagnostics = {
+            'flow': [],    # list of (timestamp, innovation, S_inv, NIS, dof=2)
+            'tof': [],     # list of (timestamp, innovation, S_inv, NIS, dof=1)
+            'accel_att': [],  # list of (timestamp, innovation, S_inv, NIS, dof=3)
+        }
+        self._diag_timestamp = 0.0  # Updated by caller
+
     def init(self, config: Optional[ESKFConfig] = None) -> None:
         """Initialize the filter
         フィルタを初期化
@@ -529,6 +538,10 @@ class ESKF:
             if d2 > self.config.tof_chi2_gate:
                 return  # Outlier rejection
 
+        # Record innovation diagnostics
+        nis = float(y**2 / S)
+        self.diagnostics['tof'].append((self._diag_timestamp, np.array([y]), np.array([[1.0/S]]), nis, 1))
+
         # Kalman gain
         K = self.P[:, 2] / S
         dx = K * y
@@ -620,6 +633,11 @@ class ESKF:
         # K = PHT @ Si
         K = PHT @ Si
 
+        # Record innovation diagnostics (NIS)
+        # イノベーション診断を記録
+        nis = float(y @ Si @ y)
+        self.diagnostics['flow'].append((self._diag_timestamp, y.copy(), Si.copy(), nis, 2))
+
         # dx = K @ y
         dx = K @ y
         self._inject_error_state(dx)
@@ -678,6 +696,10 @@ class ESKF:
             Si = np.linalg.inv(S)
         except np.linalg.LinAlgError:
             return
+
+        # Record innovation diagnostics
+        nis = float(y @ Si @ y)
+        self.diagnostics['accel_att'].append((self._diag_timestamp, y.copy(), Si.copy(), nis, 3))
 
         # Kalman gain
         K = PHT @ Si
