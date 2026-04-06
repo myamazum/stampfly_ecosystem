@@ -111,6 +111,83 @@ class ESKFConfig:
         }
 
     @classmethod
+    def from_firmware(cls, config_path: Optional[str] = None) -> 'ESKFConfig':
+        """Create config from firmware config.hpp (Single Source of Truth).
+        config.hpp からパラメータを読み込んで ESKFConfig を生成。
+
+        This is the recommended way to create ESKFConfig. It ensures
+        Python-side parameters always match the firmware.
+        """
+        import sys, os
+        # Add tools/ to path for config_parser import
+        tools_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        from common.config_parser import load_config, get_eskf_params
+
+        config = load_config(config_path)
+        eskf = get_eskf_params(config)
+
+        cfg = cls()
+        # Process noise (Q)
+        if 'gyro_noise' in eskf: cfg.gyro_noise = eskf['gyro_noise']
+        if 'accel_noise' in eskf: cfg.accel_noise = eskf['accel_noise']
+        if 'gyro_bias_noise' in eskf: cfg.gyro_bias_noise = eskf['gyro_bias_noise']
+        if 'accel_bias_noise' in eskf: cfg.accel_bias_noise = eskf['accel_bias_noise']
+
+        # Measurement noise (R)
+        if 'baro_noise' in eskf: cfg.baro_noise = eskf['baro_noise']
+        if 'tof_noise' in eskf: cfg.tof_noise = eskf['tof_noise']
+        if 'mag_noise' in eskf: cfg.mag_noise = eskf['mag_noise']
+        if 'flow_noise' in eskf: cfg.flow_noise = eskf['flow_noise']
+        if 'accel_att_noise' in eskf: cfg.accel_att_noise = eskf['accel_att_noise']
+
+        # Initial covariance
+        init = config.get('eskf', {})
+        if 'INIT_POS_STD' in init: cfg.init_pos_std = init['INIT_POS_STD']
+        if 'INIT_VEL_STD' in init: cfg.init_vel_std = init['INIT_VEL_STD']
+        if 'INIT_ATT_STD' in init: cfg.init_att_std = init['INIT_ATT_STD']
+        if 'INIT_GYRO_BIAS_STD' in init: cfg.init_gyro_bias_std = init['INIT_GYRO_BIAS_STD']
+        if 'INIT_ACCEL_BIAS_STD' in init: cfg.init_accel_bias_std = init['INIT_ACCEL_BIAS_STD']
+
+        # Thresholds
+        if 'mahalanobis_threshold' in eskf: cfg.mahalanobis_threshold = eskf['mahalanobis_threshold']
+        if 'tof_tilt_threshold' in eskf: cfg.tof_tilt_threshold = init.get('TOF_TILT_THRESHOLD', cfg.tof_tilt_threshold)
+        if 'accel_motion_threshold' in eskf: cfg.accel_motion_threshold = init.get('ACCEL_MOTION_THRESHOLD', cfg.accel_motion_threshold)
+        if 'flow_min_height' in eskf: cfg.flow_min_height = eskf['flow_min_height']
+        if 'flow_max_height' in eskf: cfg.flow_max_height = eskf['flow_max_height']
+        if 'flow_tilt_cos_threshold' in eskf: cfg.flow_tilt_cos_threshold = eskf['flow_tilt_cos_threshold']
+
+        # Gates
+        if 'flow_chi2_gate' in eskf: cfg.tof_chi2_gate = eskf.get('flow_chi2_gate', cfg.tof_chi2_gate)
+
+        # Optical flow calibration
+        if 'flow_rad_per_pixel' in eskf: cfg.flow_rad_per_pixel = eskf['flow_rad_per_pixel']
+        if 'flow_gyro_scale' in eskf: cfg.flow_gyro_scale = eskf['flow_gyro_scale']
+        if 'flow_cam_to_body_xx' in eskf:
+            cfg.flow_cam_to_body = np.array([
+                [eskf.get('flow_cam_to_body_xx', 0.943), eskf.get('flow_cam_to_body_xy', 0.0)],
+                [eskf.get('flow_cam_to_body_yx', 0.0), eskf.get('flow_cam_to_body_yy', 1.015)]
+            ])
+        if 'flow_offset_x' in eskf:
+            cfg.flow_offset = np.array([eskf.get('flow_offset_x', 0.0), eskf.get('flow_offset_y', 0.0)])
+
+        # Feature flags
+        if 'use_magnetometer' in eskf: cfg.mag_enabled = eskf['use_magnetometer']
+        if 'enable_yaw_estimation' in eskf: cfg.yaw_estimation_enabled = eskf['enable_yaw_estimation']
+
+        # Adaptive
+        if 'K_ADAPTIVE' in init: cfg.k_adaptive = init['K_ADAPTIVE']
+        if 'ATT_CORRECTION_CLAMP' in init: cfg.att_correction_clamp = init['ATT_CORRECTION_CLAMP']
+
+        # Reference values
+        if 'MAG_REF_X' in init:
+            cfg.mag_ref = np.array([init['MAG_REF_X'], init.get('MAG_REF_Y', 0), init.get('MAG_REF_Z', 40)])
+        if 'GRAVITY' in init: cfg.gravity = init['GRAVITY']
+
+        return cfg
+
+    @classmethod
     def from_dict(cls, d: dict) -> 'ESKFConfig':
         """Create config from dictionary"""
         cfg = cls()
