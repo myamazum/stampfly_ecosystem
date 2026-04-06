@@ -240,7 +240,10 @@ void IMUTask(void* pvParameters)
                         // 接地判定: LandingHandler が唯一の管理者
                         // Ground state: LandingHandler is the single source of truth
                         bool is_landed = g_landing_handler.isLanded();
-                        bool skip_position = is_landed && eskf::ENABLE_LANDING_RESET;
+                        bool has_taken_off = g_landing_handler.hasTakenOff();
+                        // Freeze position until takeoff detected (prevent predict-only drift)
+                        // 離陸検出まで位置をフリーズ（predict のみのドリフト防止）
+                        bool skip_position = (is_landed || !has_taken_off) && eskf::ENABLE_LANDING_RESET;
 
                         // IMU予測 + 加速度計姿勢補正（predictIMUが両方を実行）
                         // 接地中はskip_position=trueで位置更新をスキップ（ドリフト防止）
@@ -253,9 +256,9 @@ void IMUTask(void* pvParameters)
                             ESP_LOGI(TAG, "Landed - calibration sequence will start");
                         }
 
-                        // 接地中: 位置・速度を0に保持
-                        // Grounded: hold position/velocity at zero
-                        if (is_landed) {
+                        // 接地中 or 離陸前: 位置・速度を0に保持
+                        // Grounded or pre-takeoff: hold position/velocity at zero
+                        if (is_landed || !has_taken_off) {
                             g_fusion.holdPositionVelocity();
                         }
 
@@ -274,15 +277,15 @@ void IMUTask(void* pvParameters)
                         // 接地中: 位置・速度更新を停止するため呼ばない
                         // 飛行中: 実センサ値を使用
                         static int optflow_takeoff_skip_counter = 0;  // 離陸後のスキップカウンタ
-                        if (is_landed) {
+                        if (!has_taken_off) {
                             optflow_takeoff_skip_counter = 20;  // 離陸後20回（0.2秒@100Hz）スキップ
                         }
 
                         if (g_optflow_data_ready) {
                             g_optflow_data_ready = false;
 
-                            // 接地中は位置・速度更新を停止（センサー更新を呼ばない）
-                            if (!is_landed && g_optflow_task_healthy && g_tof_task_healthy) {
+                            // 離陸前・接地中は位置・速度更新を停止（センサー更新を呼ばない）
+                            if (has_taken_off && !is_landed && g_optflow_task_healthy && g_tof_task_healthy) {
                                 if (optflow_takeoff_skip_counter > 0) {
                                     optflow_takeoff_skip_counter--;
                                     // 共分散リセット直後は過剰補正防止のためスキップ
@@ -318,7 +321,7 @@ void IMUTask(void* pvParameters)
                         // 接地中: 位置更新を停止するため呼ばない
                         // 飛行中: 実センサ値を使用
                         static int tof_takeoff_skip_counter = 0;
-                        if (is_landed) {
+                        if (!has_taken_off) {
                             tof_takeoff_skip_counter = 10;  // 離陸後10回（~0.3秒@30Hz）スキップ
                         }
                         if (g_tof_bottom_data_ready) {
