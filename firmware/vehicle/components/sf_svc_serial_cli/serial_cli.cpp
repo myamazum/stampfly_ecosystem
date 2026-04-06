@@ -191,23 +191,15 @@ int SerialCLI::init()
 
     ESP_LOGI(TAG, "stdin/stdout buffering disabled");
 
-    // Set stdin to blocking mode (remove O_NONBLOCK flag)
-    // stdinをブロッキングモードに設定（O_NONBLOCKフラグを削除）
+    // Keep stdin in non-blocking mode (O_NONBLOCK)
+    // USB CDC on ESP-IDF v5.5 crashes if fcntl switches to blocking
+    // while other tasks are writing to stdout (cdcacm_tx_cb assert).
+    // The CLI read loop already handles non-blocking reads with polling.
+    // stdinはノンブロッキングモードのまま使用する
+    // ESP-IDF v5.5のUSB CDCは他タスクがstdout書き込み中にブロッキングに
+    // 切り替えるとアサーション失敗でクラッシュする
     int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-    ESP_LOGI(TAG, "stdin flags before: 0x%x (O_NONBLOCK=%s)", flags,
-             (flags & O_NONBLOCK) ? "YES" : "NO");
-
-    if (flags & O_NONBLOCK) {
-        flags &= ~O_NONBLOCK;
-        if (fcntl(STDIN_FILENO, F_SETFL, flags) < 0) {
-            ESP_LOGE(TAG, "Failed to set stdin to blocking mode");
-        } else {
-            ESP_LOGI(TAG, "stdin set to blocking mode");
-        }
-    }
-
-    flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-    ESP_LOGI(TAG, "stdin flags after: 0x%x (O_NONBLOCK=%s)", flags,
+    ESP_LOGI(TAG, "stdin flags: 0x%x (O_NONBLOCK=%s)", flags,
              (flags & O_NONBLOCK) ? "YES" : "NO");
 
     // Initialize ESP-IDF console (for command registration)
