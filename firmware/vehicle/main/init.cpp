@@ -394,6 +394,7 @@ esp_err_t estimators()
         eskf_config.tof_innov_gate = config::eskf::TOF_INNOV_GATE;
         eskf_config.mag_chi2_gate = config::eskf::MAG_CHI2_GATE;
         eskf_config.flow_chi2_gate = config::eskf::FLOW_CHI2_GATE;
+        eskf_config.flow_innov_clamp = config::eskf::FLOW_INNOV_CLAMP;
         eskf_config.accel_att_chi2_gate = config::eskf::ACCEL_ATT_CHI2_GATE;
 
         // オプティカルフロー設定

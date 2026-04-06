@@ -143,6 +143,7 @@ public:
         // 3 DOF: 7.81=95%, 11.34=99%
         float mag_chi2_gate;        // Mag (3 DOF)
         float flow_chi2_gate;       // Flow (2 DOF)
+        float flow_innov_clamp;    // Flow innovation clamp [m/s] (0=disabled)
         float accel_att_chi2_gate;  // Accel attitude (3 DOF)
 
         // Accel attitude correction motion threshold [m/s²]
@@ -228,6 +229,7 @@ public:
             // Chi-squared gates for attitude sensors (0 = disabled)
             cfg.mag_chi2_gate = 7.81f;        // 3 DOF, 95%
             cfg.flow_chi2_gate = 5.99f;       // 2 DOF, 95%
+            cfg.flow_innov_clamp = 0.0f;      // disabled by default
             cfg.accel_att_chi2_gate = 7.81f;  // 3 DOF, 95%
             cfg.flow_min_height = 0.02f;
             cfg.flow_max_height = 4.0f;

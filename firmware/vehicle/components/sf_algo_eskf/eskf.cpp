@@ -1096,6 +1096,15 @@ void ESKF::updateFlowRaw(int16_t flow_dx, int16_t flow_dy, float distance,
     // 6. H: H[0][3]=1 (VEL_X), H[1][4]=1 (VEL_Y)
     float y0 = vx_ned - state_.velocity.x;
     float y1 = vy_ned - state_.velocity.y;
+
+    // Innovation clamp: limit velocity correction per update
+    // イノベーションクランプ: 1回の更新での速度修正量を制限
+    // Prevents flow spikes from causing sudden velocity jumps
+    if (config_.flow_innov_clamp > 0.0f) {
+        y0 = std::clamp(y0, -config_.flow_innov_clamp, config_.flow_innov_clamp);
+        y1 = std::clamp(y1, -config_.flow_innov_clamp, config_.flow_innov_clamp);
+    }
+
     float R_val = config_.flow_noise * config_.flow_noise;
 
     float P33 = P_(3, 3), P34 = P_(3, 4), P44 = P_(4, 4);
