@@ -190,7 +190,9 @@ elif selected_tab == "Rate":
 # Simulation
 # =============================================================================
 st.sidebar.markdown("---")
-disturbance = st.sidebar.slider("Disturbance [m]", 0.05, 1.0, 0.3, 0.05)
+st.sidebar.subheader("Simulation")
+disturbance_x = st.sidebar.slider("Disturbance X [m]", -1.0, 1.0, 0.3, 0.05)
+disturbance_y = st.sidebar.slider("Disturbance Y [m]", -1.0, 1.0, 0.15, 0.05)
 sim_duration = st.sidebar.slider("Duration [s]", 2.0, 30.0, 10.0, 1.0)
 
 # Run simulation
@@ -200,7 +202,7 @@ mode = 'position' if selected_tab in ['Position', 'ESKF'] else (
 
 result = sim.run(
     duration=sim_duration,
-    disturbance_pos=np.array([disturbance, 0.0]),
+    disturbance_pos=np.array([disturbance_x, disturbance_y]),
     mode=mode,
 )
 metrics = result.metrics()
@@ -209,40 +211,87 @@ metrics = result.metrics()
 # =============================================================================
 # Main display
 # =============================================================================
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 col1.metric("Pos X max", f"{metrics['pos_x_max']*100:.1f} cm")
-col2.metric("Settle time", f"{metrics['settle_time']:.1f} s")
-col3.metric("Pitch max", f"{metrics['pitch_max_deg']:.1f}°")
-col4.metric("Pos X RMS", f"{metrics['pos_x_rms']*100:.1f} cm")
+col2.metric("Pos Y max", f"{metrics['pos_y_max']*100:.1f} cm")
+col3.metric("Settle time", f"{metrics['settle_time']:.1f} s")
+col4.metric("Roll max", f"{metrics['roll_max_deg']:.1f}°")
+col5.metric("Pitch max", f"{metrics['pitch_max_deg']:.1f}°")
+col6.metric("Pos RMS", f"{np.sqrt(metrics['pos_x_rms']**2 + metrics['pos_y_rms']**2)*100:.1f} cm")
 
-# Plots
-fig = make_subplots(rows=3, cols=1,
-                    subplot_titles=("Position X", "Velocity X", "Pitch Angle"),
+# --- XY Top View ---
+fig_xy = go.Figure()
+fig_xy.add_trace(go.Scatter(
+    x=[p*100 for p in result.pos_x],
+    y=[p*100 for p in result.pos_y],
+    mode='lines', name='Trajectory',
+    line=dict(color='blue', width=1.5),
+))
+fig_xy.add_trace(go.Scatter(
+    x=[result.pos_x[0]*100], y=[result.pos_y[0]*100],
+    mode='markers', name='Start',
+    marker=dict(color='green', size=10, symbol='circle'),
+))
+fig_xy.add_trace(go.Scatter(
+    x=[result.pos_x[-1]*100], y=[result.pos_y[-1]*100],
+    mode='markers', name='End',
+    marker=dict(color='red', size=10, symbol='x'),
+))
+fig_xy.add_trace(go.Scatter(
+    x=[0], y=[0],
+    mode='markers', name='Target',
+    marker=dict(color='gray', size=12, symbol='cross'),
+))
+fig_xy.update_layout(
+    title="XY Position (Top View)",
+    xaxis_title="X (North) [cm]",
+    yaxis_title="Y (East) [cm]",
+    height=400,
+    yaxis=dict(scaleanchor="x", scaleratio=1),
+)
+st.plotly_chart(fig_xy, use_container_width=True)
+
+# --- Time series plots ---
+fig = make_subplots(rows=4, cols=1,
+                    subplot_titles=("Position X/Y", "Velocity X/Y",
+                                    "Roll/Pitch Angle", "Roll/Pitch Ref"),
                     shared_xaxes=True,
-                    vertical_spacing=0.08)
+                    vertical_spacing=0.06)
 
-# Position
+# Position X/Y
 fig.add_trace(go.Scatter(x=result.t, y=[p*100 for p in result.pos_x],
                          name="pos_x [cm]", line=dict(color='blue')), row=1, col=1)
+fig.add_trace(go.Scatter(x=result.t, y=[p*100 for p in result.pos_y],
+                         name="pos_y [cm]", line=dict(color='red')), row=1, col=1)
 fig.add_hline(y=0, line_dash="dash", line_color="gray", row=1, col=1)
 
-# Velocity
+# Velocity X/Y
 fig.add_trace(go.Scatter(x=result.t, y=[v*100 for v in result.vel_x],
-                         name="vel_x [cm/s]", line=dict(color='green')), row=2, col=1)
+                         name="vel_x [cm/s]", line=dict(color='blue', dash='dot')), row=2, col=1)
+fig.add_trace(go.Scatter(x=result.t, y=[v*100 for v in result.vel_y],
+                         name="vel_y [cm/s]", line=dict(color='red', dash='dot')), row=2, col=1)
 fig.add_hline(y=0, line_dash="dash", line_color="gray", row=2, col=1)
 
-# Pitch angle
+# Roll/Pitch angle
+fig.add_trace(go.Scatter(x=result.t, y=[r*180/np.pi for r in result.roll],
+                         name="roll [°]", line=dict(color='blue')), row=3, col=1)
 fig.add_trace(go.Scatter(x=result.t, y=[p*180/np.pi for p in result.pitch],
                          name="pitch [°]", line=dict(color='red')), row=3, col=1)
-fig.add_trace(go.Scatter(x=result.t, y=[p*180/np.pi for p in result.angle_ref_pitch],
-                         name="pitch ref [°]", line=dict(color='orange', dash='dot')), row=3, col=1)
 fig.add_hline(y=0, line_dash="dash", line_color="gray", row=3, col=1)
 
-fig.update_layout(height=700, showlegend=True)
-fig.update_xaxes(title_text="Time [s]", row=3, col=1)
+# Roll/Pitch ref
+fig.add_trace(go.Scatter(x=result.t, y=[r*180/np.pi for r in result.angle_ref_roll],
+                         name="roll ref [°]", line=dict(color='blue', dash='dot')), row=4, col=1)
+fig.add_trace(go.Scatter(x=result.t, y=[p*180/np.pi for p in result.angle_ref_pitch],
+                         name="pitch ref [°]", line=dict(color='red', dash='dot')), row=4, col=1)
+fig.add_hline(y=0, line_dash="dash", line_color="gray", row=4, col=1)
+
+fig.update_layout(height=800, showlegend=True)
+fig.update_xaxes(title_text="Time [s]", row=4, col=1)
 fig.update_yaxes(title_text="[cm]", row=1, col=1)
 fig.update_yaxes(title_text="[cm/s]", row=2, col=1)
 fig.update_yaxes(title_text="[°]", row=3, col=1)
+fig.update_yaxes(title_text="[°]", row=4, col=1)
 
 st.plotly_chart(fig, use_container_width=True)
 
