@@ -114,8 +114,9 @@ char* LineEditor::getLine(const char* prompt)
         int c = io_.read_byte(io_.ctx);
 
         if (c < 0) {
-            // Error or disconnect
-            return nullptr;
+            // No data available (non-blocking) — keep polling
+            // データなし（ノンブロッキング）— ポーリング継続
+            continue;
         }
 
         // Process character
