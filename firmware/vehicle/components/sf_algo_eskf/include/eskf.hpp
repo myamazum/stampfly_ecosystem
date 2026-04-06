@@ -75,8 +75,10 @@ public:
     static constexpr uint16_t MASK_BARO = (1u << POS_Z) | (1u << VEL_Z) | (1u << BA_Z);  // 0x4024
     static constexpr uint16_t MASK_TOF  = (1u << POS_Z) | (1u << VEL_Z) | (1u << BA_Z);  // 0x4024
     static constexpr uint16_t MASK_FLOW = (1u << POS_X) | (1u << POS_Y) |
-                                          (1u << VEL_X) | (1u << VEL_Y) |
-                                          (1u << BA_X)  | (1u << BA_Y);           // 0x301B
+                                          (1u << VEL_X) | (1u << VEL_Y);          // 0x0018|0x0003=0x001B
+    // BA_X/BA_Y removed: PMW3901 resolution (1px=8.6cm/s) is too coarse
+    // to observe accel bias (0.01 m/s²). Bias estimated via accel attitude only.
+    // BA_X/BA_Y除去: PMW3901の分解能ではバイアス推定不可、重力ベクトルのみで推定
 
     // Mask lookup table indexed by SensorGroup
     // SensorGroupでインデックスされるマスクテーブル
