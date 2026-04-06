@@ -204,11 +204,18 @@ void IMUTask(void* pvParameters)
                                 stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::CALIBRATION,
                                 stampfly::LEDPattern::SOLID, 0x00FF00, 3000);
                         } else if (cal_state == stampfly::CalibrationState::NOT_STARTED) {
-                            // LED: red slow blink = waiting for landing
-                            // LED: 赤ゆっくり点滅 = 着陸待ち
-                            led_mgr.requestChannel(
-                                stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::CALIBRATION,
-                                stampfly::LEDPattern::BLINK_SLOW, 0xFF0000);
+                            if (is_disarmed) {
+                                // LED: red slow blink = waiting for landing (disarmed only)
+                                // LED: 赤ゆっくり点滅 = 着陸待ち（disarmed時のみ）
+                                led_mgr.requestChannel(
+                                    stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::CALIBRATION,
+                                    stampfly::LEDPattern::BLINK_SLOW, 0xFF0000);
+                            } else {
+                                // Armed/flying: release calibration LED so mode color shows
+                                // Armed/飛行中: キャリブレーションLEDを解除してモード色を表示
+                                led_mgr.releaseChannel(
+                                    stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::CALIBRATION);
+                            }
                         }
                         last_cal_state = cal_state;
                     }
