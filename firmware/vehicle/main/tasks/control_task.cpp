@@ -602,7 +602,9 @@ void ControlTask(void* pvParameters)
 
                     // Stick → velocity command (body frame)
                     // スティック → 速度指令（body frame）
-                    float vel_cmd_body_x = PositionController::stickToVelocity(pitch_cmd);
+                    // pitch_cmd sign: positive = nose up = backward, so negate for forward velocity
+                    // pitch_cmd符号: 正=機首上げ=後退、速度指令は前進が正なので反転
+                    float vel_cmd_body_x = PositionController::stickToVelocity(-pitch_cmd);
                     float vel_cmd_body_y = PositionController::stickToVelocity(roll_cmd);
 
                     // Position controller update → roll/pitch angle [rad]
