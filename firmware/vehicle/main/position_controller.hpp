@@ -188,12 +188,13 @@ struct PositionController {
 
         // 5. NED -> Body: convert angle correction to body frame
         // NED → Body変換: 角度補正をbody frameに変換
-        // Inverse rotation matrix R(-yaw):
-        //   body_x =  cos_yaw * ned_x + sin_yaw * ned_y
-        //   body_y = -sin_yaw * ned_x + cos_yaw * ned_y
-        // 逆回転行列 R(-yaw) でNED角度補正をbody frameに変換
-        float pitch_body =  cos_yaw * angle_ned_x + sin_yaw * angle_ned_y;
-        float roll_body  = -sin_yaw * angle_ned_x + cos_yaw * angle_ned_y;
+        // In NED: positive pitch = nose up = backward, but we want
+        // positive angle_ned_x (north correction) to pitch nose DOWN (forward).
+        // So negate the pitch output.
+        // NED: pitch正=機首上げ=後退だが、北方向への修正には機首下げ(前進)が必要
+        // → pitch出力を反転
+        float pitch_body = -(cos_yaw * angle_ned_x + sin_yaw * angle_ned_y);
+        float roll_body  =  -sin_yaw * angle_ned_x + cos_yaw * angle_ned_y;
 
         // 6. Safety clamp: limit tilt angle from position controller
         // 安全クランプ: 位置制御からの傾斜角を制限
