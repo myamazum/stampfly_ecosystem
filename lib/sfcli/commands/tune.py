@@ -66,8 +66,24 @@ def run(args) -> int:
     elif args.tune_cmd == "params":
         return _run_params(repo_root)
     else:
-        console.error("Usage: sf tune {gui|auto|eskf|position|params}")
-        return 1
+        # Show help when no subcommand given
+        # サブコマンド未指定時はヘルプを表示
+        print("sf tune - Drone parameter tuning")
+        print()
+        print("Subcommands:")
+        print("  gui        Launch interactive tuning dashboard (Streamlit)")
+        print("  auto       Man-in-the-loop auto-tuning session")
+        print("  eskf       ESKF parameter sweep (log replay)")
+        print("  position   Position PID parameter sweep (simulation)")
+        print("  params     Show current config.hpp parameters")
+        print()
+        print("Examples:")
+        print("  sf tune gui")
+        print("  sf tune auto --phase eskf")
+        print("  sf tune eskf --log logs/latest.jsonl")
+        print("  sf tune position --disturbance 0.3")
+        print("  sf tune params")
+        return 0
 
 
 def _run_gui(repo_root: Path, port: int) -> int:
