@@ -66,7 +66,7 @@ def run(args) -> int:
     elif args.tune_cmd == "params":
         return _run_params(repo_root)
     else:
-        console.print_error("Usage: sf tune {gui|auto|eskf|position|params}")
+        console.error("Usage: sf tune {gui|auto|eskf|position|params}")
         return 1
 
 
@@ -74,11 +74,11 @@ def _run_gui(repo_root: Path, port: int) -> int:
     """Launch Streamlit dashboard."""
     dashboard = repo_root / "tools" / "tuning" / "dashboard.py"
     if not dashboard.exists():
-        console.print_error(f"Dashboard not found: {dashboard}")
+        console.error(f"Dashboard not found: {dashboard}")
         return 1
 
-    console.print_info(f"Launching tuning dashboard on port {port}...")
-    console.print_info(f"Open http://localhost:{port} in browser")
+    console.info(f"Launching tuning dashboard on port {port}...")
+    console.info(f"Open http://localhost:{port} in browser")
 
     try:
         result = subprocess.run(
@@ -89,7 +89,7 @@ def _run_gui(repo_root: Path, port: int) -> int:
         )
         return result.returncode
     except KeyboardInterrupt:
-        console.print_info("Dashboard stopped.")
+        console.info("Dashboard stopped.")
         return 0
 
 
@@ -114,10 +114,10 @@ def _run_eskf_sweep(repo_root: Path, log_path: str, top_n: int) -> int:
     if not log.exists():
         log = repo_root / "logs" / log_path
     if not log.exists():
-        console.print_error(f"Log file not found: {log_path}")
+        console.error(f"Log file not found: {log_path}")
         return 1
 
-    console.print_info(f"ESKF sweep with: {log}")
+    console.info(f"ESKF sweep with: {log}")
     results = sweep_eskf(str(log))
     print_results(results, top_n)
     return 0
@@ -128,7 +128,7 @@ def _run_position_sweep(repo_root: Path, disturbance: float, top_n: int) -> int:
     sys.path.insert(0, str(repo_root / "tools"))
     from tuning.sweep import sweep_position, print_results
 
-    console.print_info(f"Position PID sweep (disturbance={disturbance}m)")
+    console.info(f"Position PID sweep (disturbance={disturbance}m)")
     results = sweep_position(disturbance=disturbance)
     print_results(results, top_n)
     return 0
