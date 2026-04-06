@@ -38,6 +38,8 @@
 | [commands/sf-sim.md](commands/sf-sim.md) | `sf sim` - シミュレータ |
 | [commands/sf-cal.md](commands/sf-cal.md) | `sf cal` - センサキャリブレーション |
 
+| [commands/sf-tune.md](commands/sf-tune.md) | `sf tune` - パラメータチューニング |
+
 ### アーキテクチャ・設計
 
 | ファイル | 説明 |
