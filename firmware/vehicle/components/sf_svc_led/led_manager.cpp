@@ -173,7 +173,7 @@ void LEDManager::onFlightModeChanged(FlightMode mode)
     // SYSTEMチャンネル（StampS3 LED）: フライトモード
     uint32_t color;
     switch (mode) {
-        case FlightMode::STABILIZE:     color = 0x00FF00; break;  // Green
+        case FlightMode::STABILIZE:     color = 0x80FF00; break;  // Yellow-green
         case FlightMode::ALTITUDE_HOLD: color = 0xFF8000; break;  // Orange
         case FlightMode::POSITION_HOLD: color = 0xFF00FF; break;  // Magenta
         case FlightMode::ACRO:

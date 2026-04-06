@@ -198,11 +198,11 @@ void IMUTask(void* pvParameters)
                                 state.setFlightState(stampfly::FlightState::IDLE);
                             }
 
-                            // LED: green solid 3s then release → mode color shows through
-                            // LED: 緑点灯3秒→解除→モード色が表示される
+                            // LED: green fast blink 3s then release → mode color shows through
+                            // LED: 緑速点滅3��→解除→モード色が表示される
                             led_mgr.requestChannel(
                                 stampfly::LEDChannel::SYSTEM, stampfly::LEDPriority::CALIBRATION,
-                                stampfly::LEDPattern::SOLID, 0x00FF00, 3000);
+                                stampfly::LEDPattern::BLINK_FAST, 0x00FF00, 3000);
                         } else if (cal_state == stampfly::CalibrationState::NOT_STARTED) {
                             if (is_disarmed) {
                                 // LED: red slow blink = waiting for landing (disarmed only)
