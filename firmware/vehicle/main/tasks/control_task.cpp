@@ -447,21 +447,22 @@ void ControlTask(void* pvParameters)
                 state.setFlightMode(g_pending_mode);
                 g_attitude_controller.reset();
 
-                // ALTITUDE_HOLD/POSITION_HOLD突入時: 現在高度をキャプチャ
-                // Capture current altitude when entering ALTITUDE_HOLD or POSITION_HOLD
-                if (g_pending_mode == stampfly::FlightMode::ALTITUDE_HOLD ||
-                    g_pending_mode == stampfly::FlightMode::POSITION_HOLD) {
+                // ALTITUDE_HOLD/POSITION_HOLD突入時: FLYING中のみ高度をキャプチャ
+                // Capture altitude ONLY when FLYING (sensor-corrected ESKF state)
+                // During ARMED/DISARMED, altitude capture is deferred to the
+                // sensor warmup handler after ARMED→FLYING transition.
+                if ((g_pending_mode == stampfly::FlightMode::ALTITUDE_HOLD ||
+                     g_pending_mode == stampfly::FlightMode::POSITION_HOLD) &&
+                    flight_state == stampfly::FlightState::FLYING) {
                     auto fused_state = g_fusion.getState();
                     float alt = -fused_state.position.z;  // NED -> altitude (positive up)
                     g_altitude_controller.captureAltitude(alt);
-                    ESP_LOGI(TAG, "ALT capture: alt=%.2fm", alt);
+                    ESP_LOGI(TAG, "ALT capture (mode switch): alt=%.2fm", alt);
 
-                    // POSITION_HOLD突入時: 水平位置もキャプチャ
-                    // Also capture horizontal position when entering POSITION_HOLD
                     if (g_pending_mode == stampfly::FlightMode::POSITION_HOLD) {
                         g_position_controller.capturePosition(
                             fused_state.position.x, fused_state.position.y);
-                        ESP_LOGI(TAG, "POS capture: x=%.2f y=%.2f",
+                        ESP_LOGI(TAG, "POS capture (mode switch): x=%.2f y=%.2f",
                                  fused_state.position.x, fused_state.position.y);
                     }
                 }
@@ -857,8 +858,8 @@ void ControlTask(void* pvParameters)
                 pretakeoff_log_counter = 0;
             }
         } else {
-            // 既存: オープンループスロットル
-            // Existing: open-loop throttle
+            // 既存: オープンループスロットル（STABILIZE/ACRO モード）
+            // Existing: open-loop throttle (STABILIZE/ACRO mode)
             total_thrust = throttle * MAX_TOTAL_THRUST;
         }
 
