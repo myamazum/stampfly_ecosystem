@@ -25,13 +25,12 @@
 
 static const char* TAG = "SerialCLI";
 
-// Boot completion flag (defined in both vehicle and workshop globals)
-// ブート完了フラグ（vehicle/workshop両方のglobalsで定義）
-// Workshop: user setup() completion flag (weak - only defined in workshop)
-// ワークショップ: ユーザー setup() 完了フラグ（weak - workshopのみ定義）
+// Synchronization flags for boot sequence ordering
+// ブートシーケンス同期フラグ
 namespace globals {
-extern volatile bool g_boot_complete;
-extern volatile bool g_setup_complete __attribute__((weak));
+extern volatile bool g_boot_complete;   // app_main init done
+extern volatile bool g_cli_ready;       // CLI banner displayed
+extern volatile bool g_setup_complete __attribute__((weak));  // workshop setup() done
 }
 
 namespace stampfly {
@@ -274,6 +273,19 @@ void SerialCLI::run()
     printf("========================================\n");
     printf("  StampFly Vehicle Firmware\n");
     printf("========================================\n");
+
+    // Signal that CLI banner is displayed - workshop setup() can now run
+    // CLIバナー表示完了を通知 - workshop の setup() が実行可能に
+    globals::g_cli_ready = true;
+
+    // Wait for workshop setup() to finish before showing prompt
+    // workshop の setup() 完了を待ってからプロンプト表示
+    if (&globals::g_setup_complete) {
+        while (!globals::g_setup_complete) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+
     printf("Type 'help' for available commands\n");
     printf("\n");
 
