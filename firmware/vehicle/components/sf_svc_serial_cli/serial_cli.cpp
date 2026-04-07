@@ -25,11 +25,12 @@
 
 static const char* TAG = "SerialCLI";
 
-// Workshop: user setup() completion flag
-// weak symbol - defined in workshop build, absent in vehicle build
-// ワークショップ: ユーザー setup() 完了フラグ
-// weak宣言 - workshopビルドでは定義あり、vehicleビルドでは未定義
+// Boot completion flag (defined in both vehicle and workshop globals)
+// ブート完了フラグ（vehicle/workshop両方のglobalsで定義）
+// Workshop: user setup() completion flag (weak - only defined in workshop)
+// ワークショップ: ユーザー setup() 完了フラグ（weak - workshopのみ定義）
 namespace globals {
+extern volatile bool g_boot_complete;
 extern volatile bool g_setup_complete __attribute__((weak));
 }
 
@@ -234,16 +235,17 @@ void SerialCLI::run()
 
     ESP_LOGI(TAG, "Starting Serial CLI");
 
-    // Wait for setup to complete before showing banner
-    // バナー表示前にセットアップ完了を待つ
-    // Workshop: waits for user setup() to finish (g_setup_complete defined)
-    // Vehicle:  weak symbol resolves to null → 500ms delay で代替
+    // Wait for boot sequence to complete before showing banner
+    // ブートシーケンス完了を待ってからバナーを表示
+    // g_boot_complete: set by app_main after all init is done
+    // g_setup_complete: workshop only - set after user setup() finishes
+    while (!globals::g_boot_complete) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
     if (&globals::g_setup_complete) {
         while (!globals::g_setup_complete) {
             vTaskDelay(pdMS_TO_TICKS(10));
         }
-    } else {
-        vTaskDelay(pdMS_TO_TICKS(500));
     }
 
     // Create LineEditor with stdio I/O callbacks
