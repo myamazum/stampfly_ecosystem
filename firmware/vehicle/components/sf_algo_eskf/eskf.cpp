@@ -517,8 +517,28 @@ void ESKF::predict(const Vector3& accel, const Vector3& gyro, float dt, bool ski
     }
 
     // ---- Sparse P' = F*P*F^T + Q ----
+    //
+    // When skip_position=true (grounded/pre-takeoff):
+    //   Nav blocks (rows/cols 0-5) are NOT propagated.
+    //   State pos/vel is known to be zero (held by holdPositionVelocity),
+    //   so P_nav should remain at reset values — propagating would cause
+    //   unbounded growth without sensor corrections (ToF/Flow are gated).
+    //   Cross-terms nav↔ahrs are also frozen to prevent bias contamination.
+    //
+    // skip_position=true（接地中/離陸前）:
+    //   nav ブロック（行/列 0-5）は伝播しない。
+    //   pos/vel は holdPositionVelocity で 0 に固定されており、
+    //   P_nav はリセット値を維持すべき。伝播するとセンサ補正なしで
+    //   P が発散し、離陸時にバイアスへ誤差が注入される。
 
     float dt2 = dt * dt;
+
+    if (skip_position) {
+        // Nav blocks unchanged: copy P rows/cols 0-5 as-is
+        // then AHRS blocks will be overwritten below
+        // nav ブロック不変: P の行/列 0-5 をそのままコピー
+        temp1_ = P_;
+    } else {
 
     // ---- pos-pos (0-2, 0-2) ----
     for (int i = 0; i < 3; i++) {
@@ -741,6 +761,13 @@ void ESKF::predict(const Vector3& accel, const Vector3& gyro, float dt, bool ski
             temp1_(jj, ii) = val;
         }
     }
+
+    } // end else (!skip_position) — nav blocks propagation
+
+    // ================================================================
+    // AHRS blocks: always propagated regardless of skip_position
+    // AHRS ブロック: skip_position に関係なく常に伝播
+    // ================================================================
 
     // ---- att-att (6-8, 6-8) ----
     for (int i = 0; i < 3; i++) {
