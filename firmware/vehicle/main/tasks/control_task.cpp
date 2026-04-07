@@ -299,26 +299,42 @@ void ControlTask(void* pvParameters)
             ESP_LOGI(TAG, "PID reset on ARM (pre-takeoff)");
         }
 
-        // ARMED→FLYING遷移時: 高度/位置キャプチャ（ESKF リセット直後のクリーンな状態）
-        // ARMED→FLYING transition: capture altitude/position on clean ESKF state
+        // ARMED→FLYING遷移時: PIDリセット + センサウォームアップ開始
+        // ARMED→FLYING transition: reset PID + start sensor warmup
+        // captureAltitude は即座に行わない — ESKF リセット直後は alt=0 で
+        // 実際の物理高度と乖離しているため、ToF/Flow が反映されるまで待つ
+        static int sensor_warmup_counter = 0;
         if (flight_state == stampfly::FlightState::FLYING &&
             prev_flight_state == stampfly::FlightState::ARMED) {
-            g_altitude_controller.reset();
+            g_altitude_controller.reset();   // altitude_captured = false
             g_position_controller.reset();
+            // Wait for sensor corrections before starting PID
+            // ToF skip: 10 samples @ 30Hz = 0.33s + margin → 0.5s = 200 cycles @ 400Hz
+            // センサ補正を待ってからPID開始（ToFスキップ + マージン）
+            sensor_warmup_counter = 200;
+            ESP_LOGI(TAG, "FLYING: sensor warmup started (0.5s)");
+        }
 
-            stampfly::FlightMode fly_mode = state.getFlightMode();
-            if (fly_mode == stampfly::FlightMode::ALTITUDE_HOLD ||
-                fly_mode == stampfly::FlightMode::POSITION_HOLD) {
-                auto fused_state = g_fusion.getState();
-                float alt = -fused_state.position.z;
-                g_altitude_controller.captureAltitude(alt);
-                ESP_LOGI(TAG, "FLYING: altitude PID activated, alt=%.2fm", alt);
+        // Sensor warmup countdown: capture altitude once sensors are active
+        // センサウォームアップ完了: 実際のセンサ補正済み高度でキャプチャ
+        if (sensor_warmup_counter > 0 &&
+            flight_state == stampfly::FlightState::FLYING) {
+            sensor_warmup_counter--;
+            if (sensor_warmup_counter == 0) {
+                stampfly::FlightMode fly_mode = state.getFlightMode();
+                if (fly_mode == stampfly::FlightMode::ALTITUDE_HOLD ||
+                    fly_mode == stampfly::FlightMode::POSITION_HOLD) {
+                    auto fused_state = g_fusion.getState();
+                    float alt = -fused_state.position.z;
+                    g_altitude_controller.captureAltitude(alt);
+                    ESP_LOGI(TAG, "FLYING: altitude PID activated, alt=%.2fm (sensor-corrected)", alt);
 
-                if (fly_mode == stampfly::FlightMode::POSITION_HOLD) {
-                    g_position_controller.capturePosition(
-                        fused_state.position.x, fused_state.position.y);
-                    ESP_LOGI(TAG, "FLYING: position captured x=%.2f y=%.2f",
-                             fused_state.position.x, fused_state.position.y);
+                    if (fly_mode == stampfly::FlightMode::POSITION_HOLD) {
+                        g_position_controller.capturePosition(
+                            fused_state.position.x, fused_state.position.y);
+                        ESP_LOGI(TAG, "FLYING: position captured x=%.2f y=%.2f",
+                                 fused_state.position.x, fused_state.position.y);
+                    }
                 }
             }
         }
@@ -822,18 +838,22 @@ void ControlTask(void* pvParameters)
                          total_thrust, g_altitude_controller.getHoverThrust(), vbat);
                 alt_log_counter = 0;
             }
-        } else if (flight_state == stampfly::FlightState::ARMED &&
-                   (current_mode == stampfly::FlightMode::ALTITUDE_HOLD ||
-                    current_mode == stampfly::FlightMode::POSITION_HOLD)) {
-            // ARMED (pre-takeoff): 一定のホバー推力で自然に浮上（PIDなし）
-            // ARMED (pre-takeoff): constant hover thrust for gentle liftoff (no PID)
+        } else if ((current_mode == stampfly::FlightMode::ALTITUDE_HOLD ||
+                    current_mode == stampfly::FlightMode::POSITION_HOLD) &&
+                   (flight_state == stampfly::FlightState::ARMED ||
+                    (flight_state == stampfly::FlightState::FLYING && !g_altitude_controller.altitude_captured))) {
+            // ARMED (pre-takeoff) or FLYING warmup: ホバー推力のみ（PIDなし）
+            // ARMED (pre-takeoff) or FLYING sensor warmup: hover thrust only (no PID)
+            // During warmup, ESKF altitude is inaccurate (just reset to 0).
+            // Running PID would cause thrust overshoot since setpoint > estimated alt.
             total_thrust = g_altitude_controller.getHoverThrust();
 
             // Debug log every 400 cycles (~1s @ 400Hz)
             static int pretakeoff_log_counter = 0;
             if (++pretakeoff_log_counter >= 400) {
-                ESP_LOGI(TAG, "ARMED pre-takeoff: hover_thrust=%.3fN (waiting for FLYING)",
-                         total_thrust);
+                const char* phase = (flight_state == stampfly::FlightState::ARMED)
+                    ? "ARMED pre-takeoff" : "FLYING warmup";
+                ESP_LOGI(TAG, "%s: hover_thrust=%.3fN", phase, total_thrust);
                 pretakeoff_log_counter = 0;
             }
         } else {
