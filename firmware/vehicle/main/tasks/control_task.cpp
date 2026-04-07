@@ -792,35 +792,77 @@ void ControlTask(void* pvParameters)
         constexpr float MAX_TOTAL_THRUST = 4.0f * 0.168f;  // 4 × max_thrust_per_motor (duty≤0.95)
         float total_thrust;
 
+        // Tracks whether closed-loop altitude PID is running
+        // 閉ループ高度PIDが稼働中かを追跡
+        static bool alt_ctrl_active = false;
+
         if ((current_mode == stampfly::FlightMode::ALTITUDE_HOLD ||
              current_mode == stampfly::FlightMode::POSITION_HOLD) &&
             g_altitude_controller.altitude_captured) {
-            // 高度制御: 閉ループスロットル
-            // Altitude hold: closed-loop throttle
-            auto fused_state = g_fusion.getState();
-            float alt = -fused_state.position.z;       // NED -> altitude (positive up)
-            float vel_z = -fused_state.velocity.z;     // NED -> velocity (positive up)
 
-            uint16_t raw_throttle, raw_r, raw_p, raw_y;
-            state.getRawControlInput(raw_throttle, raw_r, raw_p, raw_y);
-            float climb_cmd = g_altitude_controller.stickToClimbRate(raw_throttle);
+            bool has_taken_off = g_landing_handler.hasTakenOff();
 
-            float vbat = state.getVoltage();
-            total_thrust = g_altitude_controller.update(climb_cmd, alt, vel_z, vbat, dt);
+            if (!has_taken_off) {
+                // Pre-takeoff: constant hover thrust for gentle automatic liftoff
+                // 離陸前: 一定のホバー推力で自然に浮上（PIDを回さない）
+                // Running PID here would cause integral windup because
+                // holdPositionVelocity() freezes altitude at 0 while
+                // setpoint is clamped to MIN_ALTITUDE (0.10m).
+                total_thrust = g_altitude_controller.getHoverThrust();
+                alt_ctrl_active = false;
 
-            // Debug log every 200 cycles (~500ms @ 400Hz)
-            static int alt_log_counter = 0;
-            if (++alt_log_counter >= 200) {
-                ESP_LOGI(TAG, "ALT_HOLD: sp=%.2fm alt=%.2fm vz=%.2fm/s thrust=%.3fN hover=%.3fN vbat=%.2fV",
-                         g_altitude_controller.altitude_setpoint, alt, vel_z,
-                         total_thrust, g_altitude_controller.getHoverThrust(), vbat);
-                alt_log_counter = 0;
+                // Debug log every 400 cycles (~1s @ 400Hz)
+                static int pretakeoff_log_counter = 0;
+                if (++pretakeoff_log_counter >= 400) {
+                    ESP_LOGI(TAG, "ALT_HOLD pre-takeoff: hover_thrust=%.3fN (waiting for ToF > 0.10m)",
+                             total_thrust);
+                    pretakeoff_log_counter = 0;
+                }
+            } else {
+                // Takeoff detected: activate closed-loop altitude control
+                // 離陸検出: 閉ループ高度制御を開始
+
+                if (!alt_ctrl_active) {
+                    // First cycle after takeoff: reset PID (clear any residual state)
+                    // and recapture altitude at current estimate
+                    // 離陸後の初回: PIDリセット（残留状態をクリア）し、
+                    // 現在の推定高度を再キャプチャ
+                    g_altitude_controller.reset();
+                    auto fused_state_capture = g_fusion.getState();
+                    float alt_capture = -fused_state_capture.position.z;
+                    g_altitude_controller.captureAltitude(alt_capture);
+                    alt_ctrl_active = true;
+                    ESP_LOGI(TAG, "ALT controller activated on takeoff: alt=%.2fm", alt_capture);
+                }
+
+                // Normal closed-loop altitude control
+                // 通常の閉ループ高度制御
+                auto fused_state = g_fusion.getState();
+                float alt = -fused_state.position.z;       // NED -> altitude (positive up)
+                float vel_z = -fused_state.velocity.z;     // NED -> velocity (positive up)
+
+                uint16_t raw_throttle, raw_r, raw_p, raw_y;
+                state.getRawControlInput(raw_throttle, raw_r, raw_p, raw_y);
+                float climb_cmd = g_altitude_controller.stickToClimbRate(raw_throttle);
+
+                float vbat = state.getVoltage();
+                total_thrust = g_altitude_controller.update(climb_cmd, alt, vel_z, vbat, dt);
+
+                // Debug log every 200 cycles (~500ms @ 400Hz)
+                static int alt_log_counter = 0;
+                if (++alt_log_counter >= 200) {
+                    ESP_LOGI(TAG, "ALT_HOLD: sp=%.2fm alt=%.2fm vz=%.2fm/s thrust=%.3fN hover=%.3fN vbat=%.2fV",
+                             g_altitude_controller.altitude_setpoint, alt, vel_z,
+                             total_thrust, g_altitude_controller.getHoverThrust(), vbat);
+                    alt_log_counter = 0;
+                }
             }
         } else {
             // 既存: オープンループスロットル
             // Existing: open-loop throttle
             // ホバー推力 0.343N (35g × 9.81) でthrottle=0.5程度を想定
             total_thrust = throttle * MAX_TOTAL_THRUST;
+            alt_ctrl_active = false;
         }
 
         // 制御入力ベクトル: [総推力, ロールトルク, ピッチトルク, ヨートルク]
