@@ -236,15 +236,8 @@ void SerialCLI::run()
 
     // Wait for boot sequence to complete before showing banner
     // ブートシーケンス完了を待ってからバナーを表示
-    // g_boot_complete: set by app_main after all init is done
-    // g_setup_complete: workshop only - set after user setup() finishes
     while (!globals::g_boot_complete) {
         vTaskDelay(pdMS_TO_TICKS(10));
-    }
-    if (&globals::g_setup_complete) {
-        while (!globals::g_setup_complete) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
     }
 
     // Create LineEditor with stdio I/O callbacks
