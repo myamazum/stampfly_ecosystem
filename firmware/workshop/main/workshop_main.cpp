@@ -89,17 +89,10 @@ void onControlPacket(const stampfly::ControlPacket& packet)
 // Attitude initialization helpers (used during boot and ARM)
 void initializeAttitudeFromBuffers()
 {
-    if (g_accel_buffer_count == 0 || g_mag_buffer_count == 0) return;
+    if (g_accel_buf.count() == 0 || g_mag_buf.count() == 0) return;
 
-    stampfly::math::Vector3 accel_sum = stampfly::math::Vector3::zero();
-    int ac = std::min(g_accel_buffer_count, REF_BUFFER_SIZE);
-    for (int i = 0; i < ac; i++) accel_sum += g_accel_buffer[i];
-    stampfly::math::Vector3 accel_avg = accel_sum * (1.0f / ac);
-
-    stampfly::math::Vector3 mag_sum = stampfly::math::Vector3::zero();
-    int mc = std::min(g_mag_buffer_count, REF_BUFFER_SIZE);
-    for (int i = 0; i < mc; i++) mag_sum += g_mag_buffer[i];
-    stampfly::math::Vector3 mag_avg = mag_sum * (1.0f / mc);
+    stampfly::math::Vector3 accel_avg = g_accel_buf.mean();
+    stampfly::math::Vector3 mag_avg = g_mag_buf.mean();
 
     if (g_fusion.isInitialized()) {
         g_fusion.initializeAttitude(accel_avg, mag_avg);
@@ -281,9 +274,9 @@ extern "C" void app_main(void)
     {
         int wait_ms = 0;
         while (wait_ms < 2000) {
-            if (g_accel_buffer_count > 0 && g_gyro_buffer_count > 0 &&
-                g_mag_buffer_count > 0 && g_baro_buffer_count > 0 &&
-                g_tof_bottom_buffer_count > 0 && g_optflow_buffer_count > 0) {
+            if (g_accel_buf.count() > 0 && g_gyro_buf.count() > 0 &&
+                g_mag_buf.count() > 0 && g_baro_buf.count() > 0 &&
+                g_tof_bottom_buf.count() > 0 && g_flow_buf.count() > 0) {
                 break;
             }
             vTaskDelay(pdMS_TO_TICKS(10));

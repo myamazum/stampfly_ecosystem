@@ -235,7 +235,7 @@ void ws::led_color(uint8_t r, uint8_t g, uint8_t b)
         led_mgr.update();
     } else {
         led_mgr.requestChannel(
-            stampfly::LEDChannel::STATUS,
+            stampfly::LEDChannel::SYSTEM,
             stampfly::LEDPriority::DEFAULT,
             stampfly::LEDPattern::SOLID,
             color);

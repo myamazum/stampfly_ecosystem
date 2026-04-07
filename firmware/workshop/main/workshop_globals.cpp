@@ -38,8 +38,6 @@ stampfly::Button g_button;
 // =============================================================================
 
 sf::SensorFusion g_fusion;
-stampfly::AttitudeEstimator g_attitude_est;
-stampfly::AltitudeEstimator g_altitude_est;
 stampfly::LandingHandler g_landing_handler;
 
 // =============================================================================
@@ -64,43 +62,40 @@ float g_baro_reference_altitude = 0.0f;
 bool g_baro_reference_set = false;
 
 // =============================================================================
-// Sensor Reference Buffers
+// Sensor Ring Buffers (matches vehicle/main/globals.cpp)
+// センサーリングバッファ（vehicle/main/globals.cpp と同一）
 // =============================================================================
 
-stampfly::math::Vector3 g_accel_buffer[REF_BUFFER_SIZE];
-int g_accel_buffer_index = 0;
-int g_accel_buffer_count = 0;
+// IMU group (400Hz)
+RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_accel_buf;
+RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_gyro_buf;
+RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_accel_raw_buf;
+RingBuffer<stampfly::math::Vector3, IMU_BUFFER_SIZE> g_gyro_raw_buf;
 
-stampfly::math::Vector3 g_gyro_buffer[REF_BUFFER_SIZE];
-int g_gyro_buffer_index = 0;
-int g_gyro_buffer_count = 0;
+// Sensor last-read timestamps
+volatile uint32_t g_baro_last_timestamp_us = 0;
+volatile uint32_t g_tof_bottom_last_timestamp_us = 0;
+volatile uint32_t g_tof_front_last_timestamp_us = 0;
+volatile uint32_t g_mag_last_timestamp_us = 0;
+volatile uint32_t g_flow_last_timestamp_us = 0;
 
-stampfly::math::Vector3 g_mag_buffer[REF_BUFFER_SIZE];
-int g_mag_buffer_index = 0;
-int g_mag_buffer_count = 0;
+// Independent sensor buffers
+RingBuffer<stampfly::math::Vector3, MAG_BUFFER_SIZE> g_mag_buf;
 bool g_mag_ref_set = false;
 
-float g_baro_buffer[REF_BUFFER_SIZE];
-int g_baro_buffer_index = 0;
-int g_baro_buffer_count = 0;
+RingBuffer<float, BARO_BUFFER_SIZE> g_baro_buf;
 
-float g_tof_bottom_buffer[REF_BUFFER_SIZE];
-int g_tof_bottom_buffer_index = 0;
-int g_tof_bottom_buffer_count = 0;
+RingBuffer<float, TOF_BUFFER_SIZE> g_tof_bottom_buf;
+RingBuffer<float, TOF_BUFFER_SIZE> g_tof_front_buf;
 
-float g_tof_front_buffer[REF_BUFFER_SIZE];
-int g_tof_front_buffer_index = 0;
-int g_tof_front_buffer_count = 0;
-
-OptFlowData g_optflow_buffer[REF_BUFFER_SIZE];
-int g_optflow_buffer_index = 0;
-int g_optflow_buffer_count = 0;
+RingBuffer<OptFlowData, FLOW_BUFFER_SIZE> g_flow_buf;
 
 // =============================================================================
 // Calibration Data
 // =============================================================================
 
 stampfly::math::Vector3 g_initial_gyro_bias = stampfly::math::Vector3::zero();
+stampfly::math::Vector3 g_initial_accel_bias = stampfly::math::Vector3::zero();
 
 // =============================================================================
 // State Flags
