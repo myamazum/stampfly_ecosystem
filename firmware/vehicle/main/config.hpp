@@ -137,7 +137,7 @@ inline constexpr float BARO_NOISE = 0.1f;              // 気圧高度ノイズ 
 inline constexpr float TOF_NOISE = 0.03f;              // ToFノイズ [m] (VL53L3CX sigma ~20-30mm)
 inline constexpr float MAG_NOISE = 1.0f;               // 地磁気ノイズ [uT] 実測std≈0.94
 inline constexpr float FLOW_NOISE = 0.30f;             // オプティカルフローノイズ [m/s] (BW=1.5Hz: AN=0.3との組合せ)
-inline constexpr float ACCEL_ATT_NOISE = 0.06f;        // 加速度計姿勢補正ノイズ [m/s²] (初期値: 0.02)
+inline constexpr float ACCEL_ATT_NOISE = 0.02f;        // 加速度計姿勢補正ノイズ [m/s²] (重力拘束を強化して姿勢ドリフト防止)
 
 // -----------------------------------------------------------------------------
 // 初期共分散 (P行列の初期値)
