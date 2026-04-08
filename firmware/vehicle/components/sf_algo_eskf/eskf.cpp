@@ -185,16 +185,22 @@ void ESKF::recomputeActiveMask()
         mask |= MASK_BARO;  // Re-enable the shared bits
     }
 
-    // BA_X/BA_Y: weakly observable via gravity during attitude changes.
-    // Flow cannot observe them (resolution too coarse), but updateAccelAttitude
-    // provides indirect observation when roll/pitch varies.
-    // Controlled by freeze_accel_bias_ together with BA_Z.
-    // BA_X/BA_Y: 姿勢変動時に重力経由で弱く可観測。
-    // Flow では観測不可（分解能不足）だが、updateAccelAttitude が
-    // ロール/ピッチ変動時に間接的な観測を提供。
-    // BA_Z と共に freeze_accel_bias_ で制御。
+    // BA_X/BA_Y: always frozen during flight.
+    // Theoretically weakly observable via gravity during attitude changes,
+    // but in practice causes destructive feedback: BA drift → attitude drift
+    // → more BA drift → divergence in ~19s. accel_bias_noise=0.0001 is
+    // still too fast for the weak observability.
+    // BA_X/BA_Y estimation is safe ONLY on the ground (setAttitudeReference).
+    // BA_X/BA_Y: 飛行中は常時凍結。
+    // 理論的には姿勢変動時に重力経由で弱く可観測だが、
+    // 実際にはBA→姿勢→BAの正帰還で~19秒で発散する。
+    // 推定は地上キャリブレーション（setAttitudeReference）でのみ安全。
+    mask &= ~((1u << BA_X) | (1u << BA_Y));
+
+    // BA_Z: freeze when requested (grounded), unfreeze when flying (Baro/ToF observe)
+    // BA_Z: 要求時に凍結（接地中）、飛行中は解凍（Baro/ToFが観測）
     if (freeze_accel_bias_) {
-        mask &= ~((1u << BA_X) | (1u << BA_Y) | (1u << BA_Z));
+        mask &= ~(1u << BA_Z);
     }
 
     active_mask_ = mask;

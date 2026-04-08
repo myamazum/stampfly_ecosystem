@@ -76,13 +76,12 @@ public:
     static constexpr uint16_t MASK_TOF  = (1u << POS_Z) | (1u << VEL_Z) | (1u << BA_Z);  // 0x4024
     static constexpr uint16_t MASK_FLOW = (1u << POS_X) | (1u << POS_Y) |
                                           (1u << VEL_X) | (1u << VEL_Y);          // 0x0018|0x0003=0x001B
-    // BA_X/BA_Y: weakly observable via gravity when attitude varies.
-    // Not observable from Flow (resolution too coarse), but updateAccelAttitude
-    // provides indirect observation through changing gravity projection.
-    // All BA states controlled by freeze_accel_bias_ (frozen when grounded).
-    // BA_X/BA_Y: 姿勢変動時に重力経由で弱く可観測。
-    // Flow では観測不可（分解能不足）だが、重力投影の変化で間接観測。
-    // 全 BA 状態は freeze_accel_bias_ で制御（接地中は凍結）。
+    // BA_X/BA_Y: always frozen during flight (set only by ground calibration).
+    // Enabling estimation causes BA→attitude→BA positive feedback → divergence.
+    // BA_Z observable via Baro/ToF, controlled by freeze_accel_bias_ flag.
+    // BA_X/BA_Y: 飛行中は常時凍結（地上キャリブレーションでのみ設定）。
+    // 推定を有効にするとBA→姿勢→BAの正帰還で発散する。
+    // BA_Z は Baro/ToF で観測可能、freeze_accel_bias_ で制御。
 
     // Mask lookup table indexed by SensorGroup
     // SensorGroupでインデックスされるマスクテーブル
