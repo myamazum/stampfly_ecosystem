@@ -373,7 +373,7 @@ static_assert(sizeof(SensorEntryHeader) == 2, "SensorEntryHeader size mismatch")
 
 /// Maximum unified packet size (must fit in UDP MTU)
 /// 統合パケットの最大サイズ（UDP MTU に収まること）
-inline constexpr int UNIFIED_MAX_SIZE = 1024;  // Typical ~970B with CtrlRef v5
+inline constexpr int UNIFIED_MAX_SIZE = 1280;  // ~1060B with P_diag, MTU=1472B safe
 
 /// Unified packet buffer (built dynamically)
 /// 統合パケットバッファ（動的に構築）
