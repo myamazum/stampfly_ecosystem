@@ -103,7 +103,7 @@ FMT_CTRL_REF_V1 = '<I 2B 2h'
 FMT_CTRL_REF_V2 = '<I 2B 2h f'
 FMT_CTRL_REF_V3 = '<I 2B 2h 5f'
 FMT_CTRL_REF_V4 = '<I 2B 2h 7f'
-FMT_CTRL_REF_V5 = '<I 2B 2h 9f'
+FMT_CTRL_REF_V5 = '<I 2B 2h 10f'
 FMT_CTRL_REF = FMT_CTRL_REF_V5  # default for new logs
 assert struct.calcsize(FMT_CTRL_REF_V5) == 50
 
