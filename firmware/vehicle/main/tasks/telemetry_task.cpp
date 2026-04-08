@@ -359,18 +359,16 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         addSensorEntry(PKT_CTRL_REF, &cr, sizeof(cr));
     }
 
-    // ESKF P matrix diagonal (10Hz = every 5th ctrl_ref cycle)
-    // ESKF P行列対角要素（10Hz = ctrl_ref の5回に1回）
-    // Copy diagonal to avoid race with IMU task predict()
-    // IMUタスクの predict() との競合回避のためコピー
+    // ESKF P matrix diagonal — TEMPORARILY DISABLED for crash debugging
+    // ESKF P行列対角要素 — クラッシュ調査のため一時無効化
+#if 0
     {
         static int p_diag_divider = 0;
         if ((cycle & 7) == 0 && ++p_diag_divider >= 5) {
             p_diag_divider = 0;
             EskfPDiagSample ps;
             ps.timestamp_us = imu_ts;
-            const auto& eskf = g_fusion.getESKF();
-            const auto& P = eskf.getCovariance();
+            const auto& P = g_fusion.getESKF().getCovariance();
             for (int i = 0; i < 15; i++) {
                 float val = P(i, i);
                 ps.p_diag[i] = std::isfinite(val) ? val : 0.0f;
@@ -378,6 +376,7 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
             addSensorEntry(PKT_ESKF_PDIAG, &ps, sizeof(ps));
         }
     }
+#endif
 
     // Optical Flow (~100Hz)
     if (uint32_t ts = g_flow_last_timestamp_us; ts != last_flow_ts && ts != 0) {
@@ -500,7 +499,9 @@ void TelemetryTask(void* pvParameters)
 
     // Create send task
     // 送信タスク作成
-    xTaskCreatePinnedToCore(TelemetrySendTask, "TelemSend", 4096,
+    // Stack: SendItem(1282B) + sendto/lwIP internals (~2KB) + FreeRTOS(200B)
+    // スタック: SendItem(1282B) + sendto/lwIP内部(~2KB) + FreeRTOS(200B)
+    xTaskCreatePinnedToCore(TelemetrySendTask, "TelemSend", 6144,
                             nullptr, 12, nullptr, 0);
 
     // Local state (small — only counters and indices)
