@@ -76,9 +76,11 @@ public:
     static constexpr uint16_t MASK_TOF  = (1u << POS_Z) | (1u << VEL_Z) | (1u << BA_Z);  // 0x4024
     static constexpr uint16_t MASK_FLOW = (1u << POS_X) | (1u << POS_Y) |
                                           (1u << VEL_X) | (1u << VEL_Y);          // 0x0018|0x0003=0x001B
-    // BA_X/BA_Y removed: PMW3901 resolution (1px=8.6cm/s) is too coarse
-    // to observe accel bias (0.01 m/s²). Bias estimated via accel attitude only.
-    // BA_X/BA_Y除去: PMW3901の分解能ではバイアス推定不可、重力ベクトルのみで推定
+    // BA_X/BA_Y permanently frozen: no sensor can observe lateral accel bias.
+    // PMW3901 resolution (1px=8.6cm/s) too coarse, accel-attitude only sees gravity.
+    // BA_Z is observable via Baro/ToF, controlled by freeze_accel_bias_ flag.
+    // BA_X/BA_Y 常時凍結: 水平加速度バイアスを観測できるセンサなし。
+    // BA_Z は Baro/ToF で観測可能、freeze_accel_bias_ で制御。
 
     // Mask lookup table indexed by SensorGroup
     // SensorGroupでインデックスされるマスクテーブル

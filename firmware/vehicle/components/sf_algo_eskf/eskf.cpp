@@ -185,10 +185,16 @@ void ESKF::recomputeActiveMask()
         mask |= MASK_BARO;  // Re-enable the shared bits
     }
 
-    // Freeze accel bias when requested
-    // 加速度バイアスフリーズ要求時
+    // BA_X/BA_Y: always frozen — no sensor can observe lateral accel bias
+    // (Flow resolution too coarse, accel-attitude only sees gravity)
+    // BA_X/BA_Y: 常時凍結 — 水平加速度バイアスを観測できるセンサがない
+    // （Flowは分解能不足、重力観測のみでは水平方向は不可）
+    mask &= ~((1u << BA_X) | (1u << BA_Y));
+
+    // BA_Z: freeze when requested (grounded), unfreeze when flying (Baro/ToF observe)
+    // BA_Z: 要求時に凍結（接地中）、飛行中は解凍（Baro/ToFが観測）
     if (freeze_accel_bias_) {
-        mask &= ~((1u << BA_X) | (1u << BA_Y) | (1u << BA_Z));
+        mask &= ~(1u << BA_Z);
     }
 
     active_mask_ = mask;
@@ -391,7 +397,12 @@ void ESKF::setAttitudeReference(const Vector3& level_accel, const Vector3& gyro_
     P_(BG_Y, BG_Y) = init_P_diag_[BG_Y];
     P_(BG_Z, BG_Z) = init_P_diag_[BG_Z];
 
-    freeze_accel_bias_ = false;
+    // Do NOT change freeze_accel_bias_ here.
+    // BA_X/BA_Y are always frozen (no observable sensor).
+    // BA_Z freeze/unfreeze is managed by setFreezeAccelBias() at takeoff/landing.
+    // freeze_accel_bias_ をここで変更しない。
+    // BA_X/BA_Y は常時凍結（観測可能なセンサなし）。
+    // BA_Z の凍結/解凍は takeoff/landing 時に setFreezeAccelBias() で管理。
     recomputeActiveMask();
     enforceCovarianceConstraints();
 
