@@ -353,7 +353,26 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         state.getMotorDuties(cr.motor_duty);
         cr.alt_setpoint = state.getAltSetpoint();
         cr.alt_vel_target = state.getAltVelTarget();
+        cr.climb_rate_cmd = state.getClimbRateCmd();
+        cr.pos_setpoint_x = state.getPosSPx();
+        cr.pos_setpoint_y = state.getPosSPy();
         addSensorEntry(PKT_CTRL_REF, &cr, sizeof(cr));
+    }
+
+    // ESKF P matrix diagonal (10Hz = every 5th ctrl_ref cycle)
+    // ESKF P行列対角要素（10Hz = ctrl_ref の5回に1回）
+    {
+        static int p_diag_divider = 0;
+        if ((cycle & 7) == 0 && ++p_diag_divider >= 5) {
+            p_diag_divider = 0;
+            EskfPDiagSample ps;
+            ps.timestamp_us = imu_ts;
+            const auto& P = g_fusion.getESKF().getCovariance();
+            for (int i = 0; i < 15; i++) {
+                ps.p_diag[i] = P(i, i);
+            }
+            addSensorEntry(PKT_ESKF_PDIAG, &ps, sizeof(ps));
+        }
     }
 
     // Optical Flow (~100Hz)

@@ -51,6 +51,7 @@ PKT_TOF_FRONT  = 0x47
 PKT_BARO      = 0x45
 PKT_MAG       = 0x46
 PKT_CTRL_REF  = 0x48
+PKT_ESKF_PDIAG = 0x49
 PKT_RATE_REF  = 0x99  # virtual ID for 400Hz rate_ref (fixed part of unified packet)
 PKT_STATUS    = 0x4F
 
@@ -102,8 +103,14 @@ FMT_CTRL_REF_V1 = '<I 2B 2h'
 FMT_CTRL_REF_V2 = '<I 2B 2h f'
 FMT_CTRL_REF_V3 = '<I 2B 2h 5f'
 FMT_CTRL_REF_V4 = '<I 2B 2h 7f'
-FMT_CTRL_REF = FMT_CTRL_REF_V4  # default for new logs
-assert struct.calcsize(FMT_CTRL_REF_V4) == 38
+FMT_CTRL_REF_V5 = '<I 2B 2h 9f'
+FMT_CTRL_REF = FMT_CTRL_REF_V5  # default for new logs
+assert struct.calcsize(FMT_CTRL_REF_V5) == 50
+
+# EskfPDiagSample: 64 bytes (10Hz)
+#   timestamp(I) + p_diag(15f) = 64B
+FMT_ESKF_PDIAG = '<I 15f'
+assert struct.calcsize(FMT_ESKF_PDIAG) == 64
 
 # RateRefFixed: 6 bytes (rate ref, 400Hz, fixed part of unified packet)
 #   rate_ref_roll(h) + rate_ref_pitch(h) + rate_ref_yaw(h)
@@ -123,7 +130,8 @@ SAMPLE_INFO = {
     PKT_BARO:      ('Baro',      FMT_BARO,      12),
     PKT_MAG:       ('Mag',       FMT_MAG,       16),
     PKT_TOF_FRONT: ('ToF_Frt',   FMT_TOF,        9),
-    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  38),
+    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  50),
+    PKT_ESKF_PDIAG:('P_diag',   FMT_ESKF_PDIAG, 64),
 }
 
 # CSV column names per packet type
@@ -175,6 +183,15 @@ CSV_COLUMNS = {
         'total_thrust',
         'motor_duty_FR', 'motor_duty_RR', 'motor_duty_RL', 'motor_duty_FL',
         'alt_setpoint', 'alt_vel_target',
+        'climb_rate_cmd', 'pos_setpoint_x', 'pos_setpoint_y',
+    ],
+    PKT_ESKF_PDIAG: [
+        'timestamp_us',
+        'p_pos_x', 'p_pos_y', 'p_pos_z',
+        'p_vel_x', 'p_vel_y', 'p_vel_z',
+        'p_att_x', 'p_att_y', 'p_att_z',
+        'p_bg_x', 'p_bg_y', 'p_bg_z',
+        'p_ba_x', 'p_ba_y', 'p_ba_z',
     ],
 }
 
@@ -264,7 +281,7 @@ def parse_packet(data: bytes) -> list:
                     results.append((sensor_id, sample))
                 elif sensor_id == PKT_CTRL_REF:
                     # Backward compatible: accept v1(10B), v2(14B), v3(30B)
-                    # 後方互換: v1(10B), v2(14B), v3(30B) を受け入れ
+                    # 後方互換: v1(10B), v2(14B), v3(30B), v4(38B) を受け入れ
                     if data_size == 10:
                         cols = CSV_COLUMNS[PKT_CTRL_REF][:5]
                         vals = struct.unpack_from(FMT_CTRL_REF_V1, data, offset)
@@ -276,6 +293,10 @@ def parse_packet(data: bytes) -> list:
                     elif data_size == 30:
                         cols = CSV_COLUMNS[PKT_CTRL_REF][:10]
                         vals = struct.unpack_from(FMT_CTRL_REF_V3, data, offset)
+                        results.append((sensor_id, dict(zip(cols, vals))))
+                    elif data_size == 38:
+                        cols = CSV_COLUMNS[PKT_CTRL_REF][:12]
+                        vals = struct.unpack_from(FMT_CTRL_REF_V4, data, offset)
                         results.append((sensor_id, dict(zip(cols, vals))))
             offset += data_size
 
@@ -638,6 +659,18 @@ class UDPTelemetryCapture:
                 'motor_duty': [round(s.get(f'motor_duty_{m}', 0.0), 4) for m in ('FR','RR','RL','FL')],
                 'alt_sp': round(s.get('alt_setpoint', 0.0), 4),
                 'alt_vel_target': round(s.get('alt_vel_target', 0.0), 4),
+                'climb_cmd': round(s.get('climb_rate_cmd', 0.0), 4),
+                'pos_sp': [round(s.get('pos_setpoint_x', 0.0), 4),
+                           round(s.get('pos_setpoint_y', 0.0), 4)],
+            },
+            PKT_ESKF_PDIAG: lambda s: {
+                'id': 'p_diag',
+                'ts': s['timestamp_us'],
+                'pos': [s['p_pos_x'], s['p_pos_y'], s['p_pos_z']],
+                'vel': [s['p_vel_x'], s['p_vel_y'], s['p_vel_z']],
+                'att': [s['p_att_x'], s['p_att_y'], s['p_att_z']],
+                'bg': [s['p_bg_x'], s['p_bg_y'], s['p_bg_z']],
+                'ba': [s['p_ba_x'], s['p_ba_y'], s['p_ba_z']],
             },
             PKT_RATE_REF: lambda s: {
                 'id': 'rate_ref',

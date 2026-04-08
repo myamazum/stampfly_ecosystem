@@ -73,6 +73,7 @@ struct AltitudeController {
 
     float altitude_setpoint = 0.0f; // Target altitude [m]
     float last_velocity_target = 0.0f; // Last altitude PID output [m/s] (for telemetry)
+    float last_climb_rate_cmd = 0.0f;  // Last stick climb rate command [m/s] (for telemetry)
     bool altitude_captured = false;  // Altitude captured flag
     bool initialized = false;
     bool stick_unlocked_ = false;   // True after stick returns to center deadzone
@@ -176,6 +177,7 @@ struct AltitudeController {
 
         // Update altitude setpoint from stick command
         // スティックコマンドからセットポイントを更新
+        last_climb_rate_cmd = climb_rate_cmd;  // Save for telemetry
         if (climb_rate_cmd != 0.0f) {
             altitude_setpoint += climb_rate_cmd * dt;
             altitude_setpoint = std::clamp(altitude_setpoint, MIN_ALTITUDE, MAX_ALTITUDE);
