@@ -867,6 +867,8 @@ void ControlTask(void* pvParameters)
         // Control input vector: [total_thrust, roll_torque, pitch_torque, yaw_torque]
         float control[4] = {total_thrust, roll_out, pitch_out, yaw_out};
         state.setTotalThrust(total_thrust);
+        state.setAltitudeRef(g_altitude_controller.altitude_setpoint,
+                             g_altitude_controller.last_velocity_target);
 
         // Update battery voltage for thrust→duty conversion (LPF, τ≈5s)
         // バッテリー電圧を更新（LPF適用、時定数約5秒）

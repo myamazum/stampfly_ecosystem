@@ -351,6 +351,8 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
         cr.angle_ref_pitch = static_cast<int16_t>(ap * 10000.0f);
         cr.total_thrust = state.getTotalThrust();
         state.getMotorDuties(cr.motor_duty);
+        cr.alt_setpoint = state.getAltSetpoint();
+        cr.alt_vel_target = state.getAltVelTarget();
         addSensorEntry(PKT_CTRL_REF, &cr, sizeof(cr));
     }
 

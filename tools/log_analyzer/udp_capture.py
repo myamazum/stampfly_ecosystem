@@ -93,15 +93,17 @@ assert struct.calcsize(FMT_BARO) == 12
 FMT_MAG = '<I 3f'
 assert struct.calcsize(FMT_MAG) == 16
 
-# CtrlRefSample: 30 bytes (v3) or 14 bytes (v2) or 10 bytes (v1)
+# CtrlRefSample: 38 bytes (v4) or 30 bytes (v3) or 14 bytes (v2) or 10 bytes (v1)
 # v1: timestamp(I) + flight_mode(B) + reserved(B) + angle_ref(2h) = 10B
 # v2: v1 + total_thrust(f) = 14B
 # v3: v2 + motor_duty(4f) = 30B
+# v4: v3 + alt_setpoint(f) + alt_vel_target(f) = 38B
 FMT_CTRL_REF_V1 = '<I 2B 2h'
 FMT_CTRL_REF_V2 = '<I 2B 2h f'
 FMT_CTRL_REF_V3 = '<I 2B 2h 5f'
-FMT_CTRL_REF = FMT_CTRL_REF_V3  # default for new logs
-assert struct.calcsize(FMT_CTRL_REF_V3) == 30
+FMT_CTRL_REF_V4 = '<I 2B 2h 7f'
+FMT_CTRL_REF = FMT_CTRL_REF_V4  # default for new logs
+assert struct.calcsize(FMT_CTRL_REF_V4) == 38
 
 # RateRefFixed: 6 bytes (rate ref, 400Hz, fixed part of unified packet)
 #   rate_ref_roll(h) + rate_ref_pitch(h) + rate_ref_yaw(h)
@@ -121,7 +123,7 @@ SAMPLE_INFO = {
     PKT_BARO:      ('Baro',      FMT_BARO,      12),
     PKT_MAG:       ('Mag',       FMT_MAG,       16),
     PKT_TOF_FRONT: ('ToF_Frt',   FMT_TOF,        9),
-    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  30),
+    PKT_CTRL_REF:  ('CtrlRef',   FMT_CTRL_REF,  38),
 }
 
 # CSV column names per packet type
@@ -172,6 +174,7 @@ CSV_COLUMNS = {
         'angle_ref_roll', 'angle_ref_pitch',
         'total_thrust',
         'motor_duty_FR', 'motor_duty_RR', 'motor_duty_RL', 'motor_duty_FL',
+        'alt_setpoint', 'alt_vel_target',
     ],
 }
 
@@ -269,6 +272,10 @@ def parse_packet(data: bytes) -> list:
                     elif data_size == 14:
                         cols = CSV_COLUMNS[PKT_CTRL_REF][:6]
                         vals = struct.unpack_from(FMT_CTRL_REF_V2, data, offset)
+                        results.append((sensor_id, dict(zip(cols, vals))))
+                    elif data_size == 30:
+                        cols = CSV_COLUMNS[PKT_CTRL_REF][:10]
+                        vals = struct.unpack_from(FMT_CTRL_REF_V3, data, offset)
                         results.append((sensor_id, dict(zip(cols, vals))))
             offset += data_size
 
@@ -629,6 +636,8 @@ class UDPTelemetryCapture:
                 'angle_ref': [s['angle_ref_roll'] / 10000.0, s['angle_ref_pitch'] / 10000.0],
                 'total_thrust': round(s.get('total_thrust', 0.0), 4),
                 'motor_duty': [round(s.get(f'motor_duty_{m}', 0.0), 4) for m in ('FR','RR','RL','FL')],
+                'alt_sp': round(s.get('alt_setpoint', 0.0), 4),
+                'alt_vel_target': round(s.get('alt_vel_target', 0.0), 4),
             },
             PKT_RATE_REF: lambda s: {
                 'id': 'rate_ref',

@@ -189,9 +189,11 @@ struct CtrlRefSample {
     int16_t  angle_ref_pitch;    // 2B [rad × 10000] outer loop target angle
     float    total_thrust;       // 4B [N] actual commanded thrust (all modes)
     float    motor_duty[4];      // 16B [0-1] actual motor duties (FR,RR,RL,FL)
+    float    alt_setpoint;       // 4B [m] altitude setpoint (positive up)
+    float    alt_vel_target;     // 4B [m/s] altitude PID velocity target (positive up)
 };
 
-static_assert(sizeof(CtrlRefSample) == 30, "CtrlRefSample size mismatch");
+static_assert(sizeof(CtrlRefSample) == 38, "CtrlRefSample size mismatch");
 
 /// Rate reference (400Hz, fixed part of unified packet, no timestamp - shares IMU ts)
 /// レート目標値（400Hz、統合パケット固定部分、タイムスタンプなし - IMU ts と共有）

@@ -193,6 +193,15 @@ public:
     void setTotalThrust(float thrust) { total_thrust_ = thrust; }
     float getTotalThrust() const { return total_thrust_; }
 
+    /// Set/get altitude control targets (for telemetry)
+    /// 高度制御目標値（テレメトリ用）
+    void setAltitudeRef(float setpoint, float vel_target) {
+        alt_setpoint_ = setpoint;
+        alt_vel_target_ = vel_target;
+    }
+    float getAltSetpoint() const { return alt_setpoint_; }
+    float getAltVelTarget() const { return alt_vel_target_; }
+
     /// Set/get actual motor duties [0-1] (for telemetry)
     /// 実際のモータDuty [0-1]（テレメトリ用）
     void setMotorDuties(const float duties[4]) {
@@ -261,6 +270,8 @@ private:
     float ctrl_rate_ref_yaw_ = 0;     // [rad/s]
     float total_thrust_ = 0;          // [N] actual commanded total thrust
     float motor_duties_[4] = {};      // [0-1] actual motor duty (FR,RR,RL,FL)
+    float alt_setpoint_ = 0;          // [m] altitude setpoint (positive up)
+    float alt_vel_target_ = 0;        // [m/s] altitude PID velocity target
 
     // Debug mode
     bool debug_mode_ = false;
