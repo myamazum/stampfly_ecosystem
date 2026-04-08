@@ -361,15 +361,19 @@ static void udpCollectCycle(int read_idx, uint32_t imu_ts,
 
     // ESKF P matrix diagonal (10Hz = every 5th ctrl_ref cycle)
     // ESKF P行列対角要素（10Hz = ctrl_ref の5回に1回）
+    // Copy diagonal to avoid race with IMU task predict()
+    // IMUタスクの predict() との競合回避のためコピー
     {
         static int p_diag_divider = 0;
         if ((cycle & 7) == 0 && ++p_diag_divider >= 5) {
             p_diag_divider = 0;
             EskfPDiagSample ps;
             ps.timestamp_us = imu_ts;
-            const auto& P = g_fusion.getESKF().getCovariance();
+            const auto& eskf = g_fusion.getESKF();
+            const auto& P = eskf.getCovariance();
             for (int i = 0; i < 15; i++) {
-                ps.p_diag[i] = P(i, i);
+                float val = P(i, i);
+                ps.p_diag[i] = std::isfinite(val) ? val : 0.0f;
             }
             addSensorEntry(PKT_ESKF_PDIAG, &ps, sizeof(ps));
         }
