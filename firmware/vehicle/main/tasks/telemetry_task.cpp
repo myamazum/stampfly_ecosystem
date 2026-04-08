@@ -59,7 +59,7 @@ static int s_unified_count = 0;  // 0..7, send when reaches 8
 // 8サイクル中に蓄積されるセンサエントリ（可変部分）
 struct PendingSensor {
     uint8_t id;
-    uint8_t data[32];  // max single sensor sample size (CtrlRefSample=30B)
+    uint8_t data[64];  // max single sensor sample size (EskfPDiagSample=64B)
     uint8_t size;
 };
 static PendingSensor s_pending_sensors[32];  // max entries per unified packet
