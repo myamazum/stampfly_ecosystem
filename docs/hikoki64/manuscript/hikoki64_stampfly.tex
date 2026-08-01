@@ -151,9 +151,8 @@ StampFly は著者が開発に携わった M5Stack 社の市販の開発用機�
 位置制御には，オプティカルフローと測距に
 よる速度推定をオンボードで実現した PX4FLOW\cite{honegger2013}，Bitcraze 社
 Crazyflie 用の Flow Deck\cite{flowdeck}，数十グラム級機体への実装
-\cite{mcguire2017}など多くの先行例があり，国内でも機上実装したオプティカル
-フローによる速度推定の補正と精度検証が報告されている\cite{ohtaki2014}．
-本稿は手法そのものの新規性を主張するものではない．
+\cite{mcguire2017}，国内グループによる飛行制御への適用\cite{kendoul2009}など
+多くの先行例があり，本稿は手法そのものの新規性を主張するものではない．
 
 本稿の主眼は，開発過程で遭遇した「シミュレーションでは安定，実機では発散」
 という乖離の解明と解決の過程にある．実機と同一の制御ソフトウェアを実行する
@@ -339,9 +338,10 @@ SILシミュレーションでは安定に動作した位置制御カスケー�
   H.~Kappen: Efficient Optical Flow and Stereo Vision for Velocity Estimation
   and Obstacle Avoidance on an Autonomous Pocket Drone, IEEE Robotics and
   Automation Letters, Vol.~2, No.~2, pp.~1070--1076, 2017.
-\bibitem{ohtaki2014} 大滝拓郎，岩倉大輔，野波健蔵:
-  オプティカルフローセンサを用いたUAVの飛行制御,
-  ロボティクス・メカトロニクス講演会2014講演概要集, 2A2-C02, 2014.
+\bibitem{kendoul2009} F.~Kendoul, I.~Fantoni and K.~Nonami: Optic Flow-Based
+  Vision System for Autonomous 3D Localization and Control of Small Aerial
+  Vehicles, Robotics and Autonomous Systems, Vol.~57, No.~6--7,
+  pp.~591--602, 2009.
 % 以降は2〜6章の執筆に伴い追加する（10件程度を目安）。
 % \bibitem{ref05}
 % \bibitem{ref06}

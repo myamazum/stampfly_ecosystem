@@ -31,7 +31,14 @@
 | honegger2013 | D. Honegger, L. Meier, P. Tanskanen, M. Pollefeys: An Open Source and Open Hardware Embedded Metric Optical Flow CMOS Camera for Indoor and Outdoor Applications, Proc. IEEE ICRA, 2013 | 実在確認済み（ETH著者ページ）。**ページ番号は IEEE Xplore で要確認** |
 | mcguire2017 | K. McGuire, G. de Croon, C. De Wagter, K. Tuyls, H. Kappen: Efficient Optical Flow and Stereo Vision for Velocity Estimation and Obstacle Avoidance on an Autonomous Pocket Drone, IEEE Robotics and Automation Letters, Vol.2, No.2, pp.1070–1076, 2017. DOI: 10.1109/LRA.2017.2658940 | 実在確認済み |
 | flowdeck | Bitcraze AB: Flow deck v2 (製品Web) | Flow Deck 単体の査読論文は存在しない→製品として引用するのが実態に即す |
-| ohtaki2014 | 大滝拓郎・岩倉大輔・野波健蔵: オプティカルフローセンサを用いたUAVの飛行制御, ロボティクス・メカトロニクス講演会2014講演概要集, 2A2-C02, 2014. DOI: 10.1299/jsmermd.2014._2a2-c02_1 | **全文確認済み(2026-08-01)**。内容=速度推定補正式の導出とVICON検証(誤差0.4→高度改善で0.1 m/s)。**閉ループ飛行制御は未実装(今後の課題と明記)・機体は約2kg級**。引用時は「速度推定の補正と精度検証」としてのみ引く(「飛行制御への適用」と書かない) |
+| kendoul2009 | F. Kendoul, I. Fantoni, K. Nonami: Optic Flow-Based Vision System for Autonomous 3D Localization and Control of Small Aerial Vehicles, Robotics and Autonomous Systems, Vol.57, No.6–7, pp.591–602, 2009. DOI: 10.1016/j.robot.2009.02.001 | **全文確認済み(2026-08-01)**。650gクアッドロータ、光流由来の速度・位置を機上制御器(50Hz)にフィードバックし自動離陸〜自動着陸の完全自律飛行を実証。千葉大・野波研グループ関与(オートパイロットは千葉大で製作と本文に明記、実験地は要注意)。1章[4]「国内グループによる飛行制御への適用」の根拠 |
+| grabe2012 | V. Grabe, H. H. Bülthoff, P. Robuffo Giordano: On-board Velocity Estimation and Closed-loop Control of a Quadrotor UAV based on Optical Flow, Proc. IEEE ICRA, pp.491–497, 2012 | 全文確認済み。閉ループ速度制御実飛行(制御演算は地上局)。速度誤差0.039–0.084 m/s。未引用・4章以降の候補 |
+| herisse2012 | B. Hérissé, T. Hamel, R. Mahony, F.-X. Russotto: Landing a VTOL Unmanned Aerial Vehicle on a Moving Platform Using Optical Flow, IEEE Trans. Robotics, Vol.28, No.1, pp.77–89, 2012 | 全文確認済み。光流PIフィードバックで移動台への自動着陸実飛行。未引用・候補 |
+| bristeau2011 | P.-J. Bristeau, F. Callou, D. Vissière, N. Petit: The Navigation and Control Technology Inside the AR.Drone Micro UAV, Proc. 18th IFAC World Congress, 2011 | **アブスト+二次文献確認のみ(本文未取得)**。市販機の下向きカメラ速度推定が制御ループ内。「市販機・プラットフォーム文書化論文」の前例として1章二本柱化の際の引用候補。**引用前に本文入手を推奨** |
+| zufferey2005 | J.-C. Zufferey, D. Floreano: Toward 30-gram Autonomous Indoor Aircraft: Vision-based Obstacle Avoidance and Altitude Control, Proc. IEEE ICRA, pp.2594–2599, 2005 | アブスト確認のみ。30g・光流閉ループだが**固定翼**。質量最近接の参考 |
+| （取りやめ）ohtaki2014 | 大滝・岩倉・野波: オプティカルフローセンサを用いたUAVの飛行制御, ROBOMECH2014, 2A2-C02. DOI: 10.1299/jsmermd.2014._2a2-c02_1 | 全文確認の結果**閉ループ未実装(速度推定のVICON検証のみ)・機体約2kg級**のため1章引用を取りやめ(2026-08-01)。kendoul2009に差し替え |
+
+**国内文献に関する注意（2026-08-01調査）**: 日本単独グループの「フロー閉ループ+実飛行」査読文献は未発見（熊本大2021系はシミュレーションのみの疑い）。関連研究で国内実証に言及する場合は「国内グループによる」(kendoul2009)の表現に留める。調査時取得のPDF一次資料はセッションのscratchpad配下に保存（grabe2012.pdf等）。
 | — | StampFly を扱った学術文献 | **未発見**（2026-08-01時点）→「著者の知る限り先行学術報告は見当たらない」と書ける |
 
 ## 未検証・保留
