@@ -31,7 +31,7 @@
 | honegger2013 | D. Honegger, L. Meier, P. Tanskanen, M. Pollefeys: An Open Source and Open Hardware Embedded Metric Optical Flow CMOS Camera for Indoor and Outdoor Applications, Proc. IEEE ICRA, 2013 | 実在確認済み（ETH著者ページ）。**ページ番号は IEEE Xplore で要確認** |
 | mcguire2017 | K. McGuire, G. de Croon, C. De Wagter, K. Tuyls, H. Kappen: Efficient Optical Flow and Stereo Vision for Velocity Estimation and Obstacle Avoidance on an Autonomous Pocket Drone, IEEE Robotics and Automation Letters, Vol.2, No.2, pp.1070–1076, 2017. DOI: 10.1109/LRA.2017.2658940 | 実在確認済み |
 | flowdeck | Bitcraze AB: Flow deck v2 (製品Web) | Flow Deck 単体の査読論文は存在しない→製品として引用するのが実態に即す |
-| ohtaki2014 | 大滝拓郎・岩倉大輔・野波健蔵: オプティカルフローセンサを用いたUAVの飛行制御, ロボティクス・メカトロニクス講演会2014講演概要集, 2A2-C02, 2014 | 実在確認済み |
+| ohtaki2014 | 大滝拓郎・岩倉大輔・野波健蔵: オプティカルフローセンサを用いたUAVの飛行制御, ロボティクス・メカトロニクス講演会2014講演概要集, 2A2-C02, 2014. DOI: 10.1299/jsmermd.2014._2a2-c02_1 | **全文確認済み(2026-08-01)**。内容=速度推定補正式の導出とVICON検証(誤差0.4→高度改善で0.1 m/s)。**閉ループ飛行制御は未実装(今後の課題と明記)・機体は約2kg級**。引用時は「速度推定の補正と精度検証」としてのみ引く(「飛行制御への適用」と書かない) |
 | — | StampFly を扱った学術文献 | **未発見**（2026-08-01時点）→「著者の知る限り先行学術報告は見当たらない」と書ける |
 
 ## 未検証・保留
