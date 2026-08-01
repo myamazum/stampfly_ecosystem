@@ -1,0 +1,313 @@
+% !TEX program = lualatex
+%==============================================================================
+% 第64回飛行機シンポジウム（日本航空宇宙学会）講演集原稿テンプレート
+% 題目: StampFlyの位置制御に関する一考察
+%
+% 執筆メモ:
+%   - 章順は 2→3→4→5→6→1→7 の順が書きやすい（docs/hikoki64/MANUSCRIPT_PLAN.md 参照）。
+%     本ファイルの章立てはプログラム提出時の最終順序（1〜7）で並んでいる。
+%   - ビルド: cd docs/hikoki64/manuscript && lualatex hikoki64_stampfly.tex を2回。
+%
+%   体裁チェックリスト（提出前に必ず確認）:
+%     [ ] 余白: 左右 約23mm／上下 約25mm             -> geometry で設定済み
+%     [ ] 題目: 約16pt・中央揃え                       -> \fontsize{16pt}{...}
+%     [ ] 題目の先頭（左端）に講演番号（Times Roman・約16pt、題目との間1文字以上）
+%                                                       -> \LectureNumber マクロ
+%     [ ] 前付（題目〜英文Abstract）は段組なし・中央揃え、本文のみ2段組
+%     [ ] 著者名は題目から2行送り／英文題目は和文著者名から2行送り／
+%         英文キーワードは英文著者名から2行送り／英文Abstractはキーワードから2行送り
+%     [ ] セクション見出し: 明朝体・左揃え             -> \headfont を再定義
+%     [ ] 段落先頭1字下げ（和文はデフォルトで1zw字下げ）
+%     [ ] 図表に番号とタイトル（図=下部／表=上部）、図の軸に変数名、線を太く
+%     [ ] ページ番号なし                               -> \pagestyle{empty}
+%     [ ] 4ページ以上（4〜8ページ目安）
+%     [ ] 講演番号プレースホルダを、プログラム公開後に \LectureNumber の値で確定
+%     [ ] 著者名・所属（和文/英文とも）のプレースホルダを確定稿までに記入
+%==============================================================================
+\documentclass[a4paper,twocolumn,10pt]{ltjsarticle}
+
+% ---- 余白: 左右 約23mm／上下 約25mm -----------------------------------------
+\usepackage[a4paper,left=23mm,right=23mm,top=25mm,bottom=25mm]{geometry}
+
+% ---- 欧文書体: Times Roman（またはこれに準ずる書体） -------------------------
+% newtxtext/newtxmath は luatexja 環境下で英数字のみに適用され、
+% 和文（漢字・かな）は luatexja 既定の和文フォント（原ノ味明朝/ゴシック）が使われる。
+\usepackage{newtxtext}
+\usepackage{newtxmath}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+% ---- 文字サイズ・行間 --------------------------------------------------------
+% 要領: 文字サイズ 約9.5pt（9〜10pt）、行間は文字高の約50%
+% -> 本文フォントを9.5ptに、行送り(baselineskip)を約1.5倍(14.3pt)に設定する
+%    （行送り14.3pt = 文字高9.5pt + 行間4.8pt ≒ 文字高の約50%）
+\renewcommand{\normalsize}{\fontsize{9.5pt}{14.3pt}\selectfont}
+\normalsize
+
+% ---- セクション見出し: 明朝体・左揃え ----------------------------------------
+% ltjsarticle 既定の \headfont はゴシック(\gtfamily\sffamily)。
+% 要領見本（guideline.pdf p.3）に合わせ、非太字の明朝体にする。
+\renewcommand{\headfont}{\normalfont\mcfamily}
+
+% 見出し番号を見本の「1.　はじめに」形式（番号の後にピリオド）にする。
+% 注: この再定義は subsection 等にも効く（「2.1.」形式になる）。本稿は
+% \section のみ使用する想定。
+\makeatletter
+\renewcommand{\@seccntformat}[1]{\csname the#1\endcsname.\hspace{0.75em}}
+\makeatother
+
+% ---- ページ番号は不要 --------------------------------------------------------
+\pagestyle{empty}
+
+% ---- 講演番号（プレースホルダ） ----------------------------------------------
+% プログラム公開後に確定するまでのプレースホルダ。書式: Times Roman・約16pt。
+% 題目との間は1文字以上空ける（下記タイトル組版で \quad を使用）。
+\newcommand{\LectureNumber}{\#\#\#\#}
+
+\begin{document}
+
+%==============================================================================
+% 前付（題目〜英文Abstract）: 段組なし・中央揃え
+% \twocolumn[{...}] で1ページ目冒頭のみ1段組（全幅）にし、本文からは2段組に戻る。
+%==============================================================================
+\twocolumn[{%
+  \begin{center}
+    % ---- 和文題目（講演番号を先頭に、約16pt） --------------------------------
+    {\fontsize{16pt}{20pt}\selectfont \LectureNumber\quad StampFlyの位置制御に関する一考察}
+
+    \vspace{1\baselineskip}
+    % ---- 著者名（題目から2行送り）・所属は著者名の後に括弧書き ----------------
+    % TODO: 実名・所属を確定稿までに記入する
+    {\large 著者名（要記入）　（所属・要記入）}
+
+    \vspace{1\baselineskip}
+    % ---- 英文題目（和文著者名から2行送り） ------------------------------------
+    % 和文題目の仮訳。確定稿では査読・学会指定の英訳表現に置き換える。
+    {\itshape A Study on Position Control of the StampFly Palm-Sized Quadrotor}
+
+    \vspace{0.5\baselineskip}
+    % ---- 英文著者名（英文題目の下） -------------------------------------------
+    % TODO: 所属の英文表記を確定稿までに記入する
+    Kouhei Ito\ （所属・英文要記入）
+
+    \vspace{1\baselineskip}
+    % ---- Key Words（英文著者名から2行送り、3〜5語） ---------------------------
+    % TODO: 本文確定時にキーワードを3〜5語へ調整する（現在5語の仮リスト）
+    Key Words: Quadrotor, Position Control, Optical Flow, System Identification, PID Control
+
+    \vspace{1\baselineskip}
+    % ---- Abstract（キーワードから2行送り、"Abstract" の文字は中央揃え） -------
+    Abstract
+  \end{center}
+
+  \vspace{0.3\baselineskip}
+  \noindent
+  % TODO: 英文Abstractの仮文章（5〜6行）。確定稿までに精査・置き換える。
+  % 骨子: 37g機StampFlyのGPS不使用・屋内位置制御、実機飛行ログからの実効ゲイン欠損の
+  %       定量同定、変動域に対するロバスト再設計、実機検証±6-7cmという計画の要旨を反映。
+  TODO: This paper reports on GPS-denied indoor position control of the 37\,g palm-sized
+  quadrotor StampFly using optical flow and time-of-flight ranging. Although the position
+  control cascade was validated in a software-in-the-loop (SIL) simulation, the real
+  vehicle diverged in flight. We quantitatively identify the effective tilt-to-velocity
+  gain deficit from flight logs and attribute it to reduced torque authority and
+  underestimated optical-flow velocity. Based on the identified gain variation range, we
+  redesign the position control cascade for robustness and verify the result on real
+  hardware, achieving a hold accuracy of approximately $\pm$6--7\,cm. We further close the
+  causal loop by re-injecting the identified gain into the SIL plant model, reproducing
+  the divergence and confirming stability of the redesigned gains. (TODO: 要精査・要短縮)
+
+  \vspace{1\baselineskip}
+}]
+
+%==============================================================================
+% 本文（2段組）
+%==============================================================================
+
+% ------------------------------------------------------------------------------
+\section{はじめに}
+% 内容メモ（0.75p想定）:
+%   - 37g機StampFlyのGPS不使用・屋内位置制御という課題設定。
+%   - 関連研究との差分を明示: Crazyflie Flow Deck、PX4FLOW (Honegger et al., ICRA 2013)、
+%     市販小型機（フロー+ToF位置保持は既存技術であることを認めた上で差分を主張）。
+%   - 本稿の主張: 「実機の実効ゲイン欠損を飛行ログから定量的に同定し、その変動域に
+%     対してロバストな制御系を再設計・実機検証した」過程そのものが新規性。
+%   - 図: 機体写真（StampFly実機、番号+下部タイトル、キャプション例: 図1 StampFly実機）
+%
+% TODO: 本文をここに記述する（仮段落・ダミー本文）。
+本節では、37\,g級の超小型クアッドロータ StampFly を対象に、GPS を使用しない屋内環境
+における位置制御の課題を述べる。オプティカルフローと ToF 測距センサを用いた位置保持
+はすでに Crazyflie の Flow Deck や PX4FLOW など既存研究・製品で実現されているが、
+本稿では実機飛行時に顕在化した実効ゲインの欠損を飛行ログから定量的に同定し、その
+変動域に対してロバストな制御系を再設計・実機検証した過程を報告する。
+
+% \begin{figure}[t]
+%   \centering
+%   \includegraphics[width=0.9\linewidth]{fig_stampfly_photo}
+%   \caption{StampFly実機}
+%   \label{fig:stampfly-photo}
+% \end{figure}
+
+% ------------------------------------------------------------------------------
+\section{機体と制御系構成}
+% 内容メモ（0.75p想定）:
+%   - 諸元表: 質量37g、慣性、センサ一覧（IMU/ToF/オプティカルフロー/気圧 等）。
+%   - 座標系の定義（body/world, NED等）。
+%   - 4段カスケード構造（位置->速度->姿勢->レート）の説明。
+%   - PID形式: C(s) = Kp (1 + 1/(Ti s) + Td s/(eta Td s + 1))  [eta=0.125, D-on-M]
+%   - 加速度->傾き写像: a ≈ g * theta
+%   - 各段の出力リミット、アクチュエータ遅れ ~110ms を明記。
+%   - 図表: 諸元表（表番号+上部タイトル）、カスケードブロック線図（図番号+下部タイトル）
+%
+% TODO: 本文をここに記述する（仮段落・ダミー本文）。
+本節では、StampFly の機体諸元とカスケード型制御系の構成を述べる。制御系は位置・
+速度・姿勢・角速度の4段カスケード構造からなり、各段の PID 制御器は
+$C(s) = K_p\left(1 + \dfrac{1}{T_i s} + \dfrac{T_d s}{\eta T_d s + 1}\right)$
+（$\eta = 0.125$、微分先行型）の形で実装されている。姿勢角から加速度への写像は
+微小角近似により $a \approx g\theta$ で近似する。アクチュエータの応答遅れは
+約110\,msである。
+
+% \begin{table}[t]
+%   \centering
+%   \caption{StampFly諸元}
+%   \label{tab:spec}
+%   \begin{tabular}{ll}
+%     \toprule
+%     項目 & 値 \\
+%     \midrule
+%     質量 & 37\,g \\
+%     IMU & BMI270 (400\,Hz) \\
+%     測距 & ToF (VL53Lx系) \\
+%     \bottomrule
+%   \end{tabular}
+% \end{table}
+
+% ------------------------------------------------------------------------------
+\section{状態推定}
+% 内容メモ（0.75p想定）:
+%   - 15状態ESKF（主線に効く範囲に圧縮して説明。全状態の列挙は避ける）。
+%   - フロー->速度変換パイプライン: ジャイロ回転成分の除去、高度スケーリング、
+%     SQUALによるゲート処理。
+%   - 比力の罠（specific forceとreal accelerationの違い）と運動加速度補償。
+%   - ロバスト化（chi^2ゲート、active_mask、バイアスクランプ）は要点のみ触れる。
+%   - 図表: 観測モデル表、フロー処理ブロック図
+%
+% TODO: 本文をここに記述する（仮段落・ダミー本文）。
+状態推定には15状態の誤差状態カルマンフィルタ（ESKF）を用いる。オプティカルフローの
+生出力は角速度による見かけの流れ成分を含むため、ジャイロ計測値を用いてこの回転成分
+を除去したのち、ToF高度でスケーリングして並進速度に変換する。SQUAL値が閾値を下回る
+サンプルは観測から除外するゲート処理を行う。
+
+% ------------------------------------------------------------------------------
+\section{発散の解析と実効ゲイン同定}
+% 内容メモ（1.25p想定、最重要章）:
+%   - SILでは合格したカスケードが実機で発散した事実（周期9.4s, omega≈0.68rad/s,
+%     成長率sigma≈+0.057/s）。
+%   - 実効「傾き->速度」ゲイン K≈0.4g の同定。内訳=姿勢傾き達成度0.58 x
+%     フロー過小読み0.66（omega≈0.68rad/s近傍での値と明記）。
+%   - 根本原因候補: トルク効き0.4〜0.7倍。
+%   - 不安定化機構: カスケード時間スケール分離の崩壊（内側ループ帯域低下により
+%     外側ループの位相余裕が消失）。修正前後の交差周波数・位相余裕を数値で説明。
+%   - 図: 発散時系列、同定結果、ボード線図/安定余裕マップ（軸に変数名必須）
+%
+% TODO: 本文をここに記述する（仮段落・ダミー本文）。
+SILシミュレーションでは安定に動作した位置制御カスケードが、実機飛行では周期
+約9.4\,s（$\omega \approx 0.68$\,rad/s）、成長率 $\sigma \approx +0.057$/s の
+発散振動を示した。飛行ログから傾き→速度の実効ゲインを同定した結果 $K \approx 0.4g$
+となり、これは姿勢傾きの達成度（約0.58倍）とオプティカルフローの速度過小評価
+（$\omega \approx 0.68$\,rad/s 近傍で約0.66倍）の積で説明できる。この実効ゲイン低下
+により内側ループの実効帯域が低下し、カスケード制御が前提とする時間スケール分離が
+崩れ、外側ループの位相余裕が消失したことが不安定化の機構であると考えられる。
+
+% \begin{figure}[t]
+%   \centering
+%   \includegraphics[width=0.95\linewidth]{fig_divergence_timeseries}
+%   \caption{実機発散時の位置・速度時系列（横軸: 時刻 $t$ [s]、縦軸: 位置 $x$ [m]）}
+%   \label{fig:divergence}
+% \end{figure}
+
+% ------------------------------------------------------------------------------
+\section{再設計と実機検証}
+% 内容メモ（1.0p想定）:
+%   - ロバスト設計点: K in [2.8, 7] m/s^2/rad, tau in [50, 300ms] で安定となる
+%     ゲインを選定。vel.kp 0.8->3.0, pos.kp 1.0->0.4 に変更。
+%   - 性能指標を数式で定義: e(t) = ||p - p_ref|| の std/RMS/max、評価窓、電圧条件。
+%   - 複数フライトの結果を条件付きの表で提示（6/22: ±6-7cm、6/27 3分飛行:
+%     平均13cm/最大24.5cm）。数値の不整合が出ないよう、評価条件を明記して統一する。
+%   - スティック・リポジショニング操作への対応。
+%   - 図表: 修正前後比較時系列、XY軌跡、フライト条件表
+%
+% TODO: 本文をここに記述する（仮段落・ダミー本文）。
+実効ゲインの変動域 $K \in [2.8, 7]$\,m/s$^2$/rad、遅れ $\tau \in [50, 300]$\,ms の
+範囲全体で安定となるよう、速度ループゲインを0.8から3.0へ、位置ループゲインを1.0
+から0.4へ再設計した。位置誤差 $e(t) = \|p(t) - p_\mathrm{ref}\|$ の標準偏差・RMS・
+最大値を評価指標として定義し、複数回の実機飛行で検証した結果、保持精度は
+概ね $\pm$6--7\,cmであった。
+
+% \begin{table}[t]
+%   \centering
+%   \caption{実機飛行によるホバリング精度}
+%   \label{tab:flight-results}
+%   \begin{tabular}{lccc}
+%     \toprule
+%     飛行 & std [cm] & RMS [cm] & max [cm] \\
+%     \midrule
+%     6/22 & -- & -- & -- \\
+%     6/27 (3分) & -- & 13 & 24.5 \\
+%     \bottomrule
+%   \end{tabular}
+% \end{table}
+
+% ------------------------------------------------------------------------------
+\section{考察}
+% 内容メモ（0.5p想定）:
+%   - SILプラントに同定ゲインKを注入し、旧ゲインでの発散再現・新ゲインでの安定を
+%     確認したこと（因果の輪を閉じる）を「Model Identity還流サイクル」の実証として
+%     位置づける。
+%   - 限界: 床面テクスチャ/照度条件（SQUAL中央値160）、機体個体差、
+%     電池サグ（corr(V, 高度std) = -0.78）。
+%   - 高度方向の上下動は「今後の課題」として言及するに留める。高度DOBは実装済み
+%     だが効果に疑問が残り既定オフ——成果として主張しない
+%     （MANUSCRIPT_PLAN §7 方針決定 2026-08-01）。
+%   - 図: SIL再現図、電圧-高度相関図
+%
+% TODO: 本文をここに記述する（仮段落・ダミー本文）。
+同定した実効ゲインをSILプラントモデルに注入したところ、旧ゲインでは実機と同様の
+発散が再現され、再設計後のゲインでは安定が確認された。この結果は、実機同定の結果
+をモデルへ還流させる開発サイクル（Model Identity）の有効性を示すものと位置づける。
+一方で、床面テクスチャや照度条件、機体個体差、電池電圧低下に伴う推力低下、および
+高度方向の上下動の抑制といった要因・課題は未解決であり、今後の課題である。
+
+% ------------------------------------------------------------------------------
+\section{まとめ}
+% 内容メモ（0.5p想定、参考文献10件込み）:
+%   - 本稿の主張の要約: 実効ゲイン欠損の定量同定とロバスト再設計、実機検証、
+%     SILへの還流による因果閉鎖。
+%   - 今後の課題（複数機体での再現性検証、床面条件依存性の定量化 等）。
+%
+% TODO: 本文をここに記述する（仮段落・ダミー本文）。
+本稿では、37\,g級クアッドロータ StampFly の屋内位置制御において実機発散の原因と
+なった実効ゲイン欠損を飛行ログから定量的に同定し、その変動域に対してロバストな
+制御系を再設計・実機検証した。さらに同定結果をSILモデルへ還流させることで因果関係
+を確認した。今後は複数機体・複数環境での再現性検証が課題である。
+
+%==============================================================================
+% 参考文献（スケルトン、10件分。確定稿までに執筆・追記する）
+%==============================================================================
+\begin{thebibliography}{99}
+% \bibitem{ref01} 著者名: 論文題目, 雑誌名, 巻(号), pp.xx-xx, 発行年.
+% \bibitem{ref02} Honegger, D., et al.: An Open Source and Open Hardware
+%   Embedded Metric Optical Flow CMOS Camera for Indoor and Outdoor
+%   Applications, Proc. IEEE ICRA, 2013.
+% \bibitem{ref03}
+% \bibitem{ref04}
+% \bibitem{ref05}
+% \bibitem{ref06}
+% \bibitem{ref07}
+% \bibitem{ref08}
+% \bibitem{ref09}
+% \bibitem{ref10}
+\end{thebibliography}
+
+\end{document}
