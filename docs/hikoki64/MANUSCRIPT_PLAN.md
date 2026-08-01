@@ -50,7 +50,7 @@
 | 3. 状態推定 | 15状態ESKF（主線に効く範囲に**圧縮**）。フロー→速度変換パイプライン（ジャイロ回転成分除去・高度スケーリング・SQUALゲート）、比力の罠と運動加速度補償、ロバスト化（χ²ゲート・active_mask・バイアスクランプ）は要点のみ | 観測モデル表、フロー処理ブロック図 | 0.75p |
 | 4. 発散の解析と実効ゲイン同定 | SIL合格→実機発散（周期9.4s, ω≈0.68rad/s, 成長率σ≈+0.057/s）。実効「傾き→速度」ゲイン同定 K≈0.4g、内訳=姿勢傾き達成度0.58×フロー過小読み0.66（ω≈0.68rad/s近傍での値と明記）、根=トルク効き0.4〜0.7倍。**不安定化機構=カスケード時間スケール分離の崩壊**（内側帯域低下→外側位相余裕消失）を修正前後の交差周波数・位相余裕の数値で説明 | 発散時系列、同定結果、**ボード線図/余裕マップ** | 1.25p |
 | 5. 再設計と実機検証 | ロバスト設計点の選定（K∈[2.8,7] m/s²/rad, τ∈[50,300ms]で安定）、vel.kp 0.8→3.0 / pos.kp 1.0→0.4。**性能指標を数式で定義**（e(t)=‖p−p_ref‖ の std/RMS/max・評価窓・電圧条件）し、**複数フライトを条件付きの表**で提示（6/22: ±6〜7cm・6/27 3分: 平均13cm/最大24.5cm を整合的に）。スティック・リポジショニング | 修正前後比較時系列、XY軌跡、フライト条件表 | 1.0p |
-| 6. 考察 | **SILへの同定K注入による発散再現・新ゲイン安定確認**（因果を閉じる）。「実機同定をモデルへ還流する開発サイクル（Model Identity）の必要性の実証」として枠付け。限界: 床面テクスチャ/照度条件（SQUAL中央値160）、機体個体差、電池サグ（corr(V,高度std)=−0.78） | SIL再現図、電圧-高度相関図 | 0.5p |
+| 6. 考察 | **SILへの同定K注入による発散再現・新ゲイン安定確認**（因果を閉じる）。「実機同定をモデルへ還流する開発サイクル（Model Identity）の必要性の実証」として枠付け。限界: 床面テクスチャ/照度条件（SQUAL中央値160）、機体個体差、電池サグ（corr(V,高度std)=−0.78）、高度方向の上下動（**今後の課題として言及**。加速度DOBは実装済みだが効果に疑問が残り既定オフ——§7の方針決定参照） | SIL再現図、電圧-高度相関図 | 0.5p |
 | 7. まとめ＋参考文献 | 文献10件程度 | — | 0.5p |
 
 ## 4. 批判的レビューで特定した弱点と手当て（2026-07-02 実施済みレビュー）
@@ -83,14 +83,14 @@
 ## 6. 主要な材料（リポジトリ内の情報源）
 
 **中核文書（論文骨格にほぼ流用可能）:**
-- `firmware/vehicle_new/docs/control_theory_overview.md` — 制御系設計の総覧（推定/モデル/カスケード/調整）
-- `firmware/vehicle_new/docs/poshold_journey.md` — POS_HOLD実現の経緯（発散→同定→再設計、数値付き）
-- `firmware/vehicle_new/docs/poshold_accel_compensation.md` / `poshold_wobble_velocity_noise.md` — 補足
+- `firmware/vehicle/docs/control_theory_overview.md` — 制御系設計の総覧（推定/モデル/カスケード/調整）
+- `firmware/vehicle/docs/poshold_journey.md` — POS_HOLD実現の経緯（発散→同定→再設計、数値付き）
+- `firmware/vehicle/docs/poshold_accel_compensation.md` / `poshold_wobble_velocity_noise.md` — 補足
 
 **実装（数値の一次出典）:**
-- `firmware/vehicle_new/components/sf_controller_pid/pid_controller.cpp` — カスケード本体（computePositionHold: 919行付近）
-- `firmware/vehicle_new/components/sf_core/params.cpp` — 全パラメータSSOT（position.pos.kp=0.4, position.vel.kp=3.0, position.stick_vel=0.4 m/s 等）
-- `firmware/vehicle_new/components/sf_estimator_eskf/eskf_core.cpp` — 15状態ESKF・フロー処理
+- `firmware/vehicle/components/sf_controller_pid/pid_controller.cpp` — カスケード本体（computePositionHold: 919行付近）
+- `firmware/vehicle/components/sf_core/params.cpp` — 全パラメータSSOT（position.pos.kp=0.4, position.vel.kp=3.0, position.stick_vel=0.4 m/s 等）
+- `firmware/vehicle/components/sf_estimator_eskf/eskf_core.cpp` — 15状態ESKF・フロー処理
 
 **解析・図の再生成:**
 - `analysis/scripts/poshold_attID.py` — 実効ゲイン同定（ウォブルID）
@@ -101,3 +101,34 @@
 
 **SIL（弱点③の追加実験に使用）:**
 - `simulator/sil/` — 実ファームのホスト実行環境。`pos_reposition.scn` / `pos_auto_takeoff.scn` と合格基準
+
+**準備資料（2026-08-01 追加）:**
+- `docs/hikoki64/prep/firmware_position_control_report.pdf` — ファーム現状報告（19ページ。アーキテクチャ・実装値・開発時系列・文書と実装の食い違い・残作業の事実整理、全出典付き）
+
+## 7. 現状更新（2026-08-01）
+
+### パス読み替え
+2026-07-05 の `vehicle_new → vehicle` 昇格（コミット `32e9e7f9`）に伴い、本計画中の
+`firmware/vehicle_new/...` 参照は `firmware/vehicle/...` に更新済み（本日、全6箇所）。
+ファイルは同名で新パスに実在することを確認済み。
+
+### 方針決定: 高度DOBは成果として扱わない（2026-08-01 著者判断）
+高度方向の加速度DOBは実装済みで単発A/B（2026-07-18, ログ022929）では高度std −67% を
+記録したが、**パイロット体感では効果に疑問が残り**、既定有効化（`ffbdae55`）は同日中に
+差し戻された（`0a3d8a39`、現既定 `altitude.dob.fc=0.0` のオプトイン）。本論文の主線は
+POS_HOLD の水平カスケードであり、高度DOBは**成果として主張せず、6章の限界・今後の
+課題としてのみ言及**する。
+
+### 作業計画（§5）の進捗
+| # | 項目 | 状態（2026-08-01） |
+|---|------|-------------------|
+| 1 | SILへの同定ゲイン注入実験 | 未着手（最優先） |
+| 2 | ボード線図/安定余裕図の論文品質再生成 | 未着手（`design_before_after.png` は6/22の暫定図のみ） |
+| 3 | 性能指標の統一定義＋フライト条件付き比較表 | 未着手 |
+| 4 | LaTeXテンプレート作成 | **着手（2026-08-01）** → `docs/hikoki64/manuscript/hikoki64_stampfly.tex` |
+| 5 | 本文執筆 | 未着手 |
+| 6 | （任意）eskf_replay 補償ON/OFF比較 | 未着手・実施しない場合は設計記述に留める |
+| 7 | 図の全数チェック | 未着手（執筆後） |
+
+### スケジュール
+完成目標は**締切前日 2026-08-06**（著者指示、2026-08-01）。
