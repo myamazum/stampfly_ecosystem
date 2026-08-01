@@ -23,6 +23,10 @@
 %     [ ] 4ページ以上（4〜8ページ目安）
 %     [ ] 講演番号プレースホルダを、プログラム公開後に \LectureNumber の値で確定
 %     [ ] 著者名・所属（和文/英文とも）のプレースホルダを確定稿までに記入
+%     [ ] 句読点は全角「，．」で統一（1章はこの方針で執筆済み。2章以降の
+%         ダミー本文「、。」は執筆時に置換。見本PDFの句読点と最終照合）
+%     [ ] 専門用語は docs/hikoki64/terminology.md の検証済みリストに従う。
+%         新出用語は使用前に J-STAGE 等で慣用を検証してリストに追記
 %==============================================================================
 \documentclass[a4paper,twocolumn,10pt]{ltjsarticle}
 
@@ -128,19 +132,42 @@
 % ------------------------------------------------------------------------------
 \section{はじめに}
 % 内容メモ（0.75p想定）:
-%   - 37g機StampFlyのGPS不使用・屋内位置制御という課題設定。
-%   - 関連研究との差分を明示: Crazyflie Flow Deck、PX4FLOW (Honegger et al., ICRA 2013)、
-%     市販小型機（フロー+ToF位置保持は既存技術であることを認めた上で差分を主張）。
-%   - 本稿の主張: 「実機の実効ゲイン欠損を飛行ログから定量的に同定し、その変動域に
-%     対してロバストな制御系を再設計・実機検証した」過程そのものが新規性。
-%   - 図: 機体写真（StampFly実機、番号+下部タイトル、キャプション例: 図1 StampFly実機）
+%   - 用語は docs/hikoki64/terminology.md（慣用検証済みリスト）に従う。
+%     本章での方針: 「非GPS環境」（○）／「実効ゲイン」は1章では説明的表現に留め
+%     4章で初出定義／「飛行データ」（「飛行ログ」は使わない）／SILS表記。
+%   - 図: 機体写真（StampFly実機、図1・下部タイトル）→ 写真決定後に挿入。
 %
-% TODO: 本文をここに記述する（仮段落・ダミー本文）。
-本節では、37\,g級の超小型クアッドロータ StampFly を対象に、GPS を使用しない屋内環境
-における位置制御の課題を述べる。オプティカルフローと ToF 測距センサを用いた位置保持
-はすでに Crazyflie の Flow Deck や PX4FLOW など既存研究・製品で実現されているが、
-本稿では実機飛行時に顕在化した実効ゲインの欠損を飛行ログから定量的に同定し、その
-変動域に対してロバストな制御系を再設計・実機検証した過程を報告する。
+本稿は，質量37\,gの超小型クアッドロータ（quadrotor）StampFly を対象とした，
+屋内における位置制御の開発過程を報告するものである．無人航空機（ドローン）の
+応用が屋内の点検・物流や教育・研究へと広がるにつれ，GPS等の衛星測位が利用でき
+ない非GPS環境における位置の推定と制御の重要性が増している．とりわけ質量数十
+グラム級の機体は，人や設備への危害の危険性が小さく屋内での反復実験が容易である
+ことから，制御工学の教育・研究用プラットフォームとして有用である．
+
+StampFly は M5Stack 社が市販する開発用の機体であり，本研究では下方視の
+オプティカルフローセンサと ToF（Time of Flight）測距センサを用いて位置制御を
+構成した．この種のセンサ構成による位置制御には，オプティカルフローと測距に
+よる速度推定をオンボードで実現した PX4FLOW\cite{honegger2013}，Bitcraze 社
+Crazyflie 用の Flow Deck\cite{flowdeck}，数十グラム級機体への実装
+\cite{mcguire2017}，国内での飛行制御への適用\cite{ohtaki2014}など多くの先行例
+があり，本稿は手法そのものの新規性を主張するものではない．
+
+本稿の主眼は，開発過程で遭遇した「シミュレーションでは安定，実機では発散」
+という乖離の解明と解決の過程にある．実機と同一の制御ソフトウェアを実行する
+SILS（Software In the Loop Simulation）で安定を確認した位置制御系が，実機では
+周期約9.4\,sの発散振動を生じた．そこで飛行データから，傾き指令に対して実際に
+得られる速度応答のゲインを同定した結果，理想値の約4割まで低下しており，その
+内訳が姿勢応答の未達とオプティカルフローによる速度の過小評価との積で説明できる
+ことを明らかにした．さらに，同定値を1点の校正値として扱うのではなく，機体の
+個体差や環境条件による変動域を仮定してロバストに安定となるよう制御系を再設計し，
+実機でホバリング時の位置誤差 $\pm 6$〜$7$\,cm を確認した．最後に，同定した
+ゲインをシミュレーションのモデルへ反映することで実機の発散が再現されること，
+および再設計後の制御系が安定であることを確認し，実機で同定した特性をモデルへ
+反映する開発サイクルの有効性を示す．なお，StampFly を対象とした学術報告は
+著者の知る限り見当たらない．
+
+以下，2章で機体と制御系の構成，3章で状態推定，4章で発散の解析とゲインの同定，
+5章で制御系の再設計と実機検証，6章で考察を述べ，7章でまとめる．
 
 % \begin{figure}[t]
 %   \centering
@@ -295,13 +322,24 @@ SILシミュレーションでは安定に動作した位置制御カスケー�
 %==============================================================================
 % 参考文献（スケルトン、10件分。確定稿までに執筆・追記する）
 %==============================================================================
+% 書誌は docs/hikoki64/terminology.md の「参考文献（実在確認済み）」に基づく。
 \begin{thebibliography}{99}
-% \bibitem{ref01} 著者名: 論文題目, 雑誌名, 巻(号), pp.xx-xx, 発行年.
-% \bibitem{ref02} Honegger, D., et al.: An Open Source and Open Hardware
-%   Embedded Metric Optical Flow CMOS Camera for Indoor and Outdoor
-%   Applications, Proc. IEEE ICRA, 2013.
-% \bibitem{ref03}
-% \bibitem{ref04}
+\bibitem{honegger2013} D.~Honegger, L.~Meier, P.~Tanskanen and M.~Pollefeys:
+  An Open Source and Open Hardware Embedded Metric Optical Flow CMOS Camera
+  for Indoor and Outdoor Applications, Proc. IEEE Int. Conf. on Robotics and
+  Automation (ICRA), 2013.
+  % TODO: ページ番号を IEEE Xplore で確認して追記
+\bibitem{flowdeck} Bitcraze AB: Flow deck v2,
+  \texttt{https://www.bitcraze.io/products/flow-deck-v2/}（参照 2026-08-01）.
+  % TODO: URL引用の書式（参照日等）を講演集の慣例に合わせて最終確認
+\bibitem{mcguire2017} K.~McGuire, G.~de~Croon, C.~De~Wagter, K.~Tuyls and
+  H.~Kappen: Efficient Optical Flow and Stereo Vision for Velocity Estimation
+  and Obstacle Avoidance on an Autonomous Pocket Drone, IEEE Robotics and
+  Automation Letters, Vol.~2, No.~2, pp.~1070--1076, 2017.
+\bibitem{ohtaki2014} 大滝拓郎，岩倉大輔，野波健蔵:
+  オプティカルフローセンサを用いたUAVの飛行制御,
+  ロボティクス・メカトロニクス講演会2014講演概要集, 2A2-C02, 2014.
+% 以降は2〜6章の執筆に伴い追加する（10件程度を目安）。
 % \bibitem{ref05}
 % \bibitem{ref06}
 % \bibitem{ref07}
