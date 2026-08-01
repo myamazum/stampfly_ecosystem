@@ -1,0 +1,802 @@
+\documentclass[a4paper,10pt]{ltjsarticle}
+
+\usepackage{geometry}
+\geometry{margin=22mm}
+\usepackage{newtxtext,newtxmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\usepackage{amsmath}
+
+\sloppy
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\title{\Large StampFly ファームウェアの現状報告\\[2mm]
+\normalsize --- アーキテクチャ・開発経緯・工夫点 ---\\[4mm]
+\large 第64回飛行機シンポジウム原稿準備資料（内部報告）}
+\author{Kouhei Ito}
+\date{2026年8月1日}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+
+% ============================================================
+\section{本報告の目的と位置づけ}
+% ============================================================
+
+本報告は、第64回飛行機シンポジウム講演「StampFlyの位置制御に関する一考察」（締切2026-08-07）の原稿方針を決めるための、事実整理を目的とした内部資料である。論文そのものではない。
+
+原稿の構成計画は2026-07-02に承認され、\texttt{docs/hikoki64/MANUSCRIPT\_PLAN.md} として記録済みである（コミット \texttt{2180f0dc}）。本報告作成時点（2026-08-01）で締切まで6日である。
+
+本報告の出典は以下の4件の調査資料に限定する。いずれもリポジトリ \texttt{stampfly\_ecosystem} 現物（ソースコード・設計文書・git履歴・解析レポート）を出典としたサブエージェント調査の原文、および主担当による直接検証の追補である。
+
+\begin{itemize}[leftmargin=*]
+  \item facts\_architecture.md --- ファームウェア全体アーキテクチャ
+  \item facts\_implementation.md --- POS\_HOLD/状態推定の実装詳細
+  \item facts\_history.md --- 開発経緯（git履歴）と原稿準備状況
+  \item facts\_verification\_addendum.md --- 高度DOB既定値の食い違いに関する直接検証
+\end{itemize}
+
+方針として、材料にない事実は創作しない。数値・日付・ファイルパスは材料の記載をそのまま転記する。材料が「未確認」とする項目は本報告でも「未確認」と明記する。文書・実装・記録の間の食い違いを発見した場合も隠さず記録する（第8章）。誇張・宣伝的な表現は用いず、淡々とした技術報告として記述する。
+
+% ============================================================
+\section{機体とファームウェアの全体像}
+% ============================================================
+
+\subsection{ハードウェア諸元}
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lYl@{}}
+\toprule
+項目 & 値 & 出典 \\
+\midrule
+MCU & ESP32-S3（レイヤード構成図の最下層に明記） & \texttt{firmware/vehicle/docs/architecture.md:36, 645} \\
+機体質量 & 0.037\,kg（\texttt{kMassG = 0.037f * 9.80665f} [N]、コメントに「機体質量」と明記） & \texttt{firmware/vehicle/components/sf\_controller\_pid/include/pid\_controller.hpp:407, 468--470} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+指定4文書（requirements.md / architecture.md / hardware\_init.md / coding\_and\_education.md）には機体質量の数値記載はない。上表の質量値はコンポーネントのソースコード（\texttt{sf\_controller\_pid}）から確認した値であり、設計文書には未記載である（第8章で再掲）。
+
+\paragraph{センサ一覧}（\texttt{requirements.md} §5「搭載センサ」表、\texttt{requirements.md:135-147}）
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lllY@{}}
+\toprule
+センサ & 型番 & 通信/レート & 用途 \\
+\midrule
+IMU & BMI270 & SPI / 400\,Hz & 姿勢推定の主センサ \\
+地磁気 & BMM150 & I2C / 25\,Hz & ヨー推定（研究対象） \\
+気圧 & BMP280 & I2C / 50\,Hz & 高度推定（ToF範囲外） \\
+ToF（下面） & VL53L3CX & I2C / 30\,Hz & 高度計測 \\
+ToF（前面） & VL53L3CX & I2C / 30\,Hz & 障害物検知・SLAM・ナビゲーション \\
+OpticalFlow & PMW3901 & SPI / 100\,Hz & 水平位置推定 \\
+電源モニタ & INA3221 & I2C / 10\,Hz & バッテリー電圧・電流 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+備考: 「全センサ残す（IoT教材として全アクセス可能であることが重要）」（\texttt{requirements.md:147}）。前面・下面のToFは同一型番VL53L3CXで、コンポーネントとしては単一の \texttt{sf\_hal\_vl53l3cx} をBottom/Front用に2回インスタンス化する構成（\texttt{hardware\_init.md:154, 158}）。
+
+\paragraph{アクチュエータ一覧}（\texttt{requirements.md} §6, \texttt{requirements.md:149-156}）
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lYl@{}}
+\toprule
+アクチュエータ & 制御方式 & 数量 \\
+\midrule
+モーター & LEDC PWM 150kHz 8bit & 4（X-quad配置） \\
+ブザー & LEDC PWM トーン生成 & 1 \\
+LED（MCU内蔵） & WS2812 RGB & 1 \\
+LED（ボード上下） & WS2812 RGB デイジーチェーン & 2 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{ソフトウェア層構造（6層）}
+
+Application Layer（タスク: StateTask等）→ Service Layer（状態管理・通知・ログ・通信）→ Algorithm Layer（状態推定・制御・フィルタ）→ HAL Layer（IMU・Motor・LED・ToF等）→ BSP Layer（\texttt{sf\_board}、共有HW資源の唯一の所有者: I2C/SPIバス・LEDCタイマー・esp\_netif・event\_loop・NVS）→ Hardware（ESP32-S3 peripherals）。出典: \texttt{architecture.md:22-38}。
+
+\subsection{4階層アクセス制御（学習者向け並列API、横断ルールR8）}
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lllY@{}}
+\toprule
+層 & 名前空間 / 公開ヘッダ & 典型ユーザー & できること \\
+\midrule
+L0: Sketch API & \texttt{ws::*} / \texttt{ws\_api.hpp} & Workshop受講者・初心者 & \texttt{setup()}/\texttt{loop\_400Hz(dt)}、\texttt{ws::motor\_set\_duty()}等30+関数で完結。HW・タスク・Topic知識ゼロで飛行制御を体験 \\
+L1: Topic API & \texttt{sf::api::*} / \texttt{sf\_api.hpp} & 推定・制御・ガイダンス学習者 & Topicをsubscribe/publishし自作ESKF/PID/Navigatorを実装。\texttt{IEstimator}/\texttt{IController}を実装して差替え \\
+L2: HAL Direct & \texttt{stampfly::*Wrapper} / 各HALの\texttt{*\_wrapper.hpp} & HW学習者 & \texttt{BMI270Wrapper.readSensorData()}等を直接呼び、SPI/I2C/RMT/LEDCを理解。Topicを介さない経路 \\
+L3: BSP Internal & \texttt{sf::internal::board} / \texttt{sf\_board.hpp}等 & ファーム実装者・拡張者 & \texttt{sf\_board}のgetterでbus handle取得、esp-idf直叩き。起動順序やHW資源管理を変更可能 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+各層は並列に共存し、学習者は必要な層までしか降りない（\texttt{architecture.md:147-179}、\texttt{hardware\_init.md:281-311}）。これは横断ルールR8「公開APIは \texttt{sf::api} namespace、内部APIは \texttt{sf::internal} namespace に分離」（\texttt{architecture.md:93}）の具体化である。
+
+\subsection{Pub-Subトピック通信}
+
+同一MCU内タスク間通信のみを対象とし（プロセス間通信不要）、シリアライズ不要（構造体メモリ直接共有）、全トピックはコンパイル時確定（\texttt{architecture.md:187-191}）。内部実装は用途別に使い分ける（\texttt{architecture.md:193-201}）:
+
+\begin{itemize}[leftmargin=*]
+  \item IMU→推定: Lock-free SPSC Ring Buffer（ISR安全・400Hzロスなし）
+  \item ToF/Flow/Mag/Baro→推定: FreeRTOS Queue
+  \item 推定値→制御: 共有メモリ + Task Notification（最新値のみ・最低レイテンシ）
+  \item 全データ→ログ: Lock-free Ring Buffer（全サンプル保持）
+  \item 推定値/モード→テレメトリ: 共有メモリ最新値（50Hz間引き）
+\end{itemize}
+
+外部インターフェースは \texttt{topic.publish(data)} / \texttt{topic.subscribe(callback)} または \texttt{topic.latest()} に統一（\texttt{architecture.md:205-215}）。
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lYl@{}}
+\toprule
+トピック & 内容 & レート \\
+\midrule
+\texttt{sensor.imu} & IMU生データ & 400\,Hz \\
+\texttt{sensor.tof} & ToF距離 & 30\,Hz \\
+\texttt{sensor.flow} & オプティカルフロー & 100\,Hz \\
+\texttt{sensor.mag} & 地磁気 & 25\,Hz \\
+\texttt{sensor.baro} & 気圧 & 50\,Hz \\
+\texttt{sensor.power} & 電源 & 10\,Hz \\
+\texttt{estimate.state} & 推定状態 & 400\,Hz \\
+\texttt{system.mode} & モード & イベント \\
+\texttt{command.setpoint} & 操縦目標 & 50\,Hz \\
+\texttt{control.output} & 制御出力 & 400\,Hz \\
+\texttt{actuator.motor} & モータ指令 & 400\,Hz \\
+\texttt{system.alert} & アラート & イベント \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+出典: \texttt{architecture.md:219-232}。横断ルールR5「データ共有はPub-Sub Topicのみ。複数producer/複数consumerが同一バッファに無ロック並走することを禁止」、R7「同期手段は3種類のみ: Pub-Sub Topic / \texttt{xTaskNotify} / \texttt{std::atomic}。\texttt{volatile bool}の散在を禁止」（\texttt{architecture.md:85, 87}）。
+
+\subsection{BSP層（\texttt{sf\_board}）の責務}
+
+共有HW資源の唯一の所有者。出典: \texttt{hardware\_init.md:69-77} / \texttt{architecture.md:565-572}。
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}llY@{}}
+\toprule
+資源 & ESP-IDF型 & 借用するHAL/Service \\
+\midrule
+I2C master bus & \texttt{i2c\_master\_bus\_handle\_t} & sf\_hal\_bmp280, sf\_hal\_bmm150, sf\_hal\_vl53l3cx, sf\_hal\_power \\
+SPI host (IMU) & \texttt{spi\_host\_device\_t} & sf\_hal\_bmi270 \\
+SPI host (Flow) & \texttt{spi\_host\_device\_t} & sf\_hal\_pmw3901 \\
+LEDC timer & \texttt{ledc\_timer\_t} & sf\_hal\_motor, sf\_hal\_led, sf\_hal\_buzzer \\
+esp\_netif (STA) + event loop & \texttt{esp\_netif\_t*}等 & sf\_comm（WiFi/ESP-NOW）, sf\_telemetry（UDP socket） \\
+NVS default partition & nvs handle & sf\_calibration, params system \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+各HALは \texttt{sf\_board} からConfig経由でbus handleを借用する（externグローバル禁止、R1〜R2）。公開APIは \texttt{sf::internal::board::*} で、L3ユーザー専用（\texttt{hardware\_init.md:63-101}）。
+
+\subsection{タスク構成と周期}
+
+出典: \texttt{architecture.md} §6「タスク設計」（\texttt{architecture.md:506-521}、日英同一値）。
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lllY@{}}
+\toprule
+タスク & 周期 & 優先度 & 含むコンポーネント \\
+\midrule
+ImuTask & 400\,Hz & 24 & センシング(IMU) + 状態推定 \\
+ControlTask & 400\,Hz(IMU同期) & 23 & 制御 + アクチュエーション \\
+StateTask & イベント駆動 & 22 & 状態管理 \\
+FlowTask & 100\,Hz & 20 & センシング(OptFlow) \\
+MagTask & 25\,Hz & 18 & センシング(Mag) \\
+BaroTask & 50\,Hz & 16 & センシング(Baro) \\
+CommTask & 50\,Hz & 15 & 通信 + コマンド処理 \\
+TofTask & 30\,Hz & 14 & センシング(ToF) + 離着陸マネージャー \\
+TelemetryTask & 50\,Hz & 13 & テレメトリ \\
+PowerTask & 10\,Hz & 12 & センシング(Power) + フェイルセーフ \\
+ButtonTask & 50\,Hz & 10 & ボタン入力 \\
+NotifyTask & 30\,Hz & 8 & 通知(LED/ブザー) \\
+CLITask & 20\,Hz & 5 & CLI + パラメータ \\
+LogTask & 非同期 & 5 & データロガー + Blackbox \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+タスク非割当のコンポーネント: キャリブレーション管理（StateTaskのonEnterコールバックから呼ばれ常駐不要）、ナビゲーター（将来独立タスク予定、初期実装は構造のみ）、BSP \texttt{sf\_board}（\texttt{app\_main()} Phase 1で \texttt{sf::board::init()} を1回呼ぶのみ）。出典: \texttt{architecture.md:541-547}。
+
+統合理由の例（\texttt{architecture.md:525-531}）: IMU+状態推定は「400Hzで密結合、タスク切替コスト削減」、制御+アクチュエーションは「制御出力を即モーター反映、安全チェックも同タスク」。
+
+コア（CPU0/CPU1）割り当てについては、4指定文書中に \texttt{xTaskCreatePinnedToCore} やコア番号の明記は\textbf{未確認}である（grepで該当記述なし）。別のauto-memory記録に「真因=コア1飽和」という記述があり実装上コアピン留めがある可能性は高いが、指定文書には記載がなく確認できない。
+
+\subsection{飛行モードと状態遷移}
+
+出典: \texttt{requirements.md} §2「状態モデル」（\texttt{requirements.md:23-45}）。
+
+\begin{quote}\ttfamily\footnotesize\noindent
+INIT（逐次実行、サブモードなし）\\
+\ $\rightarrow$ IDLE（GROUND: ToF無効距離・ARM可・キャリブ可 / HELD: ToF有効距離・ARM禁止・推定テスト可）\\
+\ $\rightarrow$ ARMED\_GROUND（ARM、GROUNDからのみ）\\
+\ $\rightarrow$ TAKEOFF（シーケンス）\\
+\ $\rightarrow$ FLYING（ACRO: 角速度制御 / STABILIZE: 姿勢安定 / ALT\_HOLD: 高度維持 / POS\_HOLD: 位置維持）\\
+\ $\rightarrow$ LANDING（シーケンス）\\
+\ $\rightarrow$ IDLE\_GROUND
+\end{quote}
+
+設計原則（\texttt{requirements.md:47-53}）: ARM/DISARMはアクション（モードではない）、親状態が共通処理を保証、TAKEOFF/LANDINGは専用モード（離着陸マネージャーが統括）、FAILSAFEは状態ではなくイベント。
+
+離陸トリガはモードで分岐する。ALT\_HOLD/POS\_HOLDはARM自体がトリガ（スロットル入力不要、0.3s整定後に自動離陸で目標高度0.5m）、ACRO/STABILIZEは手動スロットル入力（生スロットル＝推力、自動離陸なし）。着陸も同様に、ALT\_HOLD/POS\_HOLDでのパイロットDISARMは緩降下の自動着陸、ACRO/STABILIZEでのパイロットDISARMは手動推力モードゆえ自動着陸を持たず即カット（\texttt{requirements.md:62, 65, 68}）。サブモード切替は地上（IDLE\_GROUND/ARMED\_GROUND）とFLYINGでのみ受理される（設置時の変更が最も安全なため、\texttt{requirements.md:64}）。
+
+\subsection{アーキテクチャ不変条件（INV）}
+
+出典: \texttt{architecture.md:108-119}（§2「横断ルール」直後の節）。
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lY@{}}
+\toprule
+\# & 一行要約 \\
+\midrule
+INV-1 & 全鉛直フェーズ（Grounded/TakeoffClimb/Airborne/Landing）は単一の姿勢＋レートパイプラインを共有し、独自の並列制御経路を持ってはならない。フェーズが変えてよいのは鉛直チャネルのみ \\
+INV-2 & 空中の全フェーズでパイロットの姿勢操縦（roll/pitch/yaw）を奪わない。自動化は鉛直・水平位置等の並進軸に限定し、例外は「リンク途絶」判定のみ \\
+INV-3 & 「検出」と「判断」を分離する。接地・離陸等の検出ロジックは検出層（\texttt{sf\_takeoff\_landing}等）に置き、StateManagerが判断する \\
+INV-4 & 状態機械の各(状態×入力)セルは\texttt{detailed\_design.md}§3.1の規範表で全て規定され、表にない暗黙の振る舞いを作らない \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+INV策定の背景: 「姿勢は常にパイロット」原則を確立したのに着陸（\texttt{computeLanding}）が旧前提「フェイルセーフ専用・スティック無視」のまま並列経路として残っていたことによる実機バグ（着陸中ロール/ピッチが効かない）が契機（2026-06-14、\texttt{architecture.md:112}）。
+
+\subsection{コーディング／教育方針の要点}
+
+出典: \texttt{coding\_and\_education.md}。
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{模範的ソースコードという最重要目標}: 「vehicleのコードは単なるファームウェアではなく、ドローンのファームウェアを作ろうとする人が参考にできる模範的なソースコードであること、また学習教材として機能すること」（\texttt{coding\_and\_education.md:10}）。
+  \item \textbf{可読性ルール}（\texttt{coding\_and\_education.md:22-31}）: 1関数1責務・50行以内、バイリンガルコメント（英語→日本語の順で全関数・全ブロック）、関数冒頭ドキュメント（3〜5行）、マジックナンバー禁止（全数値にconfig定数名/パラメータ名）、略語禁止、ネスト2段まで、Pub-Subによるコンポーネント間直接呼び出し禁止。
+  \item \textbf{\texttt{@design}タグによる設計トレーサビリティ}: クラス定義・インターフェース実装・状態遷移コールバックに設計文書該当箇所を参照し判定ステータス（\texttt{[OK]}/\texttt{[NG]}/\texttt{[--]}）を付記。「リリース時点で全ての\texttt{@design}タグが\texttt{[OK]}であること」（\texttt{coding\_and\_education.md:34-46}）。
+  \item \textbf{設計矛盾の即時報告}: 実装中に設計文書との矛盾を発見したら「実装を進めずに立ち止まる」「矛盾の内容を具体的に報告する」「議論して設計を更新する」「変更履歴を残す」の4段階（\texttt{coding\_and\_education.md:101-108}）。
+  \item \textbf{4段階のExamples/教育体系}: Level 1「ハードウェア基礎（ESP-IDFとセンサ）— Tier L2中心」、Level 2「通信と制御の基礎 — Tier L1/L2混在」、Level 3「フライトシステム — Tier L1中心」、Level 4「応用・拡張 — Tier L1（差し替え）+L4（応用）」に加え、Workshop LessonがTier L0に対応（\texttt{coding\_and\_education.md:239-315}、見出しのみ確認、本文詳細は未読）。
+\end{enumerate}
+
+% ============================================================
+\section{位置制御系の構成}
+% ============================================================
+
+\subsection{4段カスケード構成}
+
+実装は \texttt{firmware/vehicle/components/sf\_controller\_pid/pid\_controller.cpp} の \texttt{compute()} 内で、以下の順にブロックが実行される。全て単一の \texttt{compute()} 呼び出し内で処理され、外側/内側ループ間の分周（サブサンプリング）は行われていない（grepで分周パターン不検出）。
+
+{\footnotesize
+\begin{longtable}{@{}p{1.4cm}p{2.6cm}p{2.6cm}p{4.6cm}p{3.0cm}@{}}
+\toprule
+ループ & 入力 & 出力 & 制御器 & 出典 \\
+\midrule
+\endhead
+位置（外） & $\mathrm{pos\_setpoint} - \mathrm{state.position}$ & $v_{x,sp}, v_{y,sp}$ [NED, m/s] & P（\texttt{pos\_x\_.compute}、tiはパラメータ上存在するが実質P的運用） & \texttt{pid\_controller.cpp:\allowbreak1326-1327} \\
+速度 & $v_{sp} - \mathrm{state.velocity}$ & $a_{x,ned}, a_{y,ned}$ [NED, m/s$^2$] & PID & \texttt{pid\_controller.cpp:\allowbreak1332-1333} \\
+（加速度→傾き写像） & $a_{x,body}, a_{y,body}$（ヨー回転後） & $\mathrm{roll}_{sp}, \mathrm{pitch}_{sp}$ [rad]、$\pm\mathrm{max\_pos\_tilt\_}$でクランプ & $\theta = \mp a_{body}/g$ & \texttt{pid\_controller.cpp:\allowbreak1337-1351} \\
+姿勢 & $\mathrm{roll}_{sp}/\mathrm{pitch}_{sp} - \mathrm{euler.x/y}$ & $\mathrm{rate}_{sp,roll}/\mathrm{pitch}$ [rad/s] & PID（\texttt{att\_roll\_}, \texttt{att\_pitch\_}） & \texttt{pid\_controller.cpp:\allowbreak455-456} \\
+レート（内） & $\mathrm{rate}_{sp} - \mathrm{gyro\_rate}$ & \texttt{output.torque[0..2]} [Nm] & PID（D-on-M） & \texttt{pid\_controller.cpp:\allowbreak774-776} \\
+\bottomrule
+\end{longtable}
+}
+
+高度系は並列チェーン: \texttt{alt\_pos\_.compute()}（高度→鉛直速度目標）→ \texttt{alt\_vel\_.compute()}（鉛直速度→推力補正）→ $\mathrm{thrust} = \mathrm{hover\_thrust\_} + \mathrm{thrust\_correction}$（\texttt{pid\_controller.cpp:628-638}）。
+
+制御周期はヘッダコメントに「ControlTaskはIMU同期400Hzで動く」と明記（\texttt{pid\_controller.hpp:443-448}、\texttt{kDobRateHz = 400.0f}、\texttt{pid\_controller.hpp:453}）。位置ループの実効帯域が遅いのはゲイン設計によるものであり、サンプリング周期の分離ではない。関連文書に「位置ループ $\approx$ 0.06\,Hz、速度ループ実効クロスオーバー $\approx$ 0.19\,Hz」の記述があり、これもゲインに由来する（\texttt{poshold\_wobble\_velocity\_noise.md:65}）。
+
+\subsection{PID形式（不完全微分・D-on-M・条件付き積分）}
+
+実装は \texttt{firmware/vehicle/components/sf\_controller\_pid/include/pid.hpp}（\texttt{struct PID}）。伝達関数はファイルヘッダに明記される（\texttt{pid.hpp:14}）:
+
+\[
+C(s) = K_p\left(1 + \frac{1}{T_i s} + \frac{T_d s}{\eta T_d s + 1}\right)
+\]
+
+ここで $K_p$ は比例ゲイン、$T_i$ は積分時間 [s]、$T_d$ は微分時間 [s]、$\eta$ は不完全微分係数（既定 $\eta = 0.125$、\texttt{pid.hpp:54}）である。
+
+\begin{itemize}[leftmargin=*]
+  \item 微分は「測定値」に作用する（D-on-M）。理由は目標値ステップでの微分キック回避（\texttt{pid.hpp:20-31}）。
+  \item 双一次変換（Tustin）で離散化: $\alpha = 2\eta T_d/dt$, $a=(\alpha-1)/(\alpha+1)$, $b=2T_d/((\alpha+1)dt)$（\texttt{pid.hpp:92-102}、$dt$は制御周期 [s]）。
+  \item 積分は台形則＋条件付き積分アンチワインドアップ（出力が飽和方向に押される場合は積分更新を止める。ハードクランプはバックストップとして併用、\texttt{pid.hpp:108-133}）。
+  \item $T_i \geq 0.01$\,s の場合のみ積分実行（境界含む。過去バグの修正済み、\texttt{pid.hpp:123}）。
+\end{itemize}
+
+\subsection{加速度→傾き写像 $a \approx g\theta$}
+
+\texttt{computePositionHold()}（\texttt{pid\_controller.cpp:1260-1352}）内、NED加速度指令をヨーで機体座標へ回転後:
+
+\begin{verbatim}
+pitch_sp = clampTilt(-ax_body / gravity_);
+roll_sp  = clampTilt( ay_body / gravity_);
+\end{verbatim}
+
+（\texttt{pid\_controller.cpp:1350-1351}）。$\mathrm{gravity\_} = \mathtt{math::kGravity} = 9.80665$\,m/s$^2$（\texttt{sf\_math.hpp:39}、\texttt{pid\_controller.hpp:223}）。\texttt{clampTilt} は $\pm\mathrm{max\_pos\_tilt\_}$（既定0.1745\,rad = 10°、\texttt{pid\_controller.hpp:224}）でクランプする。
+
+\subsection{既定パラメータ値（params.cpp）}
+
+\paragraph{位置・速度系（POS\_HOLD）}
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lllY@{}}
+\toprule
+パラメータ & 既定値 & 範囲 & 出典 \\
+\midrule
+position.pos.kp & 0.4 & [0, 10] & params.cpp:771 \\
+position.pos.ti & 5.0\,s & [0.1, 100] & params.cpp:772 \\
+position.vel.kp & 3.0 & [0, 10] & params.cpp:773 \\
+position.vel.ti & 2.0\,s & [0.1, 100] & params.cpp:774 \\
+position.stick\_vel & 0.4\,m/s & [0.05, 2.0] & params.cpp:775 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+X/Y軸は同一ゲイン（\texttt{pos\_y\_ = pos\_x\_; vel\_y\_ = vel\_x\_;}、\texttt{pid\_controller.cpp:161-162}）。
+
+\paragraph{姿勢・レート系（代表値）}
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lllY@{}}
+\toprule
+パラメータ & 既定値 & 範囲 & 出典 \\
+\midrule
+attitude.roll.kp / attitude.pitch.kp & 5.0 & [0, 50] & params.cpp:719,722 \\
+attitude.roll.ti / attitude.pitch.ti & 2.0\,s & [0.01, 100] & params.cpp:720,723 \\
+attitude.roll.td / attitude.pitch.td & 0.04\,s & [0, 1] & params.cpp:721,724 \\
+rate.roll.kp & $1.0\times10^{-3}$ & [0, 0.01] & params.cpp:666 \\
+rate.roll.ti & 0.7\,s & [0.01, 100] & params.cpp:667 \\
+rate.roll.td & 0.002\,s & [0, 1] & params.cpp:668 \\
+rate.pitch.kp & $1.426432\times10^{-3}$ & [0, 0.01] & params.cpp:669 \\
+rate.pitch.td & 0.025\,s & [0, 1] & params.cpp:671 \\
+rate.yaw.kp & $1.198594\times10^{-3}$ & [0, 0.01] & params.cpp:672 \\
+rate.yaw.ti & 0.8\,s & [0.01, 100] & params.cpp:673 \\
+rate.yaw.max\_torque & $1.83\times10^{-3}$\,Nm & [1e-4, 2.1e-3] & params.cpp:677（NT金沢ヨー飽和治療） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+レートゲインの単位は「B$^{-1}$ミキサー用の物理ゲイン [Nm/(rad/s)]」（params.cpp:662-663 コメント）。
+
+\paragraph{各段のリミット値}（\texttt{pid\_controller.hpp}、コード内定数・param SSOT外）
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lllY@{}}
+\toprule
+リミット & 値 & 単位 & 出典 / 備考 \\
+\midrule
+max\_roll\_pitch\_torque\_ & $5.2\times10^{-3}$ & Nm & pid\_controller.hpp:590（旧ROLL/PITCH\_OUTPUT\_LIMIT） \\
+max\_att\_rate\_sp\_ & 3.0 & rad/s & pid\_controller.hpp:168（ACROスティックスケール1.0とは別物） \\
+max\_pos\_tilt\_ & 0.1745 (=10°) & rad & pid\_controller.hpp:224（POS\_HOLD傾き上限） \\
+max\_pos\_vel\_ & 1.0 & m/s & pid\_controller.hpp:320（POS\_HOLD速度目標上限） \\
+max\_thrust\_correction\_ & 0.15 & N & pid\_controller.hpp:200（旧VEL\_OUTPUT\_MAX） \\
+max\_thrust\_ & 0.672 & N & pid\_controller.hpp:184（4$\times$0.168N/モータ、T/W$\approx$1.85） \\
+max\_angle\_ & 0.5236 (=30°) & rad & pid\_controller.hpp:159（STABILIZE最大傾き） \\
+max\_rate\_ & 1.0 & rad/s & pid\_controller.hpp:157（ACROスティック→レート指令スケール） \\
+max\_yaw\_rate\_ & 5.0 & rad/s & pid\_controller.hpp:158 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+出力上限の代入箇所は \texttt{pid\_controller.cpp:173-183}。特に $\mathrm{vel\_x\_.output\_limit} = \mathrm{gravity\_} \times \mathrm{max\_pos\_tilt\_} \approx 1.71$\,m/s$^2$ で、速度ループ出力が傾き上限と直結する（\texttt{pid\_controller.cpp:182-183}）。
+
+これらリミット値は \texttt{params::get\_float} で読み込まれておらず（\texttt{loadParams()} 内に対応呼び出しなし）、コンパイル時定数としてハードコードされ、param SSOT（NVS経由のライブ変更）の対象外である。
+
+\subsection{高度制御（ALT\_HOLD）}
+
+構成: \texttt{altitude.alt.*}（P）→ \texttt{altitude.vel.*}（PI）→ 推力補正。
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}llY@{}}
+\toprule
+パラメータ & 既定値 & 出典 \\
+\midrule
+altitude.alt.kp & 0.45 & params.cpp:738 \\
+altitude.alt.ti & 7.0\,s & params.cpp:739 \\
+altitude.vel.kp & 0.1 & params.cpp:740 \\
+altitude.vel.ti（climb用） & 2.5\,s & params.cpp:741 \\
+altitude.vel.ti\_hover & 2.5\,s & params.cpp:742 \\
+altitude.climb\_rate & 0.5\,m/s & params.cpp:743 \\
+altitude.descent\_rate & 0.5\,m/s & params.cpp:744 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+鉛直速度ループの積分時間はフェーズ別スケジュールになっている（\texttt{applyAltVelTiForPhase()}, \texttt{pid\_controller.cpp:208-212}）: Airborne（ホバー）のみ \texttt{alt\_vel\_ti\_hover\_}、TakeoffClimb/Landing/Grounded は \texttt{alt\_vel\_ti\_climb\_} を用いる。
+
+\subsection{加速度DOB（外乱オブザーバ）}
+
+\texttt{altitude.dob.fc} が0以下（既定 \texttt{0.0f}, params.cpp:745）なら完全無効。実装は \texttt{computeDobCorrection()}（\texttt{pid\_controller.cpp:1109-}）。
+
+\begin{itemize}[leftmargin=*]
+  \item ノミナル・アクチュエーションモデル: \texttt{kDobModelDelayS = 0.0624}\,s（純遅れ$L$、飛行実測）、\texttt{kDobModelLagS = 0.02}\,s（1次遅れ$T$、モータ時定数）（\texttt{pid\_controller.hpp:440-441}）。
+  \item Qフィルタ: 2次バターワースLPF（$Q=1/\sqrt{2}$、\texttt{pid\_controller.cpp:1038-1048}）、カットオフはparam \texttt{altitude.dob.fc}。
+  \item ウォッシュアウト（1次HP）: 固定 \texttt{kDobWashoutHz = 0.03}\,Hz（\texttt{pid\_controller.hpp:438}）、DC所有権を速度ループ積分器とホバー推力学習に残す設計（\texttt{pid\_controller.cpp:1089-1092}）。
+  \item 動作周期: \texttt{kDobRateHz = 400.0}（\texttt{pid\_controller.hpp:453}）。
+\end{itemize}
+
+\paragraph{既定昇格→同日差し戻しの経緯（facts\_verification\_addendum.md による確定事実）}
+
+\begin{itemize}[leftmargin=*]
+  \item 2026-07-18 06:22 コミット \texttt{ffbdae55} \texttt{feat(control): promote altitude DOB to compiled default (fc=1.5)} --- DOBを既定有効化（\texttt{altitude.dob.fc}を1.5へ）。
+  \item 2026-07-18 08:03 コミット \texttt{0a3d8a39} \texttt{fix(control): revert altitude defaults to pre-DOB behavior (pilot urgent)} --- \textbf{同日約100分後にパイロット運用判断で差し戻し}。\texttt{altitude.dob.fc} 1.5→0.0（DOB無効）、\texttt{altitude.vel.ti\_hover} 1.5→2.5。\texttt{dob.fc=0}でDOBコード経路は不活性（SILバイト同一を実装時に検証済みとコミットに記載）。DOB実装・実飛行検証（$-67\%$、第7章参照）・1.5/1.5の組合せは機体ごとのオプトインとして残置される: \texttt{param set altitude.dob.fc 1.5} + \texttt{param set altitude.vel.ti\_hover 1.5}。
+  \item 現HEADの \texttt{params.cpp} table[]: \texttt{altitude.vel.ti\_hover} 既定2.5 (params.cpp:742)、\texttt{altitude.dob.fc} 既定0.0 (params.cpp:745)、\texttt{hover.thrust\_corr} 既定1.12 (params.cpp:746)。
+  \item \textbf{注意（コメント残存）}: \texttt{params.cpp:463} 付近の日本語コメントに「既定1.5Hz=有効」という差し戻し前の記述が残存しており、table[]の既定0.0と矛盾する。差し戻しコミットは「comments note the same-day reversal」と述べており442-444行付近には差し戻しの注記があるが、455-470行のブロックには昇格時代の文が残っている。文書・コメント整備の要修正点として記録する。
+  \item auto-memory側の「既定有効化完了」という記録は差し戻し前の状態を記録したもので、現状と不一致（メモリ側を要更新）。
+\end{itemize}
+
+\textbf{2026-08-01現在の正しい状態}: 高度DOBは「実装済み・実飛行で$-67\%$検証済み・既定はオフ（オプトイン）」である。v2026.07.2リリース（\texttt{0b463766}、\texttt{rate.roll.td=0.002}）はこの差し戻し後の既定に基づく。
+
+\subsection{ホバー推力学習}
+
+$\mathrm{hover\_thrust\_} = \mathrm{kMassG} \times \mathrm{hover.thrust\_corr}$（既定1.12, params.cpp:746, \texttt{pid\_controller.cpp:146-148}）。$\mathrm{kMassG} = 0.037 \times 9.80665$（\texttt{pid\_controller.hpp:407}）。
+
+\texttt{learnHoverThrust()}（\texttt{pid\_controller.cpp:968-1000}）: Airborne・ALT/POS\_HOLD・スロットル中立・$|v_z| < \mathrm{kHoverLearnVzDead}$（0.30\,m/s, \texttt{pid\_controller.hpp:409}）のゲート下でのみ、時定数 $\mathrm{kHoverLearnTau} = 20.0$\,s（\texttt{pid\_controller.hpp:408}）で速度ループの定常出力（\texttt{thrust\_correction}）を \texttt{hover\_thrust\_} へ1次系的に畳み込む（\texttt{pid\_controller.cpp:998}）。クランプ範囲 \texttt{kHoverCorrMin=0.5}〜\texttt{kHoverCorrMax=2.0}（\texttt{pid\_controller.hpp:410-411}）。着陸エッジで \texttt{params::set\_float} ＋ \texttt{params::save()} によりNVS保存される（\texttt{persistHoverThrust()}, \texttt{pid\_controller.cpp:1012-1022}）。\texttt{hover.thrust.learn}（既定1=ON, params.cpp:747）で無効化可能。
+
+\subsection{スティック・リポジショニング機能}
+
+実装: \texttt{computePositionHold()}（\texttt{pid\_controller.cpp:1260-1352}）。
+
+\begin{itemize}[leftmargin=*]
+  \item 速度源: \texttt{guidance\_active\_ \&\& guide\_mode\_==2} なら誘導由来（Tello rc）速度、それ以外はパイロットスティック: $v_{fwd} = -\mathrm{setpoint.pitch} \times \mathrm{stick\_reposition\_vel\_}$, $v_{right} = \mathrm{setpoint.roll} \times \mathrm{stick\_reposition\_vel\_}$（\texttt{pid\_controller.cpp:1286-1287}）。\texttt{stick\_reposition\_vel\_} は \texttt{position.stick\_vel}（既定0.4\,m/s, params.cpp:775）。
+  \item 再配置中（$v_{fwd} \neq 0 \lor v_{right} \neq 0$）: 位置ループを迂回し、機体系速度指令をNEDへ回転して速度ループへ直接渡す。位置ループ積分器はリセットし、保持目標を現在位置に固定し続ける（\texttt{pid\_controller.cpp:1300-1306}）。
+  \item 中立に戻った瞬間（\texttt{reposition\_active\_}→\texttt{false}のエッジ）: \texttt{capture\_pos\_=true} を立て、次サイクルで現在位置を新しい保持目標として捕捉（\texttt{pid\_controller.cpp:1315-1323}）。
+  \item 通常保持時は通常のP位置ループ（\texttt{pid\_controller.cpp:1326-1327}）。
+\end{itemize}
+
+符号はSTABILIZEの傾き方向と一致する（右ロール→右移動、前ピッチ→前移動、\texttt{pid\_controller.cpp:1266-1273} コメント）。\texttt{poshold\_journey.md} §5（コミット \texttt{ef3f854}）と整合。
+
+\subsection{自動離陸シーケンス（ALT/POS\_HOLD）}
+
+実装: \texttt{onTakeoff()}（\texttt{pid\_controller.cpp:1380-1409}）、\texttt{onTakeoffComplete()}（\texttt{pid\_controller.cpp:1411-1437}）、\texttt{compute()}内 \texttt{VerticalPhase::TakeoffClimb} 分岐（\texttt{pid\_controller.cpp:514-567}）。
+
+\begin{itemize}[leftmargin=*]
+  \item パラメータ: \texttt{takeoff\_climb\_rate\_} = 0.3\,m/s（\texttt{pid\_controller.hpp:642}）、\texttt{takeoff\_target\_alt\_} = 0.5\,m（\texttt{pid\_controller.hpp:655}）。paramsテーブルには見当たらず、コード内定数。
+  \item 離陸開始（\texttt{onTakeoff()}）: フェーズをTakeoffClimbに遷移、\texttt{applyAltVelTiForPhase()}でclimb用ti適用、DOB状態リシード、鉛直ループリセット、\texttt{alt\_setpoint\_ = takeoff\_target\_alt\_}、\texttt{capture\_pos\_=true}（POS\_HOLD用発進点捕捉）、スロットル再センターゲートを閉（\texttt{pid\_controller.cpp:1388-1409}）。
+  \item 上昇中: \texttt{alt\_pos\_.compute(alt\_setpoint\_, altitude, dt)} の出力を $\pm\mathrm{takeoff\_climb\_rate\_}$ にクランプして速度目標とし、\texttt{alt\_vel\_.compute()} で推力補正（\texttt{pid\_controller.cpp:527-543}）。位置ループが目標近傍で自然減速しオーバーシュートなく捕捉する設計（コメント\texttt{pid\_controller.cpp:522-525}）。
+  \item 完了検出: 片側到達判定（$\mathrm{altitude} \geq \mathrm{target} - \mathrm{kTakeoffCaptureBandM}$ を \texttt{kTakeoffSettleCycles} 継続）＋タイムアウトバックストップ \texttt{kTakeoffMaxCycles}（\texttt{pid\_controller.cpp:557-567}、具体数値は未確認）。
+  \item 姿勢はこの間もパイロットが完全掌握する（「鉛直のみ自動」設計、\texttt{pid\_controller.cpp:283-300} コメント）。旧設計（水平強制）は2026-06-14の実機バグとして修正済み。
+  \item \texttt{onTakeoffComplete()}: フェーズをAirborneへ、\texttt{alt\_vel\_.ti} をhover用に切替、\texttt{alt\_setpoint\_} は離陸目標値のまま維持（瞬時高度でなく目標値保持、行き過ぎをバイアスしない設計、\texttt{pid\_controller.cpp:1419-1436}）。
+\end{itemize}
+
+% ============================================================
+\section{状態推定（ESKF）}
+% ============================================================
+
+実装: \texttt{firmware/vehicle/components/sf\_estimator\_eskf/eskf\_core.cpp}。
+
+\subsection{状態数と内訳}
+
+15状態: [pos(3), vel(3), att\_err(3), gyro\_bias(3), accel\_bias(3)]（\texttt{eskf\_core.cpp:14}）。インデックス定義: \texttt{POS\_X=0..BA\_Z=14}（\texttt{eskf\_core.hpp:36-40}）。姿勢は誤差状態（回転ベクトル $\delta\theta$）で保持し、更新後クォータニオンに $q \leftarrow q \otimes \delta q(\delta\theta)$ として注入する（\texttt{eskf\_core.cpp:1023-1026}）。
+
+予測モデル（\texttt{predict()}, \texttt{eskf\_core.cpp:169-}）: バイアス補正済み加速度・角速度で名目状態をオイラー積分する（\texttt{pos\_ += vel\_*dt; vel\_ += (accel\_ned+gravity)*dt; q\_ = q\_*Quat::from\_rotvec(gyro*dt)}, \texttt{eskf\_core.cpp:195-199}）。
+
+\subsection{観測}
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}llYl@{}}
+\toprule
+観測 & 関数 & 内容 & 出典 \\
+\midrule
+高度（ToF） & updateToF() & 傾き補正 $\mathrm{height} = \mathrm{distance} \cdot \cos\theta_x \cdot \cos\theta_y$、傾き $>$ tof\_tilt\_threshold(0.70\,rad, eskf\_core.hpp:84) で棄却、絶対値イノベーションゲート & eskf\_core.cpp:530-555 \\
+鉛直速度（ToF微分） & updateToFVelocity() & $v_z = -\Delta\mathrm{height}/dt$、ノイズは位置観測の5倍 & eskf\_core.cpp:557-596 \\
+水平速度（フロー） & updateFlowRaw() & \S4.3参照 & eskf\_core.cpp:729-823 \\
+姿勢（加速度計） & updateAccelAttitude() & 適応R＋$\alpha$-$\beta$補償、\S4.4 & eskf\_core.cpp:645-727 \\
+気圧高度 & updateBaro() & 既定off & eskf\_core.cpp:598- \\
+地磁気 & updateMag() & 既定off、$\chi^2$ゲート mag\_chi2\_gate & eskf\_core.cpp:612-642 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+更新はジョセフ形（$P' = (I-KH)P(I-KH)^\top + KRK^\top$）とみられるが、該当コード行の個別確認は未実施であり、\texttt{control\_theory\_overview.md:82} の記述のみ確認した（\textbf{未確認}）。
+
+\subsection{フロー→速度変換パイプライン}（\texttt{updateFlowRaw()}, \texttt{eskf\_core.cpp:729-823}）
+
+\begin{enumerate}[leftmargin=*]
+  \item SQUALゲート: $\mathrm{squal} < \mathrm{cfg\_.flow\_min\_squal}$（既定10, eskf\_core.hpp:100 / params.cpp:808 \texttt{eskf.gate.flow\_squal}）で棄却。高さゲート $\mathrm{height} < \mathrm{flow\_min\_height}$（0.02\,m, eskf\_core.hpp:89）も併用（\texttt{eskf\_core.cpp:740-741}）。
+  \item ピクセル→角速度: $\mathrm{flow\_rate} = dx \cdot \mathrm{flow\_rad\_per\_pixel}/dt$（\texttt{flow\_rad\_per\_pixel}=0.00222, eskf\_core.hpp:87）（\texttt{eskf\_core.cpp:746-747}）。
+  \item ジャイロ回転成分除去: $\mathrm{trans}_x = \mathrm{flow\_rate}_x - \mathrm{flow\_gyro\_scale} \cdot \mathrm{gyro}_y$（\texttt{flow\_gyro\_scale}=1.0, eskf\_core.hpp:88）（\texttt{eskf\_core.cpp:751-752}）。
+  \item 高度スケーリング: $v_{x,body} = \mathrm{trans}_x \cdot \mathrm{height}$（\texttt{eskf\_core.cpp:756-757}）。
+  \item ヨー回転でNEDへ（\texttt{eskf\_core.cpp:761-764}）。
+  \item スカラー更新$\times2$（VEL\_X, VEL\_Y）、イノベーションクランプ \texttt{flow\_innov\_clamp}（既定0.3, params.cpp:807 \texttt{eskf.gate.flow\_clamp}）（\texttt{eskf\_core.cpp:769-784}）。
+\end{enumerate}
+
+\subsection{ロバスト化5機構}
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lYlY@{}}
+\toprule
+機構 & 実装 & パラメータ既定値 & 出典 \\
+\midrule
+$\chi^2$外れ値ゲート & vectorUpdate3()内 $d^2 = \mathrm{innov}^\top S^{-1} \mathrm{innov}$, $d^2 > \mathrm{chi2\_gate}$ で棄却 & eskf.att.chi2\_gate = 7.81（$\chi^2(3,0.95)$と一致） & eskf\_core.cpp:448-462, params.cpp:812 \\
+適応R & $R = R_{base}^2 \cdot (1+k(\|a\|-g)^2)$ & eskf.att.k\_adaptive = 10.0 & eskf\_core.cpp:678,685-686, params.cpp:811 \\
+active\_mask P隔離 & offセンサに触る状態ビットを recomputeActiveMask() で隔離、更新時 dx[i]=0 & --- & eskf\_core.cpp:863-, 1000-1004 \\
+ジャイロバイアス偏差クランプ & $b_g = \mathrm{clamp}(b_{g,nominal} \pm \mathrm{dev}, b_g)$ & eskf.bias.gyro\_dev\_max = 0.03\,rad/s & eskf\_core.cpp:1047-1050, params.cpp:787 \\
+姿勢補正クランプ & dx[ATT\_*] を $\pm$att\_correction\_clamp でクランプ & eskf.att.corr\_clamp = 0.05 & eskf\_core.cpp:1016-1022, params.cpp:813 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{$\alpha$-$\beta$トラッカ（運動加速度補償）}
+
+\texttt{updateFlowRaw()} 内、\texttt{cfg\_.accel\_comp\_enable} 時に実行される（\texttt{eskf\_core.cpp:799-822}）:
+
+\begin{verbatim}
+vpx = flow_vel_lpf_.x + a_kin_ned_.x * kFlowDt;   // 予測（kFlowDt=0.01, 100Hz公称）
+rx  = vx_ned - vpx;                                // 残差
+flow_vel_lpf_.x = vpx + alpha * rx;                // 速度状態更新
+a_kin_ned_.x   += (beta / kFlowDt) * rx;           // 加速度状態更新（クランプ ±amax）
+\end{verbatim}
+
+既定値: \texttt{eskf.accel\_comp.enable}=1, \texttt{.alpha}=0.2, \texttt{.beta}=0.02, \texttt{.max}=5.0（params.cpp:816-819）。$a_{kin,ned}$ は \texttt{updateAccelAttitude()} の予測比力 $h_{vec} = g_{expected} + R^\top a_{kin,ned}$ に折り込まれる（\texttt{eskf\_core.cpp:695-701}）。生フロー速度を使用し、融合速度 $\mathrm{vel\_}$ は使わない設計（コメントで明記、\texttt{eskf\_core.cpp:788-789}、循環回避）。
+
+\subsection{アクチュエータ遅れ（$\approx110$\,ms）の内訳}
+
+出典: \texttt{analysis/scripts/alt\_dob\_design/README.md} §2「鉛直アクチュエーション経路の同定」（\texttt{step1\_actuation\_id.py}）。同定モデル:
+
+\[
+y = k_T \cdot \frac{e^{-Ls}}{Ts+1} \cdot u_{eff} + d_{ext}, \qquad
+L \approx 62\text{\,ms（範囲55--75ms）}, \quad T = 20\text{\,ms}, \quad k_T \approx 0.95\text{（無次元）}
+\]
+
+（README.md:72-74）。
+
+\begin{itemize}[leftmargin=*]
+  \item $L$（純遅れ）: 離陸トランジェント2件（63.6/61.2ms）の実測平均62.4ms。独立監査（別実装での感度掃引）で56--70msと安定、飛行中小信号イベントでも62.5--77.5ms（README.md:76-79）。
+  \item $T$（1次遅れ）: \texttt{tools/sysid/defaults.py} の $\tau_m=0.02$s（コーストダウン系の独立測定値）を採用（README.md:80-81）。
+  \item 速度ループが見る合計遅れ0.11s（$\approx110$\,ms）の内訳: \textbf{アクチュエーション側 $L+T \approx 82$\,ms} + \textbf{ESKF速度推定側 $\approx28$\,ms}（README.md:85-86）。DOBはIMU比力を直接使うためESKF側の遅れを回避できると明記されている。
+\end{itemize}
+
+ファーム内定数: \texttt{kDobModelDelayS=0.0624}（=62.4ms, $L$）、\texttt{kDobModelLagS=0.02}（=20ms, $T$）（\texttt{pid\_controller.hpp:440-441}）。この和（$\approx82$ms）は「アクチュエーション側」のみであり、「$\approx110$ms」はESKF速度推定遅れ約28msを加えた速度ループ全体が見る合計遅れである。この区別を本報告で明示する。
+
+% ============================================================
+\section{開発の経緯（時系列）}
+% ============================================================
+
+出典: \texttt{facts\_history.md} §1「開発マイルストーン時系列」。git履歴とドキュメント・解析レポートの存在確認による。推測・補完は行っていない。
+
+\begin{longtable}{@{}p{2.0cm}p{3.3cm}p{9.9cm}@{}}
+\toprule
+日付 & コミット/出典 & 内容 \\
+\midrule
+\endhead
+2026-04-03 & \texttt{c457e8a7} & ESKF\_V2実装（active\_mask方式のP行列分離）--- vehicle\_new以前の系統 \\
+2026-04-12 & \texttt{2ca702d8} & vehicle\_new: ESKFを数学的基礎から実装 \\
+2026-05-31 & \texttt{0a997a95} & SIL: 閉ループホバー成立、P1.2(c) ゲートG3 PASS \\
+2026-06-01 & \texttt{26716dd6} & SIL: ALT\_HOLD閉ループ高度保持、ヨー中も約2cm以内で保持 \\
+2026-06-03 & \texttt{cea0d8cf} & SIL Plant時間基準バグ修正（物理3倍速→4000Hz化+固定timestep）。空中ホバーblocker真因の解決。決定論的な空中ホバー成立の起点 \\
+2026-06-05 & \texttt{65c3b805, 25146b53} & POS\_HOLDカスケード初実装（WIP、発散）＋PMW3901光学フローSILモデル追加 \\
+2026-06-06 & \texttt{1396339b, 9a2c9dad} & 運動加速度補償版accel-attitudeでPOS\_HOLD全軸保持、position.vel.kp 0.3→0.8 \\
+2026-06-08 & \texttt{90093c14} & $\chi^2$過剰棄却の根治（accel\_att\_noise 0.06→0.8）。関連解説: \texttt{24175592} \\
+2026-06-13/14 & \texttt{8223e080}ほか & 27ユニット全体コードレビュー実施 \\
+2026-06-14 & \texttt{32fc1045, 0425484a, a4dca5cd, c63de449} & ARM起点ALT/POS自動離陸（0.5m）、対称ALT\_HOLDスロットル、離陸完了時の姿勢デッドスティック、ESKFノイズパラメータ調整（accel\_att\_noise→1.2等） \\
+2026-06-21 & \texttt{d82d1dd5} & 全モード姿勢トリム実装（実飛行同定ベース） \\
+2026-06-22 & \texttt{38dc38d8, 880634b0} & POS\_HOLD実機発散→実効ゲイン再設計: position.pos.kp 0.3→0.4、position.vel.kp 2.0→3.0（\texttt{poshold\_journey.md}に詳細。同日\texttt{965300b4, da72e88a}常時オンボードトリム学習も追加） \\
+2026-06-22 & \texttt{poshold\_\allowbreak attID.py,}\newline\texttt{poshold\_\allowbreak loop\_\allowbreak design.py}（6/22 16:16-16:37） & 実効ゲイン同定（実機K$\approx$0.4g）とカスケード再設計スクリプト作成、\texttt{design\_before\_after.png}生成 \\
+2026-06-27 & \texttt{f279d68c, 39fabc35, 9ce453be, 91c4e9f5} & POS\_HOLD 3分飛行の長時間ふらつき解析、高度ふらつき外乱同定・D項検討・積分強化検討 \\
+2026-07-02 & \texttt{2180f0dc} & 原稿構成計画（MANUSCRIPT\_PLAN.md）承認・追加 \\
+2026-07-04 & \texttt{fc958772} & オンボード・ホバー推力学習（学習値をNVSに\texttt{hover.thrust\_corr}として保存） \\
+2026-07-05 & \texttt{32e9e7f9} & vehicle\_new → vehicle 昇格（旧vehicleはvehicle\_oldへ降格）。MANUSCRIPT\_PLAN.mdの\texttt{firmware/vehicle\_new/...}パス記述はこの3日後の変更で陳腐化 \\
+2026-07-13 & \texttt{3962633c, b4a333e9, 7e8cd01c, 16a7e9be} & ヨートルク飽和解析スクリプト追加、旧CSVからのヨートルク再構成、会場向け高度保持解析、位相スケジュール高度積分時間 \\
+2026-07-15 & \texttt{e7315999} & 実測モータ/プロペラ諸元（2026-07-15計測）を物理ツール・SILプラントへ反映 \\
+2026-07-17 & \texttt{0ae4deab, a9235fcb} & ミキサ$\kappa$を実測値化＋ヨーゲイン再スケール（NT金沢展示でのヨー飽和対応）、ロールゲインA/B調整 \\
+2026-07-18 & \texttt{0f34a2b2, 42c984c4, 8ce52604, ffbdae55, 1785143a} & 高度DOB（外乱オブザーバ）設計→実装→初回実機A/B→既定昇格。A/B結果: 高度std 55.2mm（静穏窓）vs 167.2mmベースライン（$\approx$67\%改善）、radial rms 55.2 vs 69.3mm。同日ロール手動チューン既定化(kp=1.0e-3, td=0.001) \\
+2026-07-22 & \texttt{3d1a35ed} & SIL model-match gate: レートループ(b,T,L)をSIL vs 実機同定で数値比較する仕組み。注: POS\_HOLD位置ループのゲイン注入とは別物（ACROレートループのSIL忠実度ゲート） \\
+2026-07-27 & \texttt{1626e313} & MOTOR\_CT切替のログ駆動再検証。「補正不要仮説」は反証、corr既定を1.12→約0.90へ切替提案（未反映・意思決定待ち） \\
+2026-07-29 & \texttt{50905d04, 2374fc3d, 6c997eac, 74bc7e07} & 飛行中熱ドリフト研究、V(T)曲線同定の試み（形状同定不能と判明）、熱ドリフト主張の格下げ（未確定に訂正）、モータ電気特性測定手順書(E1-E5)作成 \\
+\bottomrule
+\end{longtable}
+
+補足: 2026-07-13〜07-29の一連（ヨートルク飽和・MOTOR\_CT・熱ドリフト）はモータ/推力モデルの精密化であり、POS\_HOLDの位置・速度カスケードそのものへの変更ではない。原稿4章の「トルク効き0.4〜0.7倍」の裏付けデータとして間接的に関係し得るが、MANUSCRIPT\_PLAN.md承認後にこれらを論文へ反映した形跡は確認できなかった。
+
+\subsection{POS\_HOLD「実効ゲイン欠損」の詳細}
+
+出典: \texttt{poshold\_journey.md} §4.3（:148-164）、\texttt{control\_theory\_overview.md} §5.4（:255）、\texttt{params.cpp:749-770} コメント。
+
+POS\_HOLDのカスケードは2026-06-05に初実装されたが発散していた（WIP）。2026-06-06に運動加速度補償版accel-attitudeで全軸保持に成功し、position.vel.kpを0.3→0.8とした。しかしその後の実機飛行（2026-06-22）でSIL上は合格していたゲインで発散が生じ、以下の実効ゲイン欠損が同定された。
+
+\begin{itemize}[leftmargin=*]
+  \item 実効「傾き→速度」ゲイン: $K \approx 0.4g$（理想は$g$）。3手法（開ループfit・振幅関係・較正）が一致（\texttt{poshold\_journey.md:150}）。
+  \item 内訳: 姿勢ループの傾き未達（指令傾きに対し実傾き $\approx 0.58$）× フロー速度の過小読み（$\approx 0.66g$）（\texttt{poshold\_journey.md:152-154}）。$0.58 \times 0.66 \approx 0.383 \approx 0.4$。
+  \item 姿勢未達の根: 実機モータのトルク効き0.4〜0.7倍（ACRO発振解決時に同定済み、\texttt{control\_theory\_overview.md:166}）。
+  \item 実機発散の症状: 周期約9.4秒、振幅$\pm0.37\rightarrow0.50\rightarrow0.62$mと成長する緩い水平振動（不安定リミットサイクル）、$\omega\approx0.68$\,rad/s, $\sigma\approx+0.057$/s（\texttt{poshold\_journey.md:144}）。
+  \item 理想ゲイン下の安定性: $K=g$（理想）なら現ゲインは安定（$\sigma -0.124$）\textbf{＝SIL合格・実機墜落の正体}（\texttt{poshold\_journey.md:164}）。SILの内部プラントは理想ゲイン$g$を仮定しており、実機の実効ゲイン欠損$0.4g$を再現していなかったため、SIL上のみ安定と判定されていたと解釈できる。
+  \item 再設計（\texttt{poshold\_loop\_design.py}使用）: \texttt{position.vel.kp} 0.8→3.0、\texttt{position.pos.kp} 1.0→0.4（\texttt{poshold\_journey.md:170-173}、\texttt{params.cpp:771,773}現在値と一致）。ロバスト安定域: $K\in[2.8,7]$（傾き→速度ゲイン, m/s$^2$/rad）, $\tau\in[50,300]$ms（\texttt{poshold\_journey.md:175}）。
+  \item 実機検証結果: 発散振動完全消失、保持精度$\pm6$〜7cm, RMS 16mm、定常ドリフト31→16mm、有界性（前半RMS 0.028m $\approx$ 後半RMS 0.031m）（\texttt{poshold\_journey.md:177-182}）。
+  \item 限界の言明: att.kpを上げても1.2Hz共振のみ、att.tiを下げても僅少 --- 姿勢ループのチューニングに伸びしろ無し。$\pm6$〜7cmが37g機のトルク効きでの実用限界（\texttt{poshold\_journey.md:184}）。
+\end{itemize}
+
+なお \texttt{poshold\_accel\_compensation.md} 末尾（:199-210）には初回実機飛行（2026-06-22, log \texttt{20260622T161055}）時点の暫定値として \texttt{position.vel.kp} 0.8→2.0, \texttt{position.pos.kp} 1.0→0.3 の記載があるが、これは \texttt{poshold\_journey.md} 記載の最終確定値（vel.kp=3.0, pos.kp=0.4）に至る前段の暫定対策であり、両文書は時系列上の異なる時点を記録している（矛盾ではなく経緯の記録、第8章(6)で再掲）。\texttt{params.cpp} の実装値は最終確定値と一致する。
+
+% ============================================================
+\section{工夫点の整理（論文の材料候補）}
+% ============================================================
+
+本章は事実として確認できた工夫点を列挙する。各項に出典を付す。
+
+\subsection{(a) 飛行ログからの実効ゲイン欠損の定量同定}
+
+実機のPOS\_HOLD発散を、開ループfit・振幅関係・較正の3手法で $K \approx 0.4g$ と一致同定した（第5.1節、\texttt{poshold\_journey.md:150}）。SIL上は理想ゲイン$g$を仮定していたため合格していたが、実機は$0.4g$しか出ておらず、この欠損がSIL合格・実機発散の乖離の正体であった（\texttt{poshold\_journey.md:164}）。
+
+\subsection{(b) 点校正でなく変動域へのロバスト再設計}
+
+単一の同定値$K\approx0.4g$に対して点校正するのではなく、$K\in[2.8,7]$（m/s$^2$/rad）、$\tau\in[50,300]$msという変動域を仮定してロバスト安定な再設計を行った（\texttt{poshold\_loop\_design.py}使用、\texttt{poshold\_journey.md:175}）。
+
+\subsection{(c) SIL（実ファームのホスト実行・決定論）とModel Identity還流}
+
+SIL Plant時間基準バグ修正（2026-06-03, \texttt{cea0d8cf}、物理3倍速→4000Hz化+固定timestep）により決定論的な空中ホバーが成立した。POS\_HOLDカスケードの初期実装（2026-06-05）から本格的な閉ループ検証（2026-06-01のALT\_HOLD、2026-05-31のホバー成立）まで、SILが開発サイクルの中核に置かれている（第5章時系列）。2026-07-22には model-match gate（レートループのSIL vs 実機同定を数値比較する仕組み、\texttt{3d1a35ed}）が追加されたが、これはACROレートループのSIL忠実度ゲートであり、POS\_HOLD位置ループのゲイン注入とは別物である点に注意（\texttt{facts\_history.md}での明記）。
+
+\subsection{(d) 鉛直DOB（IMU比力直接使用でESKF遅れ28msを回避する設計）}
+
+速度ループが見る合計遅れ$\approx110$msのうち、アクチュエーション側$\approx82$ms（$L$=62ms+$T$=20ms）に対し、ESKF速度推定側が$\approx28$ms加わる（\texttt{README.md:85-86}、第4.6節）。DOBはIMU比力を直接使用することでこのESKF側の遅れを回避する設計である。実機A/Bで高度std $-67\%$（55.2 vs 167.2mm、第7章）を確認したが、既定はオフ（オプトイン）である（第3.6節）。
+
+\subsection{(e) オンボード・ホバー推力学習（NVS永続化）}
+
+速度ループの定常出力を時定数20sで\texttt{hover\_thrust\_}へ畳み込み、着陸時にNVSへ永続化する（第3.7節、\texttt{pid\_controller.cpp:968-1022}）。
+
+\subsection{(f) 実装細部（条件付き積分AW・フェーズ別ti・D-on-M等）}
+
+条件付き積分アンチワインドアップ（\texttt{pid.hpp:108-133}）、鉛直速度ループのフェーズ別積分時間スケジュール（\texttt{applyAltVelTiForPhase()}）、D-on-M（測定値微分によるキック回避、\texttt{pid.hpp:20-31}）、不完全微分（$\eta=0.125$）のTustin離散化（第3.2節）。
+
+\subsection{(g) INVによる構造規律}
+
+アーキテクチャ不変条件INV-1〜4（第2.7節）により、着陸時のフィードバック並列経路バグ（2026-06-14契機）の再発を防ぐ構造的規律を導入している。
+
+\subsection{(h) 教育目的の4階層アクセス}
+
+L0〜L3の4階層アクセス制御（第2.3節）により、初心者からファーム実装者まで同一コードベースを段階的に利用できる設計としている。
+
+% ============================================================
+\section{実飛行実績の数値一覧}
+% ============================================================
+
+指標定義は文書間で統一されていない（原稿計画の弱点④として記録済み、第9章参照）。以下は各出典の記載をそのまま転記する。
+
+{\footnotesize
+\begin{longtable}{@{}p{3.6cm}p{3.4cm}p{7.6cm}@{}}
+\toprule
+日付・出典 & 指標 & 数値 \\
+\midrule
+\endhead
+2026-06-22 \newline\texttt{poshold\_journey.md} & 保持精度（手放しホバー） & $\pm6$〜7cm, RMS 16mm \\
+ & 定常ドリフト & 31→16mm（改善前後） \\
+ & 有界性 & 前半RMS 0.028m $\approx$ 後半RMS 0.031m \\
+\midrule
+2026-06-27 \newline\texttt{poshold\_3min\_battery\_\allowbreak wobble\_20260627.md}（178秒の3分飛行） & 水平位置保持 & 平均drift約13cm, std 4.2cm, 最大24.5cm, 卓越周波数0.09Hz \\
+ & 姿勢 & roll/pitch $\pm7°$, std 1.6°（健全と判定） \\
+ & 高度std（前半, V$>$3.6V, $\sim$100秒まで） & 25--40mm（良好） \\
+ & 高度std（後半, V$<$3.6V） & 62→86→132mmへ増大、最悪窓でp2p約44cm \\
+ & 相関係数 & corr(電圧,高度std)$=-0.78$、corr(電圧,ホバーduty)$=-1.00$、corr(電圧,水平drift\_rms)$=+0.93$ \\
+ & 電池電圧推移 & 地上4.168V→離陸直後3.872V→最終3.488V（約$-2.1$mV/秒の単調サグ） \\
+\midrule
+2026-07-18 高度DOB \newline 初回実機A/B\newline（\texttt{0f34a2b2}） & 高度std & 108.7mm（全区間）/ 55.2mm（静穏窓） vs 167.2mmベースライン \\
+ & radial rms & 55.2 vs 69.3mm（同条件エアコン下） \\
+ & $\hat{d}$クランプ飽和 & 0\%（最大78\%まで） \\
+\bottomrule
+\end{longtable}
+}
+
+2026-06-27の解析結論として記載されている内容: 高度ふらつきの主因は電池消耗（V$<$3.6Vでのモータ推力頭打ち/非線形化）であり、水平・姿勢制御には問題がないとされている（\texttt{poshold\_3min\_battery\_wobble\_20260627.md}）。
+
+% ============================================================
+\section{文書・実装・記録の食い違い（生の報告）}
+% ============================================================
+
+以下は調査で発見された文書・実装・記録間の食い違いを、隠さずそのまま記録したものである。
+
+\subsection*{(1) コンポーネント数の不一致}
+
+実ディレクトリ数（\texttt{ls firmware/vehicle/components/}）は\textbf{30}: \texttt{sf\_actuator, sf\_api, sf\_autotune, sf\_board, sf\_calibration, sf\_comm, sf\_command, sf\_controller, sf\_controller\_pid, sf\_core, sf\_estimator, sf\_estimator\_complementary, sf\_estimator\_eskf, sf\_failsafe, sf\_hal\_bmi270, sf\_hal\_bmm150, sf\_hal\_bmp280, sf\_hal\_button, sf\_hal\_buzzer, sf\_hal\_led, sf\_hal\_motor, sf\_hal\_pmw3901, sf\_hal\_power, sf\_hal\_vl53l3cx, sf\_logger, sf\_math, sf\_notify, sf\_state, sf\_takeoff\_landing, sf\_telemetry}。
+
+\texttt{architecture.md} 本文の日本語版は「実装コンポーネント数: \textbf{27}（HAL 10 + 責務系14 + コア基盤3）」（\texttt{architecture.md:145}）、英語版は「Implemented component count: \textbf{26} (HAL 10 + responsibility-mapped 14 + infra 2)」（\texttt{architecture.md:698}）と\textbf{日英で数値が異なる}（コア基盤3 vs infra 2、\texttt{sf\_board}の扱いが日本語版では別カウント、英語版では未反映）。英語版側には「v3 update note: 日本語§2はR1-R16・BSP層・4階層アクセスモデルで拡張されたが英語訳は未完了（M1cで完了予定）」という明示的な注記がある（\texttt{architecture.md:627}）。
+
+さらに実ディレクトリ数30に対し、文書の対応表（\texttt{architecture.md:125-143}）には \texttt{sf\_api}, \texttt{sf\_autotune}, \texttt{sf\_estimator\_complementary} の3コンポーネントが\textbf{掲載されていない}。これは文書が実装の後発追加分を反映しきれていないことを示唆する（推測せず、事実として「文書記載と実ディレクトリの間に差分がある」とのみ記録する）。
+
+\subsection*{(2) MANUSCRIPT\_PLAN.md のパス記述の陳腐化}
+
+\texttt{MANUSCRIPT\_PLAN.md} が参照する7箇所の \texttt{firmware/vehicle\_new/...} パス記述は、2026-07-05の \texttt{vehicle\_new → vehicle} 昇格（\texttt{32e9e7f9}、\texttt{MANUSCRIPT\_PLAN.md} 承認の3日後）により陳腐化している。実体は同名で新パス \texttt{firmware/vehicle/} 配下に存在確認済みである。\texttt{simulator/sil/} と \texttt{logs/*.jsonl} の記載は変更なく実在する。
+
+\subsection*{(3) 高度DOB既定値の食い違い（解決済み・真相は同日差し戻し）}
+
+第3.6節に記載の通り、auto-memory記録は「既定有効化完了」（2026-07-18のDOB既定昇格 \texttt{ffbdae55} 時点の状態）としているが、現HEADの実装（\texttt{params.cpp}）は既定0.0（無効）である。真相は同日約100分後の差し戻し（\texttt{0a3d8a39}）であり、矛盾ではなく記録更新の遅れである。加えて \texttt{params.cpp:463} 付近には昇格時代の「既定1.5Hz=有効」というコメントが残存しており、table[]の既定0.0と字面上矛盾している（コメント整備の要修正点）。
+
+\subsection*{(4) リミット値がparam SSOT外}
+
+第3.4節に記載の通り、位置・速度・姿勢・レート各段の出力リミット（\texttt{max\_pos\_tilt\_}, \texttt{max\_thrust\_} 等）は \texttt{pid\_controller.hpp} 内のコンパイル時定数であり、\texttt{params::get\_float} で読み込まれない。すなわちNVS経由のライブパラメータ変更（param SSOT）の対象外である。
+
+\subsection*{(5) 機体質量が設計文書になくコードのみ}
+
+第2.1節に記載の通り、機体質量0.037kgは指定4文書（requirements.md / architecture.md / hardware\_init.md / coding\_and\_education.md）のいずれにも記載がなく、\texttt{pid\_controller.hpp} のコード内定数（コメント付き）としてのみ確認できる。
+
+\subsection*{(6) poshold\_accel\_compensation.md と poshold\_journey.md のゲイン値の違いは時系列上の別時点}
+
+第5.1節末尾に記載の通り、\texttt{poshold\_accel\_compensation.md} 記載の暫定ゲイン（\texttt{position.vel.kp} 0.8→2.0, \texttt{position.pos.kp} 1.0→0.3、2026-06-22初回飛行時点）と、\texttt{poshold\_journey.md} 記載の最終確定値（vel.kp=3.0, pos.kp=0.4）は矛盾ではなく、同一の再設計プロセス内の異なる時点（暫定対策→最終確定）を記録したものである。現在の \texttt{params.cpp} 実装値は最終確定値と一致する。
+
+% ============================================================
+\section{原稿執筆に向けた現状}
+% ============================================================
+
+\subsection{MANUSCRIPT\_PLAN.md §5 残作業チェック（facts\_history.md §3 照合）}
+
+{\footnotesize
+\begin{longtable}{@{}p{0.5cm}p{4.0cm}p{2.3cm}p{7.7cm}@{}}
+\toprule
+\# & 計画項目 & 状態 & 根拠 \\
+\midrule
+\endhead
+1 & SILへの同定ゲイン注入実験（旧ゲイン発散再現・新ゲイン安定確認） & 未着手 & \texttt{git log --all --since=2026-07-02 --grep="poshold" -i} はMANUSCRIPT\_PLAN追加コミット(\texttt{2180f0dc})のみ。\texttt{simulator/sil/scenarios/} の \texttt{pos\_reposition.scn} / \texttt{pos\_auto\_takeoff.scn} は既存の機能検証シナリオで、同定K・$\tau$注入の専用実験は見当たらない。7/22の\texttt{3d1a35ed}(model-match gate)はレートループの話で別物 \\
+2 & \texttt{poshold\_loop\_design.py}によるボード線図/安定余裕図の論文品質再生成 & 未着手（暫定図のみ存在） & \texttt{design\_before\_after.png}（6/22生成）は計画承認前の図。7/2以降に再生成コミットなし。bode/margin/stability等の名称のファイルも見つからず \\
+3 & LaTeXテンプレート作成 & 未着手 & \texttt{docs/hikoki64/} には \texttt{guideline.pdf}, \texttt{template.docx}, \texttt{MANUSCRIPT\_PLAN.md} のみ。本報告作成前は.texファイルなし \\
+4 & 実飛行ログ \newline\texttt{logs/stampfly\_udp\_\allowbreak20260627T020137.jsonl} の存在確認 & 存在確認済み & 実在（256591行/55MB） \\
+5 & \texttt{firmware/vehicle\_new/...}パスの食い違い & 食い違いあり（第8章(2)参照） & MANUSCRIPT\_PLAN.mdが参照する7パス全て\texttt{firmware/vehicle\_new/}のまま記載。実体は2026-07-05の昇格(\texttt{32e9e7f9})で\texttt{firmware/vehicle/}配下に移動済み \\
+\bottomrule
+\end{longtable}
+}
+
+総括: MANUSCRIPT\_PLAN.md §5の作業計画7項目（うち1項目は任意の \texttt{eskf\_replay} アブレーション）のうち、実質的に着手済みなのは材料の存在のみである。①SIL注入実験、②図の論文品質再生成、③LaTeXテンプレート、④性能指標統一比較表、⑤本文執筆はすべて確認できる範囲で未着手。締切2026-08-07に対し、オフライン実験部分がまるごと残っている。
+
+\subsection{解析レポート・スクリプト棚卸し}
+
+\begin{table}[h]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}lY@{}}
+\toprule
+ファイル & 一行説明（存在確認済み） \\
+\midrule
+\texttt{analysis/scripts/poshold\_attID.py} & 実効「傾き→速度」ゲインK同定（2026-06-22 17:53, 9122 bytes） \\
+\texttt{analysis/scripts/poshold\_loop\_design.py} & 位置カスケードPID再設計・安定余裕評価（2026-06-22 16:37, 11306 bytes、Bodeプロット専用関数は未確認） \\
+\texttt{analysis/scripts/poshold\_alt\_loop\_sim.py} & 高度ループ再生シミュレーション（2026-06-27 02:42, 7020 bytes） \\
+\texttt{analysis/scripts/poshold\_analysis.py} & POS\_HOLD全体メトリクス＋図生成（2026-06-22 16:16, 16723 bytes） \\
+\texttt{analysis/scripts/poshold\_battery\_wobble.py} & 3分飛行の時間分割・電圧相関解析（2026-06-27 02:12, 4724 bytes） \\
+\texttt{analysis/reports/poshold\_3min\_battery\_wobble\_20260627.md} & 3分飛行ログの高度/位置ふらつきと電池電圧の相関レポート（2026-06-27 02:12, 5850 bytes） \\
+\texttt{analysis/reports/poshold\_altitude\_wobble\_measures\_20260627.md} & 高度ふらつき対策の検討レポート（2026-06-27 02:29） \\
+\texttt{analysis/out/poshold/design\_before\_after.png} & 修正前後比較図（2026-06-22 16:40, 120KB、論文品質での再生成は未確認） \\
+\texttt{analysis/out/poshold/*.png}（飛行ログ図5点） & 個別フライトログの可視化図（2026-06-22〜06-27） \\
+\texttt{analysis/out/poshold/metrics.json} & メトリクス数値のJSON（2026-06-27 02:08, 1326 bytes） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+MANUSCRIPT\_PLAN.mdが列挙する4スクリプト・1レポートはすべて実在確認済みである。ただしいずれも最終更新は2026-06-27までで、原稿計画承認（2026-07-02）以降に更新の痕跡はない（\texttt{git log --since=2026-07-02} でこれらのパスへの変更コミット0件）。
+
+\subsection{締切までの残日数}
+
+本報告作成日2026-08-01時点で、締切2026-08-07まで\textbf{6日}である。
+
+% ============================================================
+\section{未確認事項一覧}
+% ============================================================
+
+全材料ファイルに記載された「未確認」項目を統合して列挙する。
+
+\begin{itemize}[leftmargin=*]
+  \item コアピン留め（CPU0/CPU1タスク割り当て）: 4指定文書中に記載なし。別のauto-memory記録に「真因=コア1飽和」という記述はあるが指定文書には未記載。
+  \item 機体質量0.037kgの設計文書上の記載: \texttt{requirements.md}/\texttt{architecture.md}にはなし。コード（\texttt{pid\_controller.hpp}）から確認した値であり、指定4文書外の出典。
+  \item \texttt{coding\_and\_education.md} §3〜5（Examples詳細構成・チュートリアル計画・実装優先順位の本文）: 見出しのみ確認、本文は未読のため詳細未確認。
+  \item \texttt{sf\_api}, \texttt{sf\_autotune}, \texttt{sf\_estimator\_complementary} の3コンポーネントの責務定義: \texttt{architecture.md}の対応表に掲載なく、文書上の正式な責務記述は未確認（ディレクトリ存在のみ確認）。
+  \item ESKF更新のジョセフ形式: 設計文書（\texttt{control\_theory\_overview.md:82}）の記載のみ確認し、\texttt{eskf\_core.cpp} の該当実装行は直接照合していない。
+  \item \texttt{kTakeoffCaptureBandM}, \texttt{kTakeoffSettleCycles} の具体的数値: 未読み取り。
+  \item \texttt{altitude.vel.ti\_hover} の実運用値がclimb用tiと異なるかどうか: \texttt{params.cpp} 既定値からは差が読めない（既定は両方2.5）。
+  \item ヨー軸モデル（\texttt{yaw\_axis\_model.md}）: 要求範囲外のため未読了。
+  \item \texttt{poshold\_loop\_design.py}にボード線図描画専用の関数があるか: 未確認。
+  \item \texttt{design\_before\_after.png}の図の中身: 画像未確認、ファイル名からの推定に留まる。
+  \item モータ電気特性・熱ドリフト系の一連（2026-07-27〜07-29）が原稿4章「トルク効き0.4〜0.7倍」の数値に反映される予定かどうか: 意思決定待ちの状態。
+\end{itemize}
+
+\end{document}
