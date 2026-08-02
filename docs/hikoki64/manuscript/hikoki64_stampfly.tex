@@ -369,20 +369,160 @@ $L\in[50,300]$\,ms% src: poshold\_journey.md:175
 \end{table*}
 
 % ------------------------------------------------------------------------------
+% 4章「小型機ゆえの困難」 起草（v3計画 配分0.75p）
+% 内容: Crazyflie既報と対応付け可能な3件（電池電圧の低下／モータのトルク効きと
+%       個体差／オプティカルフローの床面依存）＋本機の観測値。対処済み/残存を
+%       表で明示。5章「到達点と課題」との重複回避（詳細は5章へ1文誘導のみ）。
+% 統合時の注意: 本文中の「オプティカルフロー」「ToF」は1章・3章で既に初出定義
+%   済みのため，本章では再定義しない。SQUAL棄却ゲートの説明も3.2節記載済みの
+%   ため重複記述しない（本章では「3.2節」として参照するのみ）。
+% ------------------------------------------------------------------------------
 \section{小型機ゆえの困難}
-% v3計画: Crazyflie既報と対応付け可能な3件（電池電圧の低下／モータ個体差・トルク効き／
-% フロー床面依存）＋本機の観測値。対処済み/残存を表で明示。0.75p。
-% TODO: 本文執筆（次ステップ）。
-（本章は執筆中である．電池電圧の低下・モータ個体差・オプティカルフローの床面依存
-という小型機に共通の困難を，Crazyflie における既報と対応付けて述べる．）
+\label{sec:difficulties}
+
+開発過程では，小型機に特有ないくつかの困難に遭遇した．いずれもCrazyflieに
+おける既報と対応付けられる現象であり，以下に本機での観測値と対処を示す
+（表\ref{tab:difficulties}）．詳細な残存課題は5章で扱う．
+
+第一に，電池電圧の低下である．3分間の連続したPOS\_HOLD飛行では，電池電圧が
+離陸直後の3.87\,Vから飛行終盤の3.49\,V程度まで低下し
+% src: analysis/reports/poshold_3min_battery_wobble_20260627.md:27,29
+，電圧と高度保持のばらつき（標準偏差）の相関は$-0.78$であった
+% src: analysis/reports/poshold_3min_battery_wobble_20260627.md:13,47
+．推力指令をデューティへ変換する段ではリアルタイムの電源電圧を用いて補償して
+おり
+% src: firmware/vehicle/components/sf_actuator/actuator.cpp:105-108,117
+，電圧とホバー時デューティの相関は$-1.00$に達したことから，補償が機能して
+いることを確認した
+% src: analysis/reports/poshold_3min_battery_wobble_20260627.md:14-15,49
+．Crazyflieでも電池電圧の低下に対する補償式が示されている\cite{giernacki2017}．
+
+第二に，モータのトルク効きと個体差である．実機モータの実効トルクは理論値の
+0.4〜0.7倍にとどまる
+% src: firmware/vehicle/docs/control_theory_overview.md:166
+．単一の値へ校正するのではなく，この変動域全体で安定となるよう位置制御系を
+設計した（3.3節）．Crazyflieでも個体ごとのモータ推力特性の同定が報告されて
+いる\cite{forster2015,eschmann2024}．
+
+第三に，オプティカルフローの床面依存である．3.3節で同定した速度スケール
+（$\approx 0.66$，既出）は，個体差・床面・電圧によって変動しうる量であり
+% src: docs/hikoki64/MANUSCRIPT_PLAN.md:69（4章の防御問答）
+，単点の校正ではなくSQUALによる棄却ゲート（3.2節）と変動域を見込んだロバス
+ト設計（3.3節）で対処した．本機でのフロー品質は良好であった（SQUAL中央値
+160）
+% src: analysis/reports/poshold_3min_battery_wobble_20260627.md:79
+．ただし床面条件に対する定量的な依存性の評価は行っておらず，残存課題として
+5章で扱う．
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{小型機ゆえの困難：本機の観測値と対処}
+\label{tab:difficulties}
+\begin{tabularx}{\columnwidth}{@{}X X X X@{}}
+\toprule
+困難 & 本機の観測 & 対処 & 残存課題 \\
+\midrule
+電池電圧の低下 &
+3分飛行で3.87→3.49\,V，corr(V,高度std)$=-0.78$ &
+duty変換での電圧補償（corr$=-1.00$） &
+低電圧域の非線形性（5章） \\
+モータのトルク効き・個体差 &
+実効トルク理論値の0.4〜0.7倍 &
+変動域ロバスト設計（3.3節） &
+個体差の定量評価（5章） \\
+フローの床面依存 &
+速度スケール$\approx$0.66，SQUAL中央値160 &
+SQUALゲート＋変動域設計 &
+床面条件依存の評価（5章） \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 % ------------------------------------------------------------------------------
 \section{到達点と課題}
-% v3計画: 冒頭に再設計後の実績（記録24飛行・計約25分、多様条件で位置発散の再発なし）
-% ＋保持性能（条件付き表）／残存課題／今後／開発基盤の現状小節。0.75p。
-% TODO: 本文執筆（次ステップ）。
-（本章は執筆中である．再設計後の飛行実績と位置保持の精度，残存する課題，
-および開発基盤の現状を述べる．）
+% 執筆: 5章担当（v3計画 章構成表）。配分0.75p。
+% 出典: docs/hikoki64/prep/verification_findings_20260802.md（実績・残存課題）、
+%       firmware/vehicle/docs/poshold_journey.md、
+%       docs/hikoki64/prep/firmware_position_control_report.tex §7（性能指標一覧）、
+%       analysis/scripts/alt_dob_design/README.md（高度DOB検証飛行の付随データ）、
+%       docs/hikoki64/prep/crazyflie_gap_analysis.md（Crazyflie対比・今後の発展）、
+%       docs/hikoki64/prep/gap/sf_ecosystem.md §3,§4（開発基盤の現状）、
+%       docs/hikoki64/MANUSCRIPT_PLAN.md §7（高度DOBを成果として扱わない方針）。
+% 統合時の注意: 「SILS」「モデル一致ゲート」「ロール・ピッチ軸は合格」等は2章末で
+% 既出のため，本章では要点のみ簡潔に参照する（重複記述を避ける）。
+
+再設計後，2026年6月22日から7月18日にかけて記録された飛行24回，飛行時間の合計約25分
+（展示会場，空調による外乱，電池電圧の低下，角速度ループ（内側ループ）ゲインの3通りの
+構成変更を含む多様な条件）において，3.3節で述べたものと同型の位置発散の再発は
+確認されていない
+% src: docs/hikoki64/prep/verification_findings_20260802.md 訂正記録2（27件の記録・飛行24回・計1505秒の実測集計）
+．
+
+位置保持の精度は，評価に用いる指標や評価窓が飛行ごとに異なるため，条件付きの値として
+表\ref{tab:hold_accuracy}に示す．
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{位置保持の精度（条件付きの値）}
+\label{tab:hold_accuracy}
+\begin{tabular}{@{}p{1.4cm}p{2.5cm}p{2.6cm}@{}}
+\toprule
+日付 & 指標と値 & 条件 \\
+\midrule
+2026-06-22 & 位置誤差 $\pm6$--7\,cm，RMS 16\,mm & 手放し \\
+% src: firmware/vehicle/docs/poshold_journey.md:177-182
+2026-06-27 & 目標点からの平均距離 約13\,cm，最大24.5\,cm & 3分間の連続飛行．
+飛行後半は電池電圧の低下の影響あり \\
+% src: docs/hikoki64/prep/firmware_position_control_report.tex §7（実飛行実績の数値一覧，l.683）
+2026-07-18 & 動径方向のRMS 55.2\,mm（過去記録69.3\,mmを更新） &
+手放し約118秒．高度外乱オブザーバの検証飛行，空調による外乱下 \\
+% src: analysis/scripts/alt_dob_design/README.md:4-5
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+\raggedright{\scriptsize 注: 指標の定義と評価窓は出典ごとに異なり，いずれも条件付きの
+値として扱う．}
+\end{table}
+
+Crazyflie系の文献にはxy方向の閉ループでの位置保持の精度を直接示す公表値が
+見当たらないため
+% src: docs/hikoki64/prep/crazyflie_gap_analysis.md §1 #13, §4
+，表\ref{tab:hold_accuracy}は同クラス機の参考値としての報告を兼ねる．
+
+残存する課題は次の4点である．第一に，高度方向の上下動の抑制であり，加速度に基づく
+外乱オブザーバを実装済みであるものの，その有効性の確認は今後の課題である
+% src: docs/hikoki64/MANUSCRIPT_PLAN.md §7 方針決定（2026-08-01）
+．第二に，3.3節で同定した傾き→速度経路の実効ゲインには周波数依存があり，
+0.5--1\,rad/s帯では広帯域の値より小さいことが分かっており
+% src: docs/hikoki64/prep/verification_findings_20260802.md 新たに判明した事実2
+，その機構の解明は残されている．第三に，姿勢達成度にはロール・ピッチ間の非対称が
+見られる
+% src: docs/hikoki64/prep/verification_findings_20260802.md 新たに判明した事実3
+．第四に，2章で述べたSILSのモデル一致ゲートにおいて，ロール・ピッチ軸は合格する
+一方でヨー軸は不合格のままである
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §2.6
+．このほか，表\ref{tab:difficulties}に残存として示した低電圧域の非線形性，
+モータ個体差および床面条件の定量的な評価も今後の課題である．
+
+今後の発展としては，軌道追従機能の実装，制御器差し替えの拡充（差し替え用の
+インターフェースは実装済みである），外部測位の観測経路の追加が挙げられる
+% src: docs/hikoki64/prep/crazyflie_gap_analysis.md §3
+．
+
+\subsection{開発基盤の現状}
+
+開発基盤としては，15レッスンからなるワークショップ教材
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §3.1
+，ブラウザ上で動作するブロックプログラミング環境
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §3.3
+，Tello互換のPython SDK
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §6.6
+，GUIインストーラ
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §4.1
+，開発作業全般を統合するsf CLI
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §1
+を整備している．
 
 % ------------------------------------------------------------------------------
 \section{まとめ}

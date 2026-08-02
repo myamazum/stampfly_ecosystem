@@ -203,9 +203,12 @@ def make_fig1():
     ax.annotate("OLD\n$k_{p,\\mathrm{pos}}$=1.0, $k_{p,\\mathrm{vel}}$=0.8",
                 xy=(K_grid[-1], sig_O[-1]), xytext=(K_IDEAL - 0.35, sig_O[-1] - 0.075),
                 ha="right", va="top", fontsize=6.8, color=O_COLOR, zorder=5)
+    # white bbox + placement below the sigma=0 dotted line so the label is not
+    # struck through by it (visual review fix, 2026-08-02)
     ax.annotate("NEW\n$k_{p,\\mathrm{pos}}$=0.4, $k_{p,\\mathrm{vel}}$=3.0",
-                xy=(K_grid[0], sig_N[0]), xytext=(K_LO + 0.05, sig_N[0] + 0.05),
-                ha="left", va="bottom", fontsize=6.8, color=N_COLOR, zorder=5)
+                xy=(K_grid[0], sig_N[0]), xytext=(K_LO + 0.05, sig_N[0] - 0.045),
+                ha="left", va="top", fontsize=6.8, color=N_COLOR, zorder=5,
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.85))
 
     # target K markers -- labels placed near the bottom axis, clear of both
     # curves and the hatch-band text above them
