@@ -241,7 +241,7 @@ StampFly の開発は，制御系の設計，SILS（Software In the Loop Simulat
 SILSは，実機ファームウェアと同一のソースコードを無改変のままホスト計算機向けにコンパイルし，決定論的に実行する検証環境である% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.2
 ．ESP-IDF／FreeRTOS依存部分をホスト向けスタブに置き換えることで，実機と同じPub-Sub構造の制御ソフトウェアをそのまま動かす．同じソースコードが実機とSILSの双方で動くため，SILSでの合否は設計変更の実機挙動への影響を見積る手掛かりとして使う% src: firmware/vehicle/docs/development_roadmap.md:41--54
 ．ノイズ・外乱は種（シード）付き乱数で与えており，同じ種であれば実行のたびに同一の出力が得られる% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.3
-．回帰試験には42本のシナリオを用い，起動・状態遷移，推定の追従性，閉ループの安定性，アクチュエータの健全性という4種類の数値合格基準（ゲート）で自動判定する% src: simulator/sil/scenarios/*.scn 実測42本(2026-08-03。ゲート分類はsf_ecosystem.md §2.4)
+．回帰試験には42本のシナリオを用い，起動・状態遷移，推定の追従性，閉ループの安定性，アクチュエータの健全性という4種類の数値合格基準（ゲート）で自動判定する% src: simulator/sil/scenarios/*.scn 実測42本(2026-08-03; ゲート分類はsf_ecosystem.md §2.4)
 ．さらに，同一の同定手順をSILSと実機双方の飛行データに適用して結果を数値で突き合わせる仕組み（モデル一致ゲート）を備えており，2026年7月26日時点の計測ではロール・ピッチ軸は合格，ヨー軸は不合格である% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.6
 ．SILSはあくまで理想化したプラントに基づく検証であり，実機との一致は今後も確認を要する項目である旨は5章で改めて扱う．
 
