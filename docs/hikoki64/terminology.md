@@ -21,6 +21,7 @@
 | 頑健性 | ロバスト性／ロバスト設計／ロバスト安定 | 多数（ROBOMECH2013「クアッドコプターの…ロバスト制御」等） | 問題なし |
 | Software-in-the-Loop | **SILS（Software In the Loop Simulation）** ※初出併記 | 第57回自動制御連合講演会(2014) 組込み系SILS | 「SILシミュレーション」は実例未確認 |
 | SITL | **一般語としては使わない**。ArduPilot/PX4のシミュレータに言及する場合のみ固有名として（例:「ArduPilotのSITL」） | SITLはArduPilot/PX4エコシステムのツール呼称。学術文献での出現もツール名言及がほぼ全て（2026-08-02判断） | 概念はSILS/SILで表す |
+| 電池の電圧降下現象 | 「電池電圧の低下」「放電に伴う電圧低下」「負荷時の電圧降下」 | **「サグ」は著者指示（2026-08-02）により会話・論文とも使用禁止** | 補償の文脈は「電圧低下の補償」 |
 | 多重ループ制御 | カスケード制御／カスケード構造 | 計測と制御1-2(1954)以来の確立語 | 問題なし |
 | 慣性センサ | 慣性計測装置（IMU）※初出併記、以後 IMU | 日本船舶海洋工学会論文集21ほか | 問題なし |
 | 飛行記録 | **飛行データ** | KJSASS 54-628「飛行データを伝送」 | 「飛行ログ」は学術実例未確認→使わない |
@@ -45,15 +46,15 @@
 
 | ラベル | 書誌 | 確認レベル・内容 |
 |--------|------|-----------------|
-| forster2015 | J. Förster: System Identification of the Crazyflie 2.0 Nano Quadrocopter, Bachelor Thesis, ETH Zurich, 2015. DOI: 10.3929/ethz-b-000214143 | **全文読了（147頁）**。質量28.0g・慣性行列・推力/トルク写像・モータ離散伝達関数・抗力3モデルを単一個体で同定。パラメータ開示論文の模範。4基間個体差・フロー・サグ・保持精度の言及なし |
-| giernacki2017 | W. Giernacki et al.: Crazyflie 2.0 quadrotor as a platform for research and education in robotics and control engineering, Proc. MMAR 2017, pp.37–42. DOI: 10.1109/MMAR.2017.8046794 | **全文読了**。諸元・既定PIDゲイン表・**電池サグ補償式(5)を明示**。教育プラットフォーム論文の代表。保持精度の定量値なし |
+| forster2015 | J. Förster: System Identification of the Crazyflie 2.0 Nano Quadrocopter, Bachelor Thesis, ETH Zurich, 2015. DOI: 10.3929/ethz-b-000214143 | **全文読了（147頁）**。質量28.0g・慣性行列・推力/トルク写像・モータ離散伝達関数・抗力3モデルを単一個体で同定。パラメータ開示論文の模範。4基間個体差・フロー・電圧低下・保持精度の言及なし |
+| giernacki2017 | W. Giernacki et al.: Crazyflie 2.0 quadrotor as a platform for research and education in robotics and control engineering, Proc. MMAR 2017, pp.37–42. DOI: 10.1109/MMAR.2017.8046794 | **全文読了**。諸元・既定PIDゲイン表・**電池電圧低下の補償式(5)を明示**。教育プラットフォーム論文の代表。保持精度の定量値なし |
 | greiff2017 | M. Greiff: Modelling and Control of the Crazyflie Quadrotor for Aggressive and Autonomous Flight by Optical Flow Driven State Estimation, MSc Thesis, Lund Univ., TFRT-6026, 2017 | **全文読了**。設計手順の体系的記述（モデル→制御→スカラー更新EKF→実機）。PWM-推力比の電池依存を明記。フロー静止ドリフトの理論・実験。高度推定std≈1.6cm等 |
 | eschmann2024 | J. Eschmann, D. Albani, G. Loianno: Data-Driven System Identification of Quadrotors Subject to Motor Delays, arXiv:2404.07837 | 該当箇所読了。CF2.1のモータ時定数 T_m=0.072s（公式実測≈0.073s・Förster 0.065sと3者近接）。モータ個別推力曲線に言及 |
 | mueller2017 | M. W. Mueller, M. Hehn, R. D'Andrea: Covariance Correction Step for Kalman Filtering with an Attitude, J. Guidance, Control, and Dynamics, Vol.40, No.9, pp.2301–2306, 2017 | **アブストのみ（本文ペイウォール）**。Crazyflie公式EKFの理論基盤。引用前に本文入手推奨 |
 | crazysim2024 | C. Llanes et al.: CrazySim: A Software-in-the-Loop Simulator for the Crazyflie Nano Quadrotor, Proc. IEEE ICRA 2024 | 本文未確認（GitHub README・公式ブログ確認）。**「SIL用改造ファームであり実機書込禁止」とREADME明記**＝Code Identity SILSではない。SILS章の差別化の根拠 |
-| — | Bitcraze 公式ブログ・文書群（サグ補償2025/10、フロー床面条件、EKF supervisor 等） | 直接確認済み。困難B.1-B.5の既報の一次情報源。URL引用の形式は要検討 |
+| — | Bitcraze 公式ブログ・文書群（電圧低下補償2025/10、フロー床面条件、EKF supervisor 等） | 直接確認済み。困難B.1-B.5の既報の一次情報源。URL引用の形式は要検討 |
 
-**帰結**: 小型機の困難（モータ個体差・電池サグ・フロー床面依存・遅れ・EKF工夫）は全て Crazyflie 系で既報 → 論文では「発見」と書かず対応付けで引用。Crazyflie に**実機同一ソースの決定論的SILSは無い**（公式discussion #995で非サポート明言）。**xy閉ループ位置保持精度の公表値も見当たらない**（±6〜7cmの報告自体に資料価値）。
+**帰結**: 小型機の困難（モータ個体差・電池電圧の低下・フロー床面依存・遅れ・EKF工夫）は全て Crazyflie 系で既報 → 論文では「発見」と書かず対応付けで引用。Crazyflie に**実機同一ソースの決定論的SILSは無い**（公式discussion #995で非サポート明言）。**xy閉ループ位置保持精度の公表値も見当たらない**（±6〜7cmの報告自体に資料価値）。
 | — | StampFly を扱った学術文献 | **未発見**（2026-08-01時点）→「著者の知る限り先行学術報告は見当たらない」と書ける |
 
 ## 未検証・保留
