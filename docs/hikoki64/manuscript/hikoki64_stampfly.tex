@@ -138,8 +138,8 @@
 %     4章で初出定義／「飛行データ」（「飛行ログ」は使わない）／SILS表記。
 %   - 図: 機体写真（StampFly実機、図1・下部タイトル）→ 写真決定後に挿入。
 %
-本稿は，質量37\,gの超小型クアッドロータ（quadrotor）StampFly を対象とした，
-屋内における位置制御の開発過程を報告するものである．無人航空機（ドローン）の
+本稿は，質量37\,gの超小型クアッドロータ（quadrotor）StampFly（図\ref{fig:stampfly-photo}）
+を対象とした，屋内における位置制御の開発過程を報告するものである．無人航空機（ドローン）の
 応用が屋内の点検・物流や教育・研究へと広がるにつれ，GPS等の衛星測位が利用でき
 ない非GPS環境における位置の推定と制御の重要性が増している．とりわけ質量数十
 グラム級の機体は，人や設備への危害の危険性が小さく屋内での反復実験が容易である
@@ -175,12 +175,12 @@ SILS（Software In the Loop Simulation）で安定を確認した位置制御系
 以下，2章で機体と開発環境，3章で位置制御系の設計と実機での再設計，4章で
 小型機ゆえの困難，5章で到達点と課題を述べ，6章でまとめる．
 
-% \begin{figure}[t]
-%   \centering
-%   \includegraphics[width=0.9\linewidth]{fig_stampfly_photo}
-%   \caption{StampFly実機}
-%   \label{fig:stampfly-photo}
-% \end{figure}
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figs/fig_stampfly_photo.jpg}
+  \caption{StampFly実機（質量37\,g）}
+  \label{fig:stampfly-photo}
+\end{figure}
 
 % ============================================================
 \section{機体と開発環境}
