@@ -305,7 +305,9 @@ $\chi^2$ゲート（自由度3，有意水準0.95に対応する閾値7.81）% s
 SILSによる検証に合格したカスケードで臨んだ初の実機飛行（2026-06-22）では，
 離陸から約15\,秒% src: 飛行窓14.51s, verification\_findings\_20260802.md \#1（確定）, paper\_figs.py flight\_window
 のうちに水平方向の変位（動径 $r=\sqrt{x^2+y^2}$）が振動を伴いながら増大し，終端で約0.75\,mに達し% src: paper\_figs.py（r\_max=0.746 m at t=16.31 s）, logs/stampfly\_udp\_20260622T161055.jsonl
-，壁への接触に至り推力を停止して飛行を終えた% src: verification\_findings\_20260802.md \#1（thrustカット）（図\ref{fig:divergence}）．この乖離の原因を探るため，
+，壁への接触に至り推力を停止して飛行を終えた（図\ref{fig:divergence}）
+% src: verification\_findings\_20260802.md \#1（thrustカット）
+．この乖離の原因を探るため，
 専用のスティック加振飛行データを用い，指令傾き（角度指令）とジャイロ積分による
 実傾きとの回帰から姿勢達成度を，加速度の慣性積分によって得た速度とESKF出力速度
 との回帰からオプティカルフロー由来の速度のスケールを，それぞれ切片なしの
