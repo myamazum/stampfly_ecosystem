@@ -41,6 +41,7 @@
 
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{tabularx}
 \usepackage{amsmath}
 
 % ---- 文字サイズ・行間 --------------------------------------------------------
@@ -157,19 +158,22 @@ Crazyflie 用の Flow Deck\cite{flowdeck}，数十グラム級機体への実装
 本稿の主眼は，開発過程で遭遇した「シミュレーションでは安定，実機では発散」
 という乖離の解明と解決の過程にある．実機と同一の制御ソフトウェアを実行する
 SILS（Software In the Loop Simulation）で安定を確認した位置制御系が，実機では
-周期約9.4\,sの発散振動を生じた．そこで飛行データから，傾き指令に対して実際に
+飛行開始から約15秒のうちに水平方向の変位が増大する発散を生じた
+% src: verification_findings_20260802.md #1（飛行窓14.5s・radial 0.07→0.75m）
+．そこで飛行データから，傾き指令に対して実際に
 得られる速度応答のゲインを同定した結果，理想値の約4割まで低下しており，その
 内訳が姿勢応答の未達とオプティカルフローによる速度の過小評価との積で説明できる
 ことを明らかにした．さらに，同定値を1点の校正値として扱うのではなく，機体の
 個体差や環境条件による変動域を仮定してロバストに安定となるよう制御系を再設計し，
-実機でホバリング時の位置誤差 $\pm 6$〜$7$\,cm を確認した．最後に，同定した
-ゲインをシミュレーションのモデルへ反映することで実機の発散が再現されること，
-および再設計後の制御系が安定であることを確認し，実機で同定した特性をモデルへ
-反映する開発サイクルの有効性を示す．なお，StampFly を対象とした学術報告は
+実機でホバリング時の位置誤差 $\pm 6$〜$7$\,cm を確認した．最後に，同定したゲインを用いた線形モデルの解析により，当時の設計が不安定と
+なる条件と再設計後の安定を確認し，実機で同定した特性をモデルへ反映する
+開発サイクルの有効性を示す
+% src: verification_findings_20260802.md #5（SILでの発散再現は不成立のため線形モデルで説明: sil_injection_20260802.md）
+．なお，StampFly を対象とした学術報告は
 著者の知る限り見当たらない．
 
-以下，2章で機体と制御系の構成，3章で状態推定，4章で発散の解析とゲインの同定，
-5章で制御系の再設計と実機検証，6章で考察を述べ，7章でまとめる．
+以下，2章で機体と開発環境，3章で位置制御系の設計と実機での再設計，4章で
+小型機ゆえの困難，5章で到達点と課題を述べ，6章でまとめる．
 
 % \begin{figure}[t]
 %   \centering
@@ -178,148 +182,218 @@ SILS（Software In the Loop Simulation）で安定を確認した位置制御系
 %   \label{fig:stampfly-photo}
 % \end{figure}
 
+% ============================================================
+\section{機体と開発環境}
+% ============================================================
+% 執筆: 2章担当（v3計画 章構成表）。配分0.75p。パラメータ表はここには置かない（3.4節）。
+% 出典: firmware_position_control_report.tex（機体諸元・センサ一覧）、
+%       docs/hikoki64/prep/gap/sf_ecosystem.md（SILS実装の事実棚卸し）
+% 統合時の注意: 1章（既存の旧稿）に既に「オプティカルフローセンサ」「ToF（Time of
+% Flight）測距センサ」の初出定義がある場合、本章の重複定義を削る調整が必要。
+
+表1に機体諸元とセンサ構成を示す．姿勢推定には慣性計測装置（IMU）を，水平方向の位置推定にはオプティカルフローセンサを，高度計測にはToF（Time of Flight）測距センサを用いる．前面と下面のToF測距センサは同一型番のセンサをそれぞれ独立に搭載したものであり，前面は障害物検知，下面は高度計測に用いる% src: firmware/vehicle/docs/hardware_init.md:154,158
+．
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{機体諸元とセンサ構成}
+\label{tab:vehicle_spec}
+\begin{tabularx}{\columnwidth}{@{}X l l r@{}}
+\toprule
+項目 & 型番 & I/F & レート \\
+\midrule
+質量 & \multicolumn{3}{l@{}}{37\,g\textsuperscript{a}} \\
+MCU & \multicolumn{3}{l@{}}{ESP32-S3\textsuperscript{b}} \\
+IMU & BMI270 & SPI & 400\,Hz \\
+地磁気センサ & BMM150 & I2C & 25\,Hz \\
+気圧センサ & BMP280 & I2C & 50\,Hz \\
+ToF測距（下面） & VL53L3CX & I2C & 30\,Hz \\
+ToF測距（前面） & VL53L3CX & I2C & 30\,Hz \\
+オプティカルフロー & PMW3901 & SPI & 100\,Hz \\
+電源モニタ & INA3221 & I2C & 10\,Hz \\
+\bottomrule
+\end{tabularx}
+
+\vspace{2pt}
+\raggedright
+{\scriptsize センサ行の出典: \texttt{requirements.md:135--147}．\textsuperscript{a}\,\texttt{pid\_controller.hpp:407,468--470}．\textsuperscript{b}\,\texttt{architecture.md:36,645}．パスは \texttt{firmware/vehicle/docs/} または \texttt{firmware/vehicle/components/sf\_controller\_pid/include/} を基準とする．}
+\end{table}
+
+StampFly の開発は，制御系の設計，SILS（Software In the Loop Simulation）による検証，実機飛行，実機飛行で得た飛行データからのシステム同定，同定結果の制御系モデルへの反映という手順を繰り返すループとして進めている．
+% TODO: 開発フロー図（後日TikZ）
+設計変更はまずSILS上で検証し，問題がなければ実機に反映する．実機飛行で得られた飛行データはオフラインでの同定に用い，同定して得た値は制御系のモデルおよびSILSのプラント（機体運動を模擬する数値モデル）の双方に反映する．設計段階のゲインやフィルタ定数はこのループを通じて段階的に更新される値であり，最終的な推奨パラメータは3.4節にまとめて示す．
+
+SILSは，実機ファームウェアと同一のソースコードを無改変のままホスト計算機向けにコンパイルし，決定論的に実行する検証環境である% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.2
+．ESP-IDF／FreeRTOS依存部分をホスト向けスタブに置き換えることで，実機と同じPub-Sub構造の制御ソフトウェアをそのまま動かす．同じソースコードが実機とSILSの双方で動くため，SILSでの合否は設計変更の実機挙動への影響を見積る手掛かりとして使う% src: firmware/vehicle/docs/development_roadmap.md:41--54
+．ノイズ・外乱は種（シード）付き乱数で与えており，同じ種であれば実行のたびに同一の出力が得られる% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.3
+．回帰試験には40本のシナリオを用い，起動・状態遷移，推定の追従性，閉ループの安定性，アクチュエータの健全性という4種類の数値合格基準（ゲート）で自動判定する% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.4
+．さらに，同一の同定手順をSILSと実機双方の飛行データに適用して結果を数値で突き合わせる仕組み（モデル一致ゲート）を備えており，2026年7月26日時点の計測ではロール・ピッチ軸は合格，ヨー軸は不合格である% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.6
+．SILSはあくまで理想化したプラントに基づく検証であり，実機との一致は今後も確認を要する項目である旨は5章で改めて扱う．
+
+\section{位置制御系の設計と実機での再設計}
+\label{sec:design}
+
+\subsection{カスケード構造とPID形式}
+
+位置制御系は，位置$\rightarrow$速度$\rightarrow$姿勢$\rightarrow$角速度の4段カスケード構造からなり，
+全段が単一の制御周期400\,Hz% src: pid_controller.hpp:443-448（ControlTaskはIMU同期400Hz）
+で，同一の呼び出し内に逐次実行される（外側・内側ループ間の分周は行わない）% src: firmware_position_control_report.tex §3.1（compute()内で分周パターン不検出）
+．位置ループ（P，出力は速度指令 $v_\mathrm{sp}$\,[NED, m/s]）% src: pid_controller.cpp:1326-1327
+の出力は速度ループ（PID，出力は加速度指令 $a_\mathrm{ned}$\,[m/s$^2$]）% src: pid_controller.cpp:1332-1333
+へ渡り，速度ループの出力は機体座標系へヨー回転した後，微小角近似
+$\theta \approx a/g$ により傾き指令へ写像される
+（$\mathrm{pitch}_\mathrm{sp}=-a_{x,\mathrm{body}}/g$，$\mathrm{roll}_\mathrm{sp}=a_{y,\mathrm{body}}/g$% src: pid_controller.cpp:1350-1351
+，重力加速度 $g=9.80665$\,m/s$^2$% src: sf_math.hpp:39, pid_controller.hpp:223
+，$\pm 10$\textdegree（0.1745\,rad）% src: pid_controller.hpp:224
+でクランプ）．傾き指令は姿勢ループ（PID，出力は角速度指令 $\mathrm{rate}_\mathrm{sp}$\,[rad/s]）% src: pid_controller.cpp:455-456
+を経て，最内周の角速度ループ（PID，出力はトルク指令 [Nm]）% src: pid_controller.cpp:774-776
+へ渡る．全段のPID制御器は共通の伝達関数
+
+\[
+C(s)=K_p\left(1+\frac{1}{T_i s}+\frac{T_d s}{\eta T_d s+1}\right)
+\]
+% src: pid.hpp:14
+を持つ．ここで $K_p$ は比例ゲイン，$T_i$\,[s] は積分時間，$T_d$\,[s] は微分時間，
+$\eta$ は不完全微分係数（既定 $\eta=0.125$）% src: pid.hpp:54
+である．微分は目標値でなく測定値に作用させる方式（D-on-M）により目標値ステップでの
+微分キックを避け% src: pid.hpp:20-31
+，積分は台形則と条件付き積分アンチワインドアップ（出力が飽和方向に押される場合は
+積分更新を停止する）を併用する% src: pid.hpp:108-133
+．角速度ループが出力するロール・ピッチ・ヨートルクおよび鉛直推力指令は，
+X型配置の4個のモータ% src: requirements.md:149-156
+への推力配分（以下，ミキサ）によって個々のモータ回転数指令へ変換される．
+% TODO: カスケードブロック線図（後日TikZ、ブロック線図流儀に従い作成）
+
+\subsection{状態推定}
+
+状態推定には15状態の誤差状態カルマンフィルタ（Error-State Kalman Filter, ESKF）を用いる
+（状態は位置・速度・姿勢誤差・ジャイロバイアス・加速度バイアスの各3次元）% src: eskf_core.cpp:14, eskf_core.hpp:36-40
+．オプティカルフローの生出力（画素変位）は，ジャイロ計測値を用いて回転による見かけの
+流れ成分を除去したのち% src: eskf_core.cpp:751-752, eskf_core.hpp:88（flow\_gyro\_scale=1.0）
+，ToFで得た高度でスケーリングして機体座標系の並進速度に変換し% src: eskf_core.cpp:756-757
+，ヨー回転を経てNED座標の速度観測としてスカラー更新する% src: eskf_core.cpp:761-784
+．品質指標SQUALが閾値（既定10）% src: eskf_core.hpp:100, params.cpp:808
+を下回るサンプルおよび高度0.02\,m% src: eskf_core.hpp:89
+未満のサンプルは観測から棄却する．外れ値混入への対策として，イノベーションに対する
+$\chi^2$ゲート（自由度3，有意水準0.95に対応する閾値7.81）% src: eskf_core.cpp:448-462, params.cpp:812
+をはじめとする複数のロバスト化機構を備える．
+
+\subsection{SILS検証から実機発散，実効ゲイン同定，再設計まで}
+
+SILSによる検証に合格したカスケードで臨んだ初の実機飛行（2026-06-22）では，
+離陸から約15\,秒% src: 飛行窓14.51s, verification\_findings\_20260802.md \#1（確定）, paper\_figs.py flight\_window
+のうちに水平方向の変位（動径 $r=\sqrt{x^2+y^2}$）が0.07\,mから0.75\,mへ増大し% src: verification\_findings\_20260802.md \#1, logs/stampfly\_udp\_20260622T161055.jsonl
+，壁に至って飛行を終えた（図\ref{fig:divergence}）．この乖離の原因を探るため，
+専用のスティック加振飛行データから，指令傾きに対する実傾きの達成度
+$\approx 0.58$% src: verification\_findings\_20260802.md \#4（再現・頑健）, poshold\_journey.md:152-154
+と，オプティカルフロー由来の速度のスケール $\approx 0.66$% src: verification\_findings\_20260802.md \#4
+（いずれも0.15--3\,Hz帯の回帰値）% src: verification\_findings\_20260802.md \#5（訂正記録）
+を同定した．両者の積として，実効的な「傾き→速度」ゲインは理想値 $g$ の
+約0.4倍（$K\approx 0.4g\approx 3.9$\,m/s$^2$/rad）% src: poshold\_journey.md:150, verification\_findings\_20260802.md \#4
+にとどまっていたことが分かった．線形カスケードモデルによる解析では，当時のゲイン
+（位置ループ $K_p=1.0$，速度ループ $K_p=0.8$）% src: task2\_pole\_sweep.py GAINS\_O（旧ゲイン）
+は，むだ時間 $L=150$\,ms% src: paper\_figs.py TAU\_PRIMARY=0.15s（K掃引の代表値）
+において $K/g\approx 0.64$--0.80が安定限界であり% src: verification\_findings\_20260802.md \#5
+，これを下回ると不安定となる（例: $K=3.9$\,m/s$^2$/radで支配極の実部
+$\sigma\approx+0.08$〜$+0.11$）% src: verification\_findings\_20260802.md \#5
+．一方，SILSが内部プラントに仮定する理想ゲイン $K=g\approx9.81$\,m/s$^2$/radでは
+安定（$\sigma\approx-0.07$〜$-0.12$）% src: verification\_findings\_20260802.md \#5
+であり，この差がSILS合格・実機発散の乖離を説明する（図\ref{fig:stability}）．
+% 注意: 「SILSで発散を再現した」とは書かない（sil_injection_20260802.md の帰結．3.3節は線形モデルの安定限界計算で乖離を説明する）
+以上を踏まえ，単一の同定値への点校正ではなく，$K\in[2.8,7]$\,m/s$^2$/rad，
+$L\in[50,300]$\,ms% src: poshold\_journey.md:175
+という変動域全体で安定となるようカスケードを再設計した（速度ループゲイン
+0.8→3.0，位置ループゲイン1.0→0.4）% src: poshold\_journey.md:170-173, params.cpp:771,773
+．この再設計は同日中の実機飛行を経て，暫定値（位置ループ1.0→0.3，速度ループ
+0.8→2.0）% src: poshold\_accel\_compensation.md:199-210（2026-06-22初回飛行時点の暫定値）
+から，最終値（位置ループ0.4，速度ループ3.0）% src: poshold\_journey.md:170-173, params.cpp:771,773
+へ確定した．
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figs/fig_divergence_timeseries}
+  \caption{実機飛行（2026-06-22）における水平位置の時系列（横軸は離陸を原点とする
+  時刻 $t$\,[s]，縦軸は位置 [m]）．飛行窓14.5\,秒のうちに動径方向の変位が
+  0.07\,mから0.75\,mへ増大し，記録が終了した．% src: logs/stampfly_udp_20260622T161055.jsonl, analysis/scripts/verify_hikoki64/paper_figs.py
+  }
+  \label{fig:divergence}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figs/fig_stability_boundary}
+  \caption{線形カスケードモデルによる，傾き→速度ゲイン $K$\,[m/s$^2$/rad]
+  に対する支配極実部 $\sigma$\,[1/s] の掃引（むだ時間 $L=150$\,ms）．
+  $\sigma>0$ は不安定を示す．旧ゲイン（$K_{p,\mathrm{pos}}=1.0$，
+  $K_{p,\mathrm{vel}}=0.8$）は $K/g\approx0.64$--0.80を境に安定/不安定が
+  入れ替わるのに対し，新ゲイン（$K_{p,\mathrm{pos}}=0.4$，$K_{p,\mathrm{vel}}=3.0$）
+  は掃引範囲全体で安定である．% src: analysis/scripts/verify_hikoki64/paper_figs.py, task2_pole_sweep.py
+  }
+  \label{fig:stability}
+\end{figure}
+
+\subsection{最終パラメータ}
+
+以上の設計・再設計を経て，本稿執筆時点の実装（現行 \texttt{params.cpp}）における
+位置制御系の最終パラメータを表\ref{tab:params}に示す．これは開発途中の一値では
+なく，本稿が示す唯一の推奨値である．
+
+\begin{table*}[t]
+  \centering\footnotesize
+  \caption{位置制御系の最終パラメータ（本稿の推奨値．現行実装と一致する唯一の
+  現行値）．比較列はCrazyflie 2.0/2.1系の対応値．}
+  \label{tab:params}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    項目 & StampFly（本稿推奨値） & Crazyflie対応値 \\
+    \midrule
+    質量 & 37\,g & 27\,g\cite{giernacki2017} \\ % src: pid_controller.hpp:407,468-470 (StampFly); terminology.md 文献表 giernacki2017 (Crazyflie)
+    鉛直むだ時間 $L$ & $\approx$62\,ms（55--75） & --- \\ % src: analysis/scripts/alt_dob_design/README.md:72-74,76-79
+    モータ時定数 $T$ & 20\,ms & 65--73\,ms\cite{forster2015,eschmann2024} \\ % src: README.md:80-81, tools/sysid/defaults.py (StampFly); MANUSCRIPT_PLAN.md §8 forster2015/eschmann2024 (Crazyflie)
+    推力ゲイン $k_T$ & $\approx$0.95（無次元） & --- \\ % src: README.md:72-74
+    位置ループ $K_p$/$T_i$ & 0.4 / 5.0\,s & --- \\ % src: params.cpp:771-772
+    速度ループ $K_p$/$T_i$ & 3.0 / 2.0\,s & --- \\ % src: params.cpp:773-774
+    高度ループ $K_p$/$T_i$ & 0.45 / 7.0\,s & --- \\ % src: params.cpp:738-739
+    高度速度ループ $K_p$/$T_i$ & 0.1 / 2.5\,s & --- \\ % src: params.cpp:740,742
+    姿勢ループ(roll/pitch) $K_p$/$T_i$/$T_d$ & 5.0 / 2.0\,s / 0.04\,s & --- \\ % src: params.cpp:719-724
+    角速度ループ $K_p$(roll/pitch/yaw)\,[$\times10^{-3}$Nm/(rad/s)] & 1.0 / 1.426 / 1.199 & --- \\ % src: params.cpp:666,669,672
+    傾き上限 & 10\textdegree（0.1745\,rad） & --- \\ % src: pid_controller.hpp:224
+    速度指令上限 & 1.0\,m/s & --- \\ % src: pid_controller.hpp:320
+    \bottomrule
+  \end{tabular}
+
+  \vspace{2pt}
+  \raggedright\footnotesize
+  注: 上表の数値は個体差・電池残量等の条件で変動し得るため，条件付きの目安として
+  扱う．% src: firmware_position_control_report.tex §8「文書・実装・記録の食い違い」の趣旨に基づく注記
+\end{table*}
+
 % ------------------------------------------------------------------------------
-\section{機体と制御系構成}
-% 内容メモ（0.75p想定）:
-%   - 諸元表: 質量37g、慣性、センサ一覧（IMU/ToF/オプティカルフロー/気圧 等）。
-%   - 座標系の定義（body/world, NED等）。
-%   - 4段カスケード構造（位置->速度->姿勢->レート）の説明。
-%   - PID形式: C(s) = Kp (1 + 1/(Ti s) + Td s/(eta Td s + 1))  [eta=0.125, D-on-M]
-%   - 加速度->傾き写像: a ≈ g * theta
-%   - 各段の出力リミット、アクチュエータ遅れ ~110ms を明記。
-%   - 図表: 諸元表（表番号+上部タイトル）、カスケードブロック線図（図番号+下部タイトル）
-%
-% TODO: 本文をここに記述する（仮段落・ダミー本文）。
-本節では、StampFly の機体諸元とカスケード型制御系の構成を述べる。制御系は位置・
-速度・姿勢・角速度の4段カスケード構造からなり、各段の PID 制御器は
-$C(s) = K_p\left(1 + \dfrac{1}{T_i s} + \dfrac{T_d s}{\eta T_d s + 1}\right)$
-（$\eta = 0.125$、微分先行型）の形で実装されている。姿勢角から加速度への写像は
-微小角近似により $a \approx g\theta$ で近似する。アクチュエータの応答遅れは
-約110\,msである。
-
-% \begin{table}[t]
-%   \centering
-%   \caption{StampFly諸元}
-%   \label{tab:spec}
-%   \begin{tabular}{ll}
-%     \toprule
-%     項目 & 値 \\
-%     \midrule
-%     質量 & 37\,g \\
-%     IMU & BMI270 (400\,Hz) \\
-%     測距 & ToF (VL53Lx系) \\
-%     \bottomrule
-%   \end{tabular}
-% \end{table}
+\section{小型機ゆえの困難}
+% v3計画: Crazyflie既報と対応付け可能な3件（電池電圧の低下／モータ個体差・トルク効き／
+% フロー床面依存）＋本機の観測値。対処済み/残存を表で明示。0.75p。
+% TODO: 本文執筆（次ステップ）。
+（本章は執筆中である．電池電圧の低下・モータ個体差・オプティカルフローの床面依存
+という小型機に共通の困難を，Crazyflie における既報と対応付けて述べる．）
 
 % ------------------------------------------------------------------------------
-\section{状態推定}
-% 内容メモ（0.75p想定）:
-%   - 15状態ESKF（主線に効く範囲に圧縮して説明。全状態の列挙は避ける）。
-%   - フロー->速度変換パイプライン: ジャイロ回転成分の除去、高度スケーリング、
-%     SQUALによるゲート処理。
-%   - 比力の罠（specific forceとreal accelerationの違い）と運動加速度補償。
-%   - ロバスト化（chi^2ゲート、active_mask、バイアスクランプ）は要点のみ触れる。
-%   - 図表: 観測モデル表、フロー処理ブロック図
-%
-% TODO: 本文をここに記述する（仮段落・ダミー本文）。
-状態推定には15状態の誤差状態カルマンフィルタ（ESKF）を用いる。オプティカルフローの
-生出力は角速度による見かけの流れ成分を含むため、ジャイロ計測値を用いてこの回転成分
-を除去したのち、ToF高度でスケーリングして並進速度に変換する。SQUAL値が閾値を下回る
-サンプルは観測から除外するゲート処理を行う。
-
-% ------------------------------------------------------------------------------
-\section{発散の解析と実効ゲイン同定}
-% 内容メモ（1.25p想定、最重要章）:
-%   - SILでは合格したカスケードが実機で発散した事実（周期9.4s, omega≈0.68rad/s,
-%     成長率sigma≈+0.057/s）。
-%   - 実効「傾き->速度」ゲイン K≈0.4g の同定。内訳=姿勢傾き達成度0.58 x
-%     フロー過小読み0.66（omega≈0.68rad/s近傍での値と明記）。
-%   - 根本原因候補: トルク効き0.4〜0.7倍。
-%   - 不安定化機構: カスケード時間スケール分離の崩壊（内側ループ帯域低下により
-%     外側ループの位相余裕が消失）。修正前後の交差周波数・位相余裕を数値で説明。
-%   - 図: 発散時系列、同定結果、ボード線図/安定余裕マップ（軸に変数名必須）
-%
-% TODO: 本文をここに記述する（仮段落・ダミー本文）。
-SILシミュレーションでは安定に動作した位置制御カスケードが、実機飛行では周期
-約9.4\,s（$\omega \approx 0.68$\,rad/s）、成長率 $\sigma \approx +0.057$/s の
-発散振動を示した。飛行ログから傾き→速度の実効ゲインを同定した結果 $K \approx 0.4g$
-となり、これは姿勢傾きの達成度（約0.58倍）とオプティカルフローの速度過小評価
-（$\omega \approx 0.68$\,rad/s 近傍で約0.66倍）の積で説明できる。この実効ゲイン低下
-により内側ループの実効帯域が低下し、カスケード制御が前提とする時間スケール分離が
-崩れ、外側ループの位相余裕が消失したことが不安定化の機構であると考えられる。
-
-% \begin{figure}[t]
-%   \centering
-%   \includegraphics[width=0.95\linewidth]{fig_divergence_timeseries}
-%   \caption{実機発散時の位置・速度時系列（横軸: 時刻 $t$ [s]、縦軸: 位置 $x$ [m]）}
-%   \label{fig:divergence}
-% \end{figure}
-
-% ------------------------------------------------------------------------------
-\section{再設計と実機検証}
-% 内容メモ（1.0p想定）:
-%   - ロバスト設計点: K in [2.8, 7] m/s^2/rad, tau in [50, 300ms] で安定となる
-%     ゲインを選定。vel.kp 0.8->3.0, pos.kp 1.0->0.4 に変更。
-%   - 性能指標を数式で定義: e(t) = ||p - p_ref|| の std/RMS/max、評価窓、電圧条件。
-%   - 複数フライトの結果を条件付きの表で提示（6/22: ±6-7cm、6/27 3分飛行:
-%     平均13cm/最大24.5cm）。数値の不整合が出ないよう、評価条件を明記して統一する。
-%   - スティック・リポジショニング操作への対応。
-%   - 図表: 修正前後比較時系列、XY軌跡、フライト条件表
-%
-% TODO: 本文をここに記述する（仮段落・ダミー本文）。
-実効ゲインの変動域 $K \in [2.8, 7]$\,m/s$^2$/rad、遅れ $\tau \in [50, 300]$\,ms の
-範囲全体で安定となるよう、速度ループゲインを0.8から3.0へ、位置ループゲインを1.0
-から0.4へ再設計した。位置誤差 $e(t) = \|p(t) - p_\mathrm{ref}\|$ の標準偏差・RMS・
-最大値を評価指標として定義し、複数回の実機飛行で検証した結果、保持精度は
-概ね $\pm$6--7\,cmであった。
-
-% \begin{table}[t]
-%   \centering
-%   \caption{実機飛行によるホバリング精度}
-%   \label{tab:flight-results}
-%   \begin{tabular}{lccc}
-%     \toprule
-%     飛行 & std [cm] & RMS [cm] & max [cm] \\
-%     \midrule
-%     6/22 & -- & -- & -- \\
-%     6/27 (3分) & -- & 13 & 24.5 \\
-%     \bottomrule
-%   \end{tabular}
-% \end{table}
-
-% ------------------------------------------------------------------------------
-\section{考察}
-% 内容メモ（0.5p想定）:
-%   - SILプラントに同定ゲインKを注入し、旧ゲインでの発散再現・新ゲインでの安定を
-%     確認したこと（因果の輪を閉じる）を「Model Identity還流サイクル」の実証として
-%     位置づける。
-%   - 限界: 床面テクスチャ/照度条件（SQUAL中央値160）、機体個体差、
-%     電池電圧の低下（corr(V, 高度std) = -0.78）。
-%   - 高度方向の上下動は「今後の課題」として言及するに留める。高度DOBは実装済み
-%     だが効果に疑問が残り既定オフ——成果として主張しない
-%     （MANUSCRIPT_PLAN §7 方針決定 2026-08-01）。
-%   - 図: SIL再現図、電圧-高度相関図
-%
-% TODO: 本文をここに記述する（仮段落・ダミー本文）。
-同定した実効ゲインをSILプラントモデルに注入したところ、旧ゲインでは実機と同様の
-発散が再現され、再設計後のゲインでは安定が確認された。この結果は、実機同定の結果
-をモデルへ還流させる開発サイクル（Model Identity）の有効性を示すものと位置づける。
-一方で、床面テクスチャや照度条件、機体個体差、電池電圧低下に伴う推力低下、および
-高度方向の上下動の抑制といった要因・課題は未解決であり、今後の課題である。
+\section{到達点と課題}
+% v3計画: 冒頭に再設計後の実績（記録24飛行・計約25分、多様条件で位置発散の再発なし）
+% ＋保持性能（条件付き表）／残存課題／今後／開発基盤の現状小節。0.75p。
+% TODO: 本文執筆（次ステップ）。
+（本章は執筆中である．再設計後の飛行実績と位置保持の精度，残存する課題，
+および開発基盤の現状を述べる．）
 
 % ------------------------------------------------------------------------------
 \section{まとめ}
 % 内容メモ（0.5p想定、参考文献10件込み）:
-%   - 本稿の主張の要約: 実効ゲイン欠損の定量同定とロバスト再設計、実機検証、
-%     SILへの還流による因果閉鎖。
-%   - 今後の課題（複数機体での再現性検証、床面条件依存性の定量化 等）。
-%
-% TODO: 本文をここに記述する（仮段落・ダミー本文）。
-本稿では、37\,g級クアッドロータ StampFly の屋内位置制御において実機発散の原因と
-なった実効ゲイン欠損を飛行ログから定量的に同定し、その変動域に対してロバストな
-制御系を再設計・実機検証した。さらに同定結果をSILモデルへ還流させることで因果関係
-を確認した。今後は複数機体・複数環境での再現性検証が課題である。
+% v3計画: 要約（パラメータ開示・設計手順・小型機の困難・開発基盤）＋文献12件。
+% 用語注意: 「還流」禁止（→反映）。「飛行ログ」禁止（→飛行データ）。
+% TODO: 本文執筆（4・5章の確定後に清書）。
+本稿では，質量37\,gのクアッドロータ StampFly を対象に，
+機体パラメータの開示と位置制御系の設計手順を整理し，開発過程で生じた小型機
+ゆえの困難とその対処，および実機と同一ソースコードによる検証環境を含む開発基盤の
+現状を報告した．
 
 %==============================================================================
 % 参考文献（スケルトン、10件分。確定稿までに執筆・追記する）
@@ -342,6 +416,19 @@ SILシミュレーションでは安定に動作した位置制御カスケー�
   Vision System for Autonomous 3D Localization and Control of Small Aerial
   Vehicles, Robotics and Autonomous Systems, Vol.~57, No.~6--7,
   pp.~591--602, 2009.
+\bibitem{forster2015} J.~Förster: System Identification of the Crazyflie 2.0
+  Nano Quadrocopter, Bachelor Thesis, ETH Zürich, 2015.
+  % 全文確認済み（terminology.md 文献表）。DOI: 10.3929/ethz-b-000214143
+\bibitem{giernacki2017} W.~Giernacki, M.~Skwierczy\'{n}ski, W.~Witwicki,
+  P.~Wro\'{n}ski and P.~Kozierski: Crazyflie 2.0 Quadrotor as a Platform for
+  Research and Education in Robotics and Control Engineering, Proc. 22nd Int.
+  Conf. on Methods and Models in Automation and Robotics (MMAR),
+  pp.~37--42, 2017.
+  % 全文確認済み（terminology.md 文献表）
+\bibitem{eschmann2024} J.~Eschmann, D.~Albani and G.~Loianno: Data-Driven
+  System Identification of Quadrotors Subject to Motor Delays,
+  arXiv:2404.07837, 2024.
+  % 該当箇所確認済み。TODO: 学会/誌採録の有無を提出前に確認し書誌を更新
 % 以降は2〜6章の執筆に伴い追加する（10件程度を目安）。
 % \bibitem{ref05}
 % \bibitem{ref06}
