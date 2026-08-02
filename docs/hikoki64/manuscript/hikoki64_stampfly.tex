@@ -21,7 +21,7 @@
 %     [ ] 図表に番号とタイトル（図=下部／表=上部）、図の軸に変数名、線を太く
 %     [ ] ページ番号なし                               -> \pagestyle{empty}
 %     [ ] 4ページ以上（4〜8ページ目安）
-%     [ ] 講演番号プレースホルダを、プログラム公開後に \LectureNumber の値で確定
+%     [x] 講演番号 3D10 確定（2026-08-02）
 %     [ ] 著者名・所属（和文/英文とも）のプレースホルダを確定稿までに記入
 %     [ ] 句読点は全角「，．」で統一（1章はこの方針で執筆済み。2章以降の
 %         ダミー本文「、。」は執筆時に置換。見本PDFの句読点と最終照合）
@@ -71,7 +71,7 @@
 % ---- 講演番号（プレースホルダ） ----------------------------------------------
 % プログラム公開後に確定するまでのプレースホルダ。書式: Times Roman・約16pt。
 % 題目との間は1文字以上空ける（下記タイトル組版で \quad を使用）。
-\newcommand{\LectureNumber}{\#\#\#\#}
+\newcommand{\LectureNumber}{3D10}
 
 \begin{document}
 
@@ -144,7 +144,10 @@
 応用が屋内の点検・物流や教育・研究へと広がるにつれ，GPS等の衛星測位が利用でき
 ない非GPS環境における位置の推定と制御の重要性が増している．とりわけ質量数十
 グラム級の機体は，人や設備への危害の危険性が小さく屋内での反復実験が容易である
-ことから，制御工学の教育・研究用プラットフォームとして有用である．
+ことから，制御工学の教育・研究用プラットフォームとして有用である．一方，搭載
+できるセンサや計算資源が限られるという小型機の制約の下で，位置保持の制御が
+どの程度成立するかは実機での確認を要する．本稿はこの問いに実機での実測を
+もって答える．
 
 StampFly は著者が開発に携わった M5Stack 社の市販の開発用機体であり，下方の
 床面を観測するオプティカルフローセンサと ToF（Time of Flight）測距センサを
@@ -154,7 +157,11 @@ StampFly は著者が開発に携わった M5Stack 社の市販の開発用機�
 よる速度推定をオンボードで実現した PX4FLOW\cite{honegger2013}，Bitcraze 社
 Crazyflie 用の Flow Deck\cite{flowdeck}，数十グラム級機体への実装
 \cite{mcguire2017}，国内グループによる飛行制御への適用\cite{kendoul2009}など
-多くの先行例があり，本稿は手法そのものの新規性を主張するものではない．
+多くの先行例がある．光流の閉ループ応用の系譜としても，移動プラットフォーム
+への光流フィードバックによる自動着陸\cite{herisse2012}，機上の光流のみによる
+閉ループ速度制御\cite{grabe2012}，固定翼機における30\,g級機体での光流を用いた
+操縦\cite{zufferey2005}などが報告されており，本稿は手法そのものの新規性を
+主張するものではない．
 
 本稿の主眼は，開発過程で遭遇した「シミュレーションでは安定，実機では発散」
 という乖離の解明と解決の過程にある．実機と同一の制御ソフトウェアを実行する
@@ -174,11 +181,11 @@ SILS（Software In the Loop Simulation）で安定を確認した位置制御系
 著者の知る限り見当たらない．
 
 以下，2章で機体と開発環境，3章で位置制御系の設計と実機での再設計，4章で
-小型機ゆえの困難，5章で到達点と課題を述べ，6章でまとめる．
+小型機に特有の困難と対処，5章で到達点と課題を述べ，6章でまとめる．
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.9\linewidth]{figs/fig_stampfly_photo.jpg}
+  \includegraphics[width=1.0\linewidth]{figs/fig_stampfly_photo.jpg}
   \caption{StampFly実機（質量37\,g）}
   \label{fig:stampfly-photo}
 \end{figure}
@@ -262,7 +269,10 @@ $\eta$ は不完全微分係数（既定 $\eta=0.125$）% src: pid.hpp:54
 積分更新を停止する）を併用する% src: pid.hpp:108-133
 ．角速度ループが出力するロール・ピッチ・ヨートルクおよび鉛直推力指令は，
 X型配置の4個のモータ% src: requirements.md:149-156
-への推力配分（以下，ミキサ）によって個々のモータ回転数指令へ変換される．
+への推力配分（以下，ミキサ）によって個々のモータ回転数指令へ変換される．この
+配分は，トルク［Nm］と推力［N］という物理量のままB$^{-1}$型の配分器で行う
+% src: firmware/vehicle/components/sf_actuator/actuator.cpp:203-215, params.cpp:662-663
+．
 % TODO: カスケードブロック線図（後日TikZ、ブロック線図流儀に従い作成）
 
 \subsection{状態推定}
@@ -285,11 +295,16 @@ SILSによる検証に合格したカスケードで臨んだ初の実機飛行�
 離陸から約15\,秒% src: 飛行窓14.51s, verification\_findings\_20260802.md \#1（確定）, paper\_figs.py flight\_window
 のうちに水平方向の変位（動径 $r=\sqrt{x^2+y^2}$）が0.07\,mから0.75\,mへ増大し% src: verification\_findings\_20260802.md \#1, logs/stampfly\_udp\_20260622T161055.jsonl
 ，壁に至って飛行を終えた（図\ref{fig:divergence}）．この乖離の原因を探るため，
-専用のスティック加振飛行データから，指令傾きに対する実傾きの達成度
+専用のスティック加振飛行データを用い，指令傾き（角度指令）とジャイロ積分による
+実傾きとの回帰から姿勢達成度を，加速度の慣性積分によって得た速度とESKF出力速度
+との回帰からオプティカルフロー由来の速度のスケールを，それぞれ切片なしの
+最小二乗で同定した% src: analysis/scripts/poshold\_attID.py:161--195（gain\_no\_intercept，帯域通過後の回帰実装）
+．指令傾きに対する実傾きの達成度は
 $\approx 0.58$% src: verification\_findings\_20260802.md \#4（再現・頑健）, poshold\_journey.md:152-154
-と，オプティカルフロー由来の速度のスケール $\approx 0.66$% src: verification\_findings\_20260802.md \#4
-（いずれも0.15--3\,Hz帯の回帰値）% src: verification\_findings\_20260802.md \#5（訂正記録）
-を同定した．両者の積として，実効的な「傾き→速度」ゲインは理想値 $g$ の
+（0.15--3\,Hz帯域通過後の回帰値）% src: analysis/scripts/poshold\_attID.py:168,171
+，オプティカルフロー由来の速度のスケールは $\approx 0.66$% src: verification\_findings\_20260802.md \#4
+（0.1--2\,Hz帯域通過後の回帰値．通過帯域は姿勢達成度と異なる）% src: analysis/scripts/poshold\_attID.py:194-195
+と同定した．両者の積として，実効的な「傾き→速度」ゲインは理想値 $g$ の
 約0.4倍（$K\approx 0.4g\approx 3.9$\,m/s$^2$/rad）% src: poshold\_journey.md:150, verification\_findings\_20260802.md \#4
 にとどまっていたことが分かった．線形カスケードモデルによる解析では，当時のゲイン
 （位置ループ $K_p=1.0$，速度ループ $K_p=0.8$）% src: task2\_pole\_sweep.py GAINS\_O（旧ゲイン）
@@ -369,8 +384,19 @@ $L\in[50,300]$\,ms% src: poshold\_journey.md:175
   扱う．% src: firmware_position_control_report.tex §8「文書・実装・記録の食い違い」の趣旨に基づく注記
 \end{table*}
 
+\subsection{スティックによる再配置}
+
+位置保持中にロール・ピッチのスティックを操作すると，その入力は位置ループを迂回
+し，既定0.4\,m/sの水平速度指令へ読み替えられて速度ループへ直接渡される
+% src: firmware/vehicle/components/sf_controller_pid/pid_controller.cpp:1286-1323, params.cpp:775
+．スティックを中立へ戻すと，そのとき停止した位置が新たな保持目標として再捕捉
+され，そこで再びホバリングする
+% src: firmware/vehicle/docs/poshold_journey.md §5
+．この機構により，位置制御は自動保持と手動での再配置を単一のモード内で両立
+する．
+
 % ------------------------------------------------------------------------------
-% 4章「小型機ゆえの困難」 起草（v3計画 配分0.75p）
+% 4章「小型機に特有の困難と対処」 起草（v3計画 配分0.75p）
 % 内容: Crazyflie既報と対応付け可能な3件（電池電圧の低下／モータのトルク効きと
 %       個体差／オプティカルフローの床面依存）＋本機の観測値。対処済み/残存を
 %       表で明示。5章「到達点と課題」との重複回避（詳細は5章へ1文誘導のみ）。
@@ -378,7 +404,7 @@ $L\in[50,300]$\,ms% src: poshold\_journey.md:175
 %   済みのため，本章では再定義しない。SQUAL棄却ゲートの説明も3.2節記載済みの
 %   ため重複記述しない（本章では「3.2節」として参照するのみ）。
 % ------------------------------------------------------------------------------
-\section{小型機ゆえの困難}
+\section{小型機に特有の困難と対処}
 \label{sec:difficulties}
 
 開発過程では，小型機に特有ないくつかの困難に遭遇した．いずれもCrazyflieに
@@ -417,7 +443,7 @@ $L\in[50,300]$\,ms% src: poshold\_journey.md:175
 
 \begin{table}[t]
 \centering\scriptsize
-\caption{小型機ゆえの困難：本機の観測値と対処}
+\caption{小型機に特有の困難：本機の観測と対処}
 \label{tab:difficulties}
 \begin{tabularx}{\columnwidth}{@{}X X X X@{}}
 \toprule
@@ -495,35 +521,55 @@ Crazyflie系の文献にはxy方向の閉ループでの位置保持の精度を
 外乱オブザーバを実装済みであるものの，その有効性の確認は今後の課題である
 % src: docs/hikoki64/MANUSCRIPT_PLAN.md §7 方針決定（2026-08-01）
 ．第二に，3.3節で同定した傾き→速度経路の実効ゲインには周波数依存があり，
-0.5--1\,rad/s帯では広帯域の値より小さいことが分かっており
+0.5--1\,rad/s帯では$\approx$0.21--0.29と，広帯域(0.2--3\,rad/s)での$\approx$0.62--0.69
+より明確に小さい
 % src: docs/hikoki64/prep/verification_findings_20260802.md 新たに判明した事実2
-，その機構の解明は残されている．第三に，姿勢達成度にはロール・ピッチ間の非対称が
-見られる
+．低周波ほど減衰する形は速度比例抗力によるロータ抗力の予言と定性的に一致するが，
+定量的な機構の解明は残されている．第三に，姿勢達成度にはロール・ピッチ間の非対称が
+見られ，pitch軸（0.85--0.97）がroll軸（0.58--0.68）より明確に良い
 % src: docs/hikoki64/prep/verification_findings_20260802.md 新たに判明した事実3
-．第四に，2章で述べたSILSのモデル一致ゲートにおいて，ロール・ピッチ軸は合格する
+．第四に，2章で述べたSILSのモデル一致ゲート（合格基準は立ち上がり時定数
+$\pm$20\%・ジャイロRMS$\pm$50\%）において，ロール・ピッチ軸は合格する
 一方でヨー軸は不合格のままである
-% src: docs/hikoki64/prep/gap/sf_ecosystem.md §2.6
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §2.6, docs/architecture/simulation-policy.md §4
 ．このほか，表\ref{tab:difficulties}に残存として示した低電圧域の非線形性，
 モータ個体差および床面条件の定量的な評価も今後の課題である．
 
-今後の発展としては，軌道追従機能の実装，制御器差し替えの拡充（差し替え用の
-インターフェースは実装済みである），外部測位の観測経路の追加が挙げられる
-% src: docs/hikoki64/prep/crazyflie_gap_analysis.md §3
+今後の発展としては，優先度の高い順に，目標点への遷移や多項式軌道への追従と
+いった軌道追従機能の実装，\texttt{IController}インターフェース（実装済み）を
+介したINDIや幾何学的制御など代替制御器の追加，モーションキャプチャ等の外部
+測位をESKFの観測へ加える経路の整備，複数機運用に向けたESP-NOWの拡張が
+挙げられる
+% src: docs/hikoki64/prep/crazyflie_gap_analysis.md §3, firmware/vehicle/docs/detailed_design.md:262（IControllerインターフェース）
 ．
 
 \subsection{開発基盤の現状}
 
-開発基盤としては，15レッスンからなるワークショップ教材
-% src: docs/hikoki64/prep/gap/sf_ecosystem.md §3.1
+開発基盤としては，環境構築からモータ制御・センサ理解，レート制御，システム
+同定・PID・状態推定，Tello風APIを経て競技に至る15レッスンからなる
+ワークショップ教材
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §3.1（lesson\_manifest.yaml準拠）
 ，ブラウザ上で動作するブロックプログラミング環境
 % src: docs/hikoki64/prep/gap/sf_ecosystem.md §3.3
 ，Tello互換のPython SDK
 % src: docs/hikoki64/prep/gap/sf_ecosystem.md §6.6
 ，GUIインストーラ
 % src: docs/hikoki64/prep/gap/sf_ecosystem.md §4.1
-，開発作業全般を統合するsf CLI
+，開発作業全般を統合するsf CLIを整備している．sf CLIは合計12,556行・29個の
+コマンドモジュールとして実装され，ビルド・書き込み・キャリブレーション・
+システム同定・SILの操作など開発作業全般を単一のインターフェースで扱う
 % src: docs/hikoki64/prep/gap/sf_ecosystem.md §1
-を整備している．
+．また，GitHub Releasesを通じてv2026.07.0からv2026.07.6まで7回のリリースを
+行っており
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §4.3
+，mainブランチへの変更の反映時にはSILシナリオによる退行試験を自動実行する
+継続的インテグレーションを備える
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §2.4, §4.3
+．なお，物理シミュレータGenesisで同定したモータの電気機械モデルのパラメータ
+（慣性・トルク定数・電機子抵抗等）はSILSのプラント改良にも反映されており，
+両シミュレーション環境は独立ではなく相互に連携している
+% src: docs/hikoki64/prep/gap/sf_ecosystem.md §7
+．
 
 % ------------------------------------------------------------------------------
 \section{まとめ}
@@ -531,10 +577,16 @@ Crazyflie系の文献にはxy方向の閉ループでの位置保持の精度を
 % v3計画: 要約（パラメータ開示・設計手順・小型機の困難・開発基盤）＋文献12件。
 % 用語注意: 「還流」禁止（→反映）。「飛行ログ」禁止（→飛行データ）。
 % TODO: 本文執筆（4・5章の確定後に清書）。
-本稿では，質量37\,gのクアッドロータ StampFly を対象に，
-機体パラメータの開示と位置制御系の設計手順を整理し，開発過程で生じた小型機
-ゆえの困難とその対処，および実機と同一ソースコードによる検証環境を含む開発基盤の
-現状を報告した．
+本稿では，質量37\,gのクアッドロータ StampFly を対象に，位置制御系の開発過程を
+報告した．2章では機体諸元とセンサ構成，実機と同一ソースコードを無改変で実行
+するSILSによる検証基盤を示した．3章ではカスケードPID構造による位置制御系の
+設計を示すとともに，SILS合格ながら実機飛行で発散した経緯から傾き→速度の実効
+ゲインを同定し，変動域全体でロバストに安定となるよう再設計して手放しでの位置
+保持を実現する過程を報告した．4章では電池電圧の低下，モータのトルク効きと個体差，
+オプティカルフローの床面依存という小型機に特有の困難を，いずれもCrazyflieに
+おける既報と対応付けて整理した．5章では到達点と残存課題を示すとともに，開発
+基盤の現状を報告した．今後，StampFlyを制御工学の学習・研究に用いる人にとって
+の参照起点となることを意図する．
 
 %==============================================================================
 % 参考文献（スケルトン、10件分。確定稿までに執筆・追記する）
@@ -557,6 +609,18 @@ Crazyflie系の文献にはxy方向の閉ループでの位置保持の精度を
   Vision System for Autonomous 3D Localization and Control of Small Aerial
   Vehicles, Robotics and Autonomous Systems, Vol.~57, No.~6--7,
   pp.~591--602, 2009.
+\bibitem{herisse2012} B.~H\'{e}riss\'{e}, T.~Hamel, R.~Mahony and
+  F.-X.~Russotto: Landing a VTOL Unmanned Aerial Vehicle on a Moving
+  Platform Using Optical Flow, IEEE Trans. on Robotics, Vol.~28, No.~1,
+  pp.~77--89, 2012.
+\bibitem{grabe2012} V.~Grabe, H.~H.~B\"{u}lthoff and P.~Robuffo~Giordano:
+  On-board Velocity Estimation and Closed-loop Control of a Quadrotor UAV
+  based on Optical Flow, Proc. IEEE Int. Conf. on Robotics and Automation
+  (ICRA), pp.~491--497, 2012.
+\bibitem{zufferey2005} J.-C.~Zufferey and D.~Floreano: Toward 30-gram
+  Autonomous Indoor Aircraft: Vision-based Obstacle Avoidance and Altitude
+  Control, Proc. IEEE Int. Conf. on Robotics and Automation (ICRA),
+  pp.~2594--2599, 2005.
 \bibitem{forster2015} J.~Förster: System Identification of the Crazyflie 2.0
   Nano Quadrocopter, Bachelor Thesis, ETH Zürich, 2015.
   % 全文確認済み（terminology.md 文献表）。DOI: 10.3929/ethz-b-000214143
