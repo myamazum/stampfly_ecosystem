@@ -1,0 +1,173 @@
+{
+  "log": "stampfly_udp_20260622T161055.jsonl",
+  "flight_window": {
+    "t_to_s": 2.217475,
+    "t_end_s": 16.725111,
+    "duration_s": 14.507635999999998
+  },
+  "sampling": {
+    "n": 5804,
+    "fs_hz": 400.0000000000085,
+    "periodogram_df_hz": 0.0689179875947637
+  },
+  "dominant_frequency": {
+    "method": "full-window Hann periodogram, genuine local maximum (argrelmax, order=3) on x-position spectrum",
+    "f_hz": 0.2067539627842911,
+    "T_s": 4.836666666666564,
+    "omega_rad_s": 1.2990734611674128
+  },
+  "zero_crossing_crosscheck": {
+    "full_periods_s": [
+      5.393111241556011,
+      4.15880717246133,
+      5.75390891535616,
+      5.114068838247441,
+      4.545047605638079
+    ],
+    "median_s": 5.114068838247441,
+    "mean_s": 4.992988754651804
+  },
+  "envelope_hilbert_x_full_window": {
+    "sigma": -0.038865868048675596,
+    "sigma_se": 0.001634867969697438,
+    "ci95": [
+      -0.04207089325242435,
+      -0.03566084284492684
+    ],
+    "A": 0.06302181686612207,
+    "r_value": -0.31250210274615203,
+    "p_value": 1.0521111933000154e-118,
+    "aic_linear": -8446.076760749482,
+    "aic_const": -7911.252302040952,
+    "n": 5224
+  },
+  "radial_coarse_peaks_full_window": {
+    "t": [
+      3.239974999999978,
+      6.309974999999913,
+      10.989974999999813,
+      16.307474999999698
+    ],
+    "r": [
+      0.004420014744123965,
+      0.3728882257384852,
+      0.49918331609187583,
+      0.7463676272872377
+    ],
+    "fit": {
+      "sigma": 0.3271589279159545,
+      "sigma_se": 0.18687713635474917,
+      "ci95": [
+        -0.47690849294856946,
+        1.1312263487804786
+      ],
+      "A": 0.007730429190800003,
+      "r_value": 0.7778941866164474,
+      "p_value": 0.22210581338355265,
+      "aic_linear": 6.132235601568727,
+      "aic_const": 7.8489226058514525,
+      "n": 4
+    }
+  },
+  "radial_coarse_troughs_full_window": {
+    "t": [
+      3.112474999999981,
+      7.999974999999877,
+      13.157474999999767,
+      16.062474999999704
+    ],
+    "r": [
+      2.426295100996012e-05,
+      0.027816924993408862,
+      0.07379444612134467,
+      0.709009654837687
+    ],
+    "fit": {
+      "sigma": 0.627656946722597,
+      "sigma_se": 0.14194962938329334,
+      "ci95": [
+        0.016896986369645428,
+        1.2384169070755484
+      ],
+      "A": 3.485095578498903e-05,
+      "r_value": 0.9524695655558953,
+      "p_value": 0.047530434444104645,
+      "aic_linear": 3.9544717705127557,
+      "aic_const": 11.46363190168214,
+      "n": 4
+    }
+  },
+  "two_point_clean_peak_to_peak_sigma_per_s": 0.06941130932277942,
+  "two_point_clean_trough_to_trough_sigma_per_s": 0.40164024754408556,
+  "sliding_window_modelfree": {
+    "window_s": 4.836666666666564,
+    "step_s": 1.209166666666641,
+    "centers_s": [
+      4.635808333333282,
+      5.844974999999923,
+      7.054141666666563,
+      8.263308333333205,
+      9.472474999999847,
+      10.681641666666488,
+      11.890808333333128,
+      13.09997499999977
+    ],
+    "ptp_x_m": [
+      0.08505967108603835,
+      0.10759799961403928,
+      0.13969223812095663,
+      0.13969223812095663,
+      0.13969223812095663,
+      0.12576305171156993,
+      0.11081936154491759,
+      0.14277649631537825
+    ],
+    "ptp_radial_m": [
+      0.3728882257384852,
+      0.3457108077024184,
+      0.3450713007450763,
+      0.4530563311159034,
+      0.47136639109846695,
+      0.4201905290398631,
+      0.42538886997053116,
+      0.5495212404378341
+    ],
+    "fit_x": {
+      "sigma": 0.03404413560161826,
+      "sigma_se": 0.02113512867352843,
+      "ci95": [
+        -0.017671661225112517,
+        0.08575993242834903
+      ],
+      "A": 0.09033798362316699,
+      "r_value": 0.5494446060042496,
+      "p_value": 0.15835265963882603,
+      "aic_linear": -27.07029706856677,
+      "aic_const": -26.195275465884574,
+      "n": 8
+    },
+    "fit_radial": {
+      "sigma": 0.043141453474810194,
+      "sigma_se": 0.013551402008983134,
+      "ci95": [
+        0.009982367299399483,
+        0.0763005396502209
+      ],
+      "A": 0.28516180599325325,
+      "r_value": 0.7925504119441574,
+      "p_value": 0.018990656796374718,
+      "aic_linear": -34.18144124299982,
+      "aic_const": -28.267621234660748,
+      "n": 8
+    }
+  },
+  "terminal_divergence": {
+    "onset_s_approx": 13.0,
+    "y_at_13s_m": 0.049253822013548214,
+    "y_at_end_m": -0.6307035663483559,
+    "radial_at_13s_m": 0.09178414846649968,
+    "radial_at_end_m": 0.7292342469834066,
+    "note": "y crosses zero near t=13.1s and falls monotonically to negative values through end of flight window; no return/turn-back observed before thrust drops below live-motor gate at t_end."
+  },
+  "method_disagreement_note": "Sign and magnitude of the envelope growth/decay rate sigma is NOT consistent across methods: Hilbert/bandpass envelope on x (full window) gives negative sigma (decay) with narrow nominal CI (but n=5224 highly autocorrelated samples, so nominal CI is likely far too narrow / overconfident); coarse radial local-extrema log-slope and model-free sliding-window peak-to-peak amplitude mostly give positive sigma (growth), with substantial sensitivity to whether the startup transient and the terminal divergence (t>13s) are included/excluded from each fit."
+}

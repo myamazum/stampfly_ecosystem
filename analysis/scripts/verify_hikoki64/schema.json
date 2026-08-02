@@ -1,0 +1,254 @@
+{
+  "mag": {
+    "n": 747,
+    "fields": [
+      "id",
+      "ts",
+      "x",
+      "y",
+      "z"
+    ],
+    "example": {
+      "id": "mag",
+      "ts": 86471120,
+      "x": -135.7202606201172,
+      "y": -65.44319152832031,
+      "z": -107.2690200805664
+    }
+  },
+  "tof_b": {
+    "n": 907,
+    "fields": [
+      "distance",
+      "id",
+      "status",
+      "ts"
+    ],
+    "example": {
+      "id": "tof_b",
+      "ts": 86473048,
+      "distance": 0.03800000250339508,
+      "status": 0
+    }
+  },
+  "imu": {
+    "n": 11984,
+    "fields": [
+      "accel",
+      "accel_bias",
+      "accel_raw",
+      "gyro",
+      "gyro_bias",
+      "gyro_raw",
+      "id",
+      "quat",
+      "ts"
+    ],
+    "example": {
+      "id": "imu",
+      "ts": 86477322,
+      "gyro": [
+        -0.01383492723107338,
+        0.001064225216396153,
+        0.002128450432792306
+      ],
+      "accel": [
+        -0.08619125932455063,
+        0.5482721924781799,
+        -9.847352027893066
+      ],
+      "gyro_raw": [
+        -0.01383492723107338,
+        0.001064225216396153,
+        0.002128450432792306
+      ],
+      "accel_raw": [
+        -0.08619125932455063,
+        0.5482721924781799,
+        -9.847352027893066
+      ],
+      "quat": [
+        0.9998064637184143,
+        0.006711422000080347,
+        -0.001002257689833641,
+        -0.018466055393218994
+      ],
+      "gyro_bias": [
+        -0.0123,
+        0.0035,
+        -0.0007
+      ],
+      "accel_bias": [
+        -0.0759,
+        0.6765,
+        0.0854
+      ]
+    }
+  },
+  "posvel": {
+    "n": 11984,
+    "fields": [
+      "id",
+      "pos",
+      "ts",
+      "vel"
+    ],
+    "example": {
+      "id": "posvel",
+      "ts": 86477322,
+      "pos": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "vel": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "rate_ref": {
+    "n": 11984,
+    "fields": [
+      "id",
+      "rate_ref",
+      "ts"
+    ],
+    "example": {
+      "id": "rate_ref",
+      "ts": 86477322,
+      "rate_ref": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "flow": {
+    "n": 3000,
+    "fields": [
+      "dx",
+      "dy",
+      "id",
+      "quality",
+      "ts"
+    ],
+    "example": {
+      "id": "flow",
+      "ts": 86477990,
+      "dx": 0,
+      "dy": 0,
+      "quality": 89
+    }
+  },
+  "baro": {
+    "n": 1476,
+    "fields": [
+      "altitude",
+      "id",
+      "pressure",
+      "ts"
+    ],
+    "example": {
+      "id": "baro",
+      "ts": 86479563,
+      "altitude": 80.79544830322266,
+      "pressure": 1003.5831909179688
+    }
+  },
+  "ctrl": {
+    "n": 1498,
+    "fields": [
+      "id",
+      "pitch",
+      "roll",
+      "throttle",
+      "ts",
+      "yaw"
+    ],
+    "example": {
+      "id": "ctrl",
+      "ts": 86491487,
+      "throttle": 0.00634765625,
+      "roll": 0.0,
+      "pitch": 0.0,
+      "yaw": 0.0
+    }
+  },
+  "ctrl_ref": {
+    "n": 1498,
+    "fields": [
+      "alt_sp",
+      "alt_vel_target",
+      "angle_ref",
+      "climb_cmd",
+      "id",
+      "mode",
+      "motor_duty",
+      "pos_sp",
+      "total_thrust",
+      "ts"
+    ],
+    "example": {
+      "id": "ctrl_ref",
+      "ts": 86494781,
+      "mode": 3,
+      "angle_ref": [
+        0.0,
+        0.0
+      ],
+      "total_thrust": 0.0,
+      "motor_duty": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "alt_sp": 0.0,
+      "alt_vel_target": 0.0,
+      "climb_cmd": 0.0,
+      "pos_sp": [
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "status": {
+    "n": 30,
+    "fields": [
+      "eskf_status",
+      "flight_state",
+      "id",
+      "pid_pitch",
+      "pid_roll",
+      "pid_yaw",
+      "ts",
+      "uptime_ms",
+      "voltage"
+    ],
+    "example": {
+      "id": "status",
+      "ts": 87459000,
+      "uptime_ms": 87459,
+      "voltage": 4.256,
+      "flight_state": 1,
+      "eskf_status": 1,
+      "pid_roll": [
+        0.0003401680733077228,
+        0.4000000059604645,
+        0.01765759289264679
+      ],
+      "pid_pitch": [
+        0.0005155375110916793,
+        0.4000000059604645,
+        0.017154943197965622
+      ],
+      "pid_yaw": [
+        0.000985891092568636,
+        0.5555555820465088,
+        0.0
+      ]
+    }
+  }
+}
