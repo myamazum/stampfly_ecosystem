@@ -109,6 +109,7 @@
 
   \vspace{0.3\baselineskip}
   \noindent
+  % Abstract中の数値(37g/15s/40%/24 flights)は本文のタグ付き値のミラー（数値監査済み 2026-08-03）
   % 英文Abstract（v3方針: 初の文書化+設計手順+発散と再設計+小型機の困難。
   % SIL再現の主張なし・数値は検証済みのもののみ。著者推敲待ち）
   This paper presents the first academic report on StampFly, a 37\,g palm-sized
@@ -120,7 +121,7 @@
   within about 15\,s. Identification from flight data revealed that the
   effective tilt-to-velocity gain was only about 40\% of the ideal value;
   redesigning the outer loops to be robust over the identified variation range
-  achieved stable position hold of several centimeters, maintained over 24
+  achieved stable position hold of several centimeters, maintained across 24
   subsequent flights. Difficulties specific to small vehicles are reported
   with references to the Crazyflie literature.
 
@@ -139,7 +140,9 @@
 %     4章で初出定義／「飛行データ」（「飛行ログ」は使わない）／SILS表記。
 %   - 図: 機体写真（StampFly実機、図1・下部タイトル）→ 写真決定後に挿入。
 %
-本稿は，質量37\,gの超小型クアッドロータ（quadrotor）StampFly（図\ref{fig:stampfly-photo}）
+本稿は，質量37\,g
+% src: pid_controller.hpp:407（kMassG）
+の超小型クアッドロータ（quadrotor）StampFly（図\ref{fig:stampfly-photo}）
 を対象とした，屋内における位置制御の開発過程を報告するものである．無人航空機（ドローン）の
 応用が屋内の点検・物流や教育・研究へと広がるにつれ，GPS等の衛星測位が利用でき
 ない非GPS環境における位置の推定と制御の重要性が増している．とりわけ質量数十
@@ -169,11 +172,15 @@ SILS（Software In the Loop Simulation）で安定を確認した位置制御系
 飛行開始から約15秒のうちに水平方向の変位が増大する発散を生じた
 % src: verification_findings_20260802.md #1（飛行窓14.5s・radial 0.07→0.75m）
 ．そこで飛行データから，傾き指令に対して実際に
-得られる速度応答のゲインを同定した結果，理想値の約4割まで低下しており，その
+得られる速度応答のゲインを同定した結果，理想値の約4割まで低下しており
+% src: poshold_journey.md:150（K≈0.4g=0.58×0.66）
+，その
 内訳が姿勢応答の未達とオプティカルフローによる速度の過小評価との積で説明できる
 ことを明らかにした．さらに，同定値を1点の校正値として扱うのではなく，機体の
 個体差や環境条件による変動域を仮定してロバストに安定となるよう制御系を再設計し，
-実機でホバリング時の位置誤差 $\pm 6$〜$7$\,cm を確認した．最後に，同定したゲインを用いた線形モデルの解析により，当時の設計が不安定と
+実機でホバリング時の位置誤差 $\pm 6$〜$7$\,cm を確認した
+% src: poshold_journey.md:177-182
+．最後に，同定したゲインを用いた線形モデルの解析により，当時の設計が不安定と
 なる条件と再設計後の安定を確認し，実機で同定した特性をモデルへ反映する
 開発サイクルの有効性を示す
 % src: verification_findings_20260802.md #5（SILでの発散再現は不成立のため線形モデルで説明: sil_injection_20260802.md）
@@ -224,7 +231,7 @@ ToF測距（前面） & VL53L3CX & I2C & 30\,Hz \\
 
 \vspace{2pt}
 \raggedright
-{\scriptsize センサ行の出典: \texttt{requirements.md:135--147}．\textsuperscript{a}\,\texttt{pid\_controller.hpp:407,468--470}．\textsuperscript{b}\,\texttt{architecture.md:36,645}．パスは \texttt{firmware/vehicle/docs/} または \texttt{firmware/vehicle/components/sf\_controller\_pid/include/} を基準とする．}
+{\scriptsize センサ行の出典: \texttt{requirements.md:139--145}．\textsuperscript{a}\,\texttt{pid\_controller.hpp:407,468--470}．\textsuperscript{b}\,\texttt{architecture.md:36,645}．パスは \texttt{firmware/vehicle/docs/} または \texttt{firmware/vehicle/components/sf\_controller\_pid/include/} を基準とする．}
 \end{table}
 
 StampFly の開発は，制御系の設計，SILS（Software In the Loop Simulation）による検証，実機飛行，実機飛行で得た飛行データからのシステム同定，同定結果の制御系モデルへの反映という手順を繰り返すループとして進めている．
@@ -234,7 +241,7 @@ StampFly の開発は，制御系の設計，SILS（Software In the Loop Simulat
 SILSは，実機ファームウェアと同一のソースコードを無改変のままホスト計算機向けにコンパイルし，決定論的に実行する検証環境である% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.2
 ．ESP-IDF／FreeRTOS依存部分をホスト向けスタブに置き換えることで，実機と同じPub-Sub構造の制御ソフトウェアをそのまま動かす．同じソースコードが実機とSILSの双方で動くため，SILSでの合否は設計変更の実機挙動への影響を見積る手掛かりとして使う% src: firmware/vehicle/docs/development_roadmap.md:41--54
 ．ノイズ・外乱は種（シード）付き乱数で与えており，同じ種であれば実行のたびに同一の出力が得られる% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.3
-．回帰試験には40本のシナリオを用い，起動・状態遷移，推定の追従性，閉ループの安定性，アクチュエータの健全性という4種類の数値合格基準（ゲート）で自動判定する% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.4
+．回帰試験には42本のシナリオを用い，起動・状態遷移，推定の追従性，閉ループの安定性，アクチュエータの健全性という4種類の数値合格基準（ゲート）で自動判定する% src: simulator/sil/scenarios/*.scn 実測42本(2026-08-03。ゲート分類はsf_ecosystem.md §2.4)
 ．さらに，同一の同定手順をSILSと実機双方の飛行データに適用して結果を数値で突き合わせる仕組み（モデル一致ゲート）を備えており，2026年7月26日時点の計測ではロール・ピッチ軸は合格，ヨー軸は不合格である% src: docs/hikoki64/prep/gap/sf_ecosystem.md \S2.6
 ．SILSはあくまで理想化したプラントに基づく検証であり，実機との一致は今後も確認を要する項目である旨は5章で改めて扱う．
 
@@ -293,7 +300,7 @@ $\chi^2$ゲート（自由度3，有意水準0.95に対応する閾値7.81）% s
 
 SILSによる検証に合格したカスケードで臨んだ初の実機飛行（2026-06-22）では，
 離陸から約15\,秒% src: 飛行窓14.51s, verification\_findings\_20260802.md \#1（確定）, paper\_figs.py flight\_window
-のうちに水平方向の変位（動径 $r=\sqrt{x^2+y^2}$）が0.07\,mから0.75\,mへ増大し% src: verification\_findings\_20260802.md \#1, logs/stampfly\_udp\_20260622T161055.jsonl
+のうちに水平方向の変位（動径 $r=\sqrt{x^2+y^2}$）が振動を伴いながら増大し，終端で約0.75\,mに達し% src: paper\_figs.py（r\_max=0.746 m at t=16.31 s）, logs/stampfly\_udp\_20260622T161055.jsonl
 ，壁に至って飛行を終えた（図\ref{fig:divergence}）．この乖離の原因を探るため，
 専用のスティック加振飛行データを用い，指令傾き（角度指令）とジャイロ積分による
 実傾きとの回帰から姿勢達成度を，加速度の慣性積分によって得た速度とESKF出力速度
@@ -309,7 +316,7 @@ $\approx 0.58$% src: verification\_findings\_20260802.md \#4（再現・頑健�
 にとどまっていたことが分かった．線形カスケードモデルによる解析では，当時のゲイン
 （位置ループ $K_p=1.0$，速度ループ $K_p=0.8$）% src: task2\_pole\_sweep.py GAINS\_O（旧ゲイン）
 は，むだ時間 $L=150$\,ms% src: paper\_figs.py TAU\_PRIMARY=0.15s（K掃引の代表値）
-において $K/g\approx 0.64$--0.80が安定限界であり% src: verification\_findings\_20260802.md \#5
+において安定限界は $K/g\approx0.80$（むだ時間を0とした場合は$\approx0.65$）であり% src: task2\_results.json（σ=0交点の線形補間 0.793/0.647）
 ，これを下回ると不安定となる（例: $K=3.9$\,m/s$^2$/radで支配極の実部
 $\sigma\approx+0.08$〜$+0.11$）% src: verification\_findings\_20260802.md \#5
 ．一方，SILSが内部プラントに仮定する理想ゲイン $K=g\approx9.81$\,m/s$^2$/radでは
@@ -330,7 +337,7 @@ $L\in[50,300]$\,ms% src: poshold\_journey.md:175
   \includegraphics[width=\linewidth]{figs/fig_divergence_timeseries}
   \caption{実機飛行（2026-06-22）における水平位置の時系列（横軸は離陸を原点とする
   時刻 $t$\,[s]，縦軸は位置 [m]）．飛行窓14.5\,秒のうちに動径方向の変位が
-  0.07\,mから0.75\,mへ増大し，記録が終了した．% src: logs/stampfly_udp_20260622T161055.jsonl, analysis/scripts/verify_hikoki64/paper_figs.py
+  振動を伴いながら増大し，終端で動径約0.75\,mに達して記録が終了した．% src: logs/stampfly_udp_20260622T161055.jsonl, analysis/scripts/verify_hikoki64/paper_figs.py
   }
   \label{fig:divergence}
 \end{figure}
@@ -341,8 +348,8 @@ $L\in[50,300]$\,ms% src: poshold\_journey.md:175
   \caption{線形カスケードモデルによる，傾き→速度ゲイン $K$\,[m/s$^2$/rad]
   に対する支配極実部 $\sigma$\,[1/s] の掃引（むだ時間 $L=150$\,ms）．
   $\sigma>0$ は不安定を示す．旧ゲイン（$K_{p,\mathrm{pos}}=1.0$，
-  $K_{p,\mathrm{vel}}=0.8$）は $K/g\approx0.64$--0.80を境に安定/不安定が
-  入れ替わるのに対し，新ゲイン（$K_{p,\mathrm{pos}}=0.4$，$K_{p,\mathrm{vel}}=3.0$）
+  $K_{p,\mathrm{vel}}=0.8$）は $K/g\approx0.80$を境に安定と不安定が入れ替わる
+  （むだ時間を0とした場合の境は$\approx0.65$）のに対し，新ゲイン（$K_{p,\mathrm{pos}}=0.4$，$K_{p,\mathrm{vel}}=3.0$）
   は掃引範囲全体で安定である．% src: analysis/scripts/verify_hikoki64/paper_figs.py, task2_pole_sweep.py
   }
   \label{fig:stability}
@@ -365,12 +372,12 @@ $L\in[50,300]$\,ms% src: poshold\_journey.md:175
     \midrule
     質量 & 37\,g & 27\,g\cite{giernacki2017} \\ % src: pid_controller.hpp:407,468-470 (StampFly); terminology.md 文献表 giernacki2017 (Crazyflie)
     鉛直むだ時間 $L$ & $\approx$62\,ms（55--75） & --- \\ % src: analysis/scripts/alt_dob_design/README.md:72-74,76-79
-    モータ時定数 $T$ & 20\,ms & 65--73\,ms\cite{forster2015,eschmann2024} \\ % src: README.md:80-81, tools/sysid/defaults.py (StampFly); MANUSCRIPT_PLAN.md §8 forster2015/eschmann2024 (Crazyflie)
+    モータ時定数 $T$ & 20\,ms & 65--72\,ms\cite{forster2015,eschmann2024} \\ % src: README.md:80-81, tools/sysid/defaults.py (StampFly); MANUSCRIPT_PLAN.md §8 forster2015/eschmann2024 (Crazyflie)
     推力ゲイン $k_T$ & $\approx$0.95（無次元） & --- \\ % src: README.md:72-74
     位置ループ $K_p$/$T_i$ & 0.4 / 5.0\,s & --- \\ % src: params.cpp:771-772
     速度ループ $K_p$/$T_i$ & 3.0 / 2.0\,s & --- \\ % src: params.cpp:773-774
     高度ループ $K_p$/$T_i$ & 0.45 / 7.0\,s & --- \\ % src: params.cpp:738-739
-    高度速度ループ $K_p$/$T_i$ & 0.1 / 2.5\,s & --- \\ % src: params.cpp:740,742
+    高度速度ループ $K_p$/$T_i$ & 0.1 / 2.5\,s & --- \\ % src: params.cpp:740-741
     姿勢ループ(roll/pitch) $K_p$/$T_i$/$T_d$ & 5.0 / 2.0\,s / 0.04\,s & --- \\ % src: params.cpp:719-724
     角速度ループ $K_p$(roll/pitch/yaw)\,[$\times10^{-3}$Nm/(rad/s)] & 1.0 / 1.426 / 1.199 & --- \\ % src: params.cpp:666,669,672
     傾き上限 & 10\textdegree（0.1745\,rad） & --- \\ % src: pid_controller.hpp:224
@@ -503,7 +510,7 @@ SQUALゲート＋変動域設計 &
 % src: docs/hikoki64/prep/firmware_position_control_report.tex §7（実飛行実績の数値一覧，l.683）
 2026-07-18 & 動径方向のRMS 55.2\,mm（過去記録69.3\,mmを更新） &
 手放し約118秒．高度外乱オブザーバの検証飛行，空調による外乱下 \\
-% src: analysis/scripts/alt_dob_design/README.md:4-5
+% src: analysis/scripts/alt_dob_design/ab20260718_results.json（flight_duration_s=117.565）; RMS値はREADME.md:4-5
 \bottomrule
 \end{tabular}
 
@@ -626,7 +633,7 @@ $\pm$20\%・ジャイロRMS$\pm$50\%）において，ロール・ピッチ軸�
   % 全文確認済み（terminology.md 文献表）。DOI: 10.3929/ethz-b-000214143
 \bibitem{giernacki2017} W.~Giernacki, M.~Skwierczy\'{n}ski, W.~Witwicki,
   P.~Wro\'{n}ski and P.~Kozierski: Crazyflie 2.0 Quadrotor as a Platform for
-  Research and Education in Robotics and Control Engineering, Proc. 22nd Int.
+  Research and Education in Robotics and Control Engineering, Proc. Int.
   Conf. on Methods and Models in Automation and Robotics (MMAR),
   pp.~37--42, 2017.
   % 全文確認済み（terminology.md 文献表）

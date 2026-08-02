@@ -68,7 +68,7 @@
 | ラベル | 書誌 | 確認レベル・内容 |
 |--------|------|-----------------|
 | forster2015 | J. Förster: System Identification of the Crazyflie 2.0 Nano Quadrocopter, Bachelor Thesis, ETH Zurich, 2015. DOI: 10.3929/ethz-b-000214143 | **全文読了（147頁）**。質量28.0g・慣性行列・推力/トルク写像・モータ離散伝達関数・抗力3モデルを単一個体で同定。パラメータ開示論文の模範。4基間個体差・フロー・電圧低下・保持精度の言及なし |
-| giernacki2017 | W. Giernacki et al.: Crazyflie 2.0 quadrotor as a platform for research and education in robotics and control engineering, Proc. MMAR 2017, pp.37–42. DOI: 10.1109/MMAR.2017.8046794 | **全文読了**。諸元・既定PIDゲイン表・**電池電圧低下の補償式(5)を明示**。教育プラットフォーム論文の代表。保持精度の定量値なし |
+| giernacki2017 | W. Giernacki et al.: Crazyflie 2.0 quadrotor as a platform for research and education in robotics and control engineering, Proc. MMAR 2017, pp.37–42. DOI: 10.1109/MMAR.2017.8046794 | **全文読了**。諸元（**総重量27g**と本文に明記——2026-08-02全文読了時に確認、原稿表1のCrazyflie質量の根拠）・既定PIDゲイン表・**電池電圧低下の補償式(5)を明示**。教育プラットフォーム論文の代表。保持精度の定量値なし。MMARの開催回次（22nd等）は未検証のため書誌に含めない |
 | greiff2017 | M. Greiff: Modelling and Control of the Crazyflie Quadrotor for Aggressive and Autonomous Flight by Optical Flow Driven State Estimation, MSc Thesis, Lund Univ., TFRT-6026, 2017 | **全文読了**。設計手順の体系的記述（モデル→制御→スカラー更新EKF→実機）。PWM-推力比の電池依存を明記。フロー静止ドリフトの理論・実験。高度推定std≈1.6cm等 |
 | eschmann2024 | J. Eschmann, D. Albani, G. Loianno: Data-Driven System Identification of Quadrotors Subject to Motor Delays, arXiv:2404.07837 | 該当箇所読了。CF2.1のモータ時定数 T_m=0.072s（公式実測≈0.073s・Förster 0.065sと3者近接）。モータ個別推力曲線に言及 |
 | mueller2017 | M. W. Mueller, M. Hehn, R. D'Andrea: Covariance Correction Step for Kalman Filtering with an Attitude, J. Guidance, Control, and Dynamics, Vol.40, No.9, pp.2301–2306, 2017 | **アブストのみ（本文ペイウォール）**。Crazyflie公式EKFの理論基盤。引用前に本文入手推奨 |
