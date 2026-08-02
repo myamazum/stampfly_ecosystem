@@ -182,7 +182,7 @@ def make_fig1():
     ax.axvspan(band_lo, K_HI, facecolor="0.90", edgecolor="0.55",
                hatch="////", linewidth=0.0, zorder=0)
     ax.text((band_lo + K_HI) / 2, -0.10,
-            "NEW: pole fit\nunavailable\n(strongly stable)",
+            "NEW: pole fit\nunavailable\n(fast decay)",
             ha="center", va="center", fontsize=6.8, color="0.25", zorder=4,
             bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="0.55", lw=0.5, alpha=0.85))
 
