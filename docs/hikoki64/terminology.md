@@ -40,6 +40,20 @@
 | （取りやめ）ohtaki2014 | 大滝・岩倉・野波: オプティカルフローセンサを用いたUAVの飛行制御, ROBOMECH2014, 2A2-C02. DOI: 10.1299/jsmermd.2014._2a2-c02_1 | 全文確認の結果**閉ループ未実装(速度推定のVICON検証のみ)・機体約2kg級**のため1章引用を取りやめ(2026-08-01)。kendoul2009に差し替え |
 
 **国内文献に関する注意（2026-08-01調査）**: 日本単独グループの「フロー閉ループ+実飛行」査読文献は未発見（熊本大2021系はシミュレーションのみの疑い）。関連研究で国内実証に言及する場合は「国内グループによる」(kendoul2009)の表現に留める。調査時取得のPDF一次資料はセッションのscratchpad配下に保存（grabe2012.pdf等）。
+
+## Crazyflie 系文献（2026-08-02 徹底調査・確認レベル付き）
+
+| ラベル | 書誌 | 確認レベル・内容 |
+|--------|------|-----------------|
+| forster2015 | J. Förster: System Identification of the Crazyflie 2.0 Nano Quadrocopter, Bachelor Thesis, ETH Zurich, 2015. DOI: 10.3929/ethz-b-000214143 | **全文読了（147頁）**。質量28.0g・慣性行列・推力/トルク写像・モータ離散伝達関数・抗力3モデルを単一個体で同定。パラメータ開示論文の模範。4基間個体差・フロー・サグ・保持精度の言及なし |
+| giernacki2017 | W. Giernacki et al.: Crazyflie 2.0 quadrotor as a platform for research and education in robotics and control engineering, Proc. MMAR 2017, pp.37–42. DOI: 10.1109/MMAR.2017.8046794 | **全文読了**。諸元・既定PIDゲイン表・**電池サグ補償式(5)を明示**。教育プラットフォーム論文の代表。保持精度の定量値なし |
+| greiff2017 | M. Greiff: Modelling and Control of the Crazyflie Quadrotor for Aggressive and Autonomous Flight by Optical Flow Driven State Estimation, MSc Thesis, Lund Univ., TFRT-6026, 2017 | **全文読了**。設計手順の体系的記述（モデル→制御→スカラー更新EKF→実機）。PWM-推力比の電池依存を明記。フロー静止ドリフトの理論・実験。高度推定std≈1.6cm等 |
+| eschmann2024 | J. Eschmann, D. Albani, G. Loianno: Data-Driven System Identification of Quadrotors Subject to Motor Delays, arXiv:2404.07837 | 該当箇所読了。CF2.1のモータ時定数 T_m=0.072s（公式実測≈0.073s・Förster 0.065sと3者近接）。モータ個別推力曲線に言及 |
+| mueller2017 | M. W. Mueller, M. Hehn, R. D'Andrea: Covariance Correction Step for Kalman Filtering with an Attitude, J. Guidance, Control, and Dynamics, Vol.40, No.9, pp.2301–2306, 2017 | **アブストのみ（本文ペイウォール）**。Crazyflie公式EKFの理論基盤。引用前に本文入手推奨 |
+| crazysim2024 | C. Llanes et al.: CrazySim: A Software-in-the-Loop Simulator for the Crazyflie Nano Quadrotor, Proc. IEEE ICRA 2024 | 本文未確認（GitHub README・公式ブログ確認）。**「SIL用改造ファームであり実機書込禁止」とREADME明記**＝Code Identity SILSではない。SILS章の差別化の根拠 |
+| — | Bitcraze 公式ブログ・文書群（サグ補償2025/10、フロー床面条件、EKF supervisor 等） | 直接確認済み。困難B.1-B.5の既報の一次情報源。URL引用の形式は要検討 |
+
+**帰結**: 小型機の困難（モータ個体差・電池サグ・フロー床面依存・遅れ・EKF工夫）は全て Crazyflie 系で既報 → 論文では「発見」と書かず対応付けで引用。Crazyflie に**実機同一ソースの決定論的SILSは無い**（公式discussion #995で非サポート明言）。**xy閉ループ位置保持精度の公表値も見当たらない**（±6〜7cmの報告自体に資料価値）。
 | — | StampFly を扱った学術文献 | **未発見**（2026-08-01時点）→「著者の知る限り先行学術報告は見当たらない」と書ける |
 
 ## 未検証・保留
