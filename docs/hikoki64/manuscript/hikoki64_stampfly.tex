@@ -27,6 +27,8 @@
 %         ダミー本文「、。」は執筆時に置換。見本PDFの句読点と最終照合）
 %     [ ] 専門用語は docs/hikoki64/terminology.md の検証済みリストに従う。
 %         新出用語は使用前に J-STAGE 等で慣用を検証してリストに追記
+%     [ ] 最終ページを1行も空けずに埋める（著者方針 2026-08-02）。調整レバー:
+%         文献の増強（検証済み候補: herisse2012/grabe2012等）、3章の拡張（〜2.0p）
 %==============================================================================
 \documentclass[a4paper,twocolumn,10pt]{ltjsarticle}
 
@@ -84,8 +86,7 @@
 
     \vspace{1\baselineskip}
     % ---- 著者名（題目から2行送り）・所属は著者名の後に括弧書き ----------------
-    % TODO: 実名・所属を確定稿までに記入する
-    {\large 著者名（要記入）　（所属・要記入）}
+    {\large 伊藤　恒平　（金沢工業大学）}
 
     \vspace{1\baselineskip}
     % ---- 英文題目（和文著者名から2行送り） ------------------------------------
@@ -94,8 +95,7 @@
 
     \vspace{0.5\baselineskip}
     % ---- 英文著者名（英文題目の下） -------------------------------------------
-    % TODO: 所属の英文表記を確定稿までに記入する
-    Kouhei Ito\ （所属・英文要記入）
+    Kouhei Ito (Kanazawa Institute of Technology)
 
     \vspace{1\baselineskip}
     % ---- Key Words（英文著者名から2行送り、3〜5語） ---------------------------
@@ -109,19 +109,20 @@
 
   \vspace{0.3\baselineskip}
   \noindent
-  % TODO: 英文Abstractの仮文章（5〜6行）。確定稿までに精査・置き換える。
-  % 骨子: 37g機StampFlyのGPS不使用・屋内位置制御、実機飛行ログからの実効ゲイン欠損の
-  %       定量同定、変動域に対するロバスト再設計、実機検証±6-7cmという計画の要旨を反映。
-  TODO: This paper reports on GPS-denied indoor position control of the 37\,g palm-sized
-  quadrotor StampFly using optical flow and time-of-flight ranging. Although the position
-  control cascade was validated in a software-in-the-loop (SIL) simulation, the real
-  vehicle diverged in flight. We quantitatively identify the effective tilt-to-velocity
-  gain deficit from flight logs and attribute it to reduced torque authority and
-  underestimated optical-flow velocity. Based on the identified gain variation range, we
-  redesign the position control cascade for robustness and verify the result on real
-  hardware, achieving a hold accuracy of approximately $\pm$6--7\,cm. We further close the
-  causal loop by re-injecting the identified gain into the SIL plant model, reproducing
-  the divergence and confirming stability of the redesigned gains. (TODO: 要精査・要短縮)
+  % 英文Abstract（v3方針: 初の文書化+設計手順+発散と再設計+小型機の困難。
+  % SIL再現の主張なし・数値は検証済みのもののみ。著者推敲待ち）
+  This paper presents the first academic report on StampFly, a 37\,g palm-sized
+  quadrotor developed by the author, documenting its position control system:
+  the identified physical parameters, the design procedure of the cascaded PID
+  controller with an error-state Kalman filter, and the software-in-the-loop
+  simulation (SILS) that executes the unmodified flight code deterministically.
+  Although the controller passed SILS verification, the first flight diverged
+  within about 15\,s. Identification from flight data revealed that the
+  effective tilt-to-velocity gain was only about 40\% of the ideal value;
+  redesigning the outer loops to be robust over the identified variation range
+  achieved stable position hold of several centimeters, maintained over 24
+  subsequent flights. Difficulties specific to small vehicles are reported
+  with references to the Crazyflie literature.
 
   \vspace{1\baselineskip}
 }]
